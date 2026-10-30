@@ -170,7 +170,7 @@ Don't use `sudo`. The installer:
 - creates the `kid` and `grownup` playlist folders
 - writes the launch agent with your home folder filled in, checks it, and starts it
 
-It starts again by itself at every login. Run the installer again after any change to the script or schedule; it replaces the running copy.
+It starts again by itself at every login. Run the installer again after any change to the script or schedule. It restarts the running copy with the new version; videos and any override are kept.
 
 ### 3. Add the videos
 
@@ -367,7 +367,8 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/`. See [Upgrading](#upgrading-from-the-single-video-version) |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
 | TV turns itself off in the evening | Disable the TV's auto power-off (see above) |
-| `Bootstrap failed` or "already loaded" | Run `bash scheduler/install.sh` again. It stops the old copy first |
+| `Bootstrap failed: 5: Input/output error` | An older installer started the new copy before the old one had stopped. `git pull` and run `bash scheduler/install.sh` again |
+| Installer says `still loaded after 10 seconds` | macOS didn't release the old copy. Log out and back in; the scheduler starts by itself at login |
 
 ## Files
 
