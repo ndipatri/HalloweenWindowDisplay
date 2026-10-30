@@ -335,11 +335,26 @@ function keepPlaying(playlist) {
     const file = nextFile(files, playlist.lastQueued);
     const url = $.NSURL.fileURLWithPath(playlist.folder + '/' + file);
     const item = $.NSClassFromString('AVPlayerItem').playerItemWithURL(url);
-    playlist.player.insertItemAfterItem(item, null);
+    appendToQueue(playlist.player, item);
     playlist.lastQueued = file;
     queued++;
   }
   return true;
+}
+
+// Adds an item to the end of the player's queue.
+// Don't use insertItem:afterItem: with null to mean "at the end": the
+// JavaScript bridge passes null as an NSNull object, not nil, and
+// AVFoundation crashes on it ("-[NSNull _nameForLogging]: unrecognized
+// selector"). Insert after the actual last item, or, when the queue is empty,
+// make the item the current one.
+function appendToQueue(player, item) {
+  const items = player.items;
+  if (items.count === 0) {
+    player.replaceCurrentItemWithPlayerItem(item);
+  } else {
+    player.insertItemAfterItem(item, items.lastObject);
+  }
 }
 
 function listVideos(folder) {
@@ -442,8 +457,19 @@ function isControlC(event) {
   );
 }
 
+let portraitMissing = null;
+
 function keepOnPortraitScreen(app, window) {
   const screen = portraitScreen();
+  if (portraitMissing !== !screen) {
+    portraitMissing = !screen;
+    log(
+      screen
+        ? 'Using the portrait display.'
+        : 'No portrait display found: is the TV connected, and rotated to ' +
+            'portrait in System Settings > Displays?',
+    );
+  }
   if (!screen) {
     if (window.isVisible) window.orderOut(null);
     return;
