@@ -8,14 +8,31 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 **Contents**
 
-1. [How it works](#how-it-works)
-2. [What you need](#what-you-need)
-3. [Make the video](#make-the-video)
-4. [Set up the Mac](#set-up-the-mac)
-5. [Set up the window](#set-up-the-window)
-6. [Day-to-day](#day-to-day)
-7. [Troubleshooting](#troubleshooting)
-8. [Files](#files)
+1. [Quick start](#quick-start)
+2. [How it works](#how-it-works)
+3. [What you need](#what-you-need)
+4. [Make the video](#make-the-video)
+5. [Set up the Mac](#set-up-the-mac)
+6. [Set up the window](#set-up-the-window)
+7. [Day-to-day](#day-to-day)
+8. [Upgrading from the single-video version](#upgrading-from-the-single-video-version)
+9. [Troubleshooting](#troubleshooting)
+10. [Files](#files)
+
+## Quick start
+
+If you already have your videos, this is the whole Mac setup. Run it in Terminal, without `sudo`:
+
+```sh
+git clone https://github.com/ndipatri/HalloweenWindowDisplay.git
+cd HalloweenWindowDisplay
+bash scheduler/install.sh                                  # creates ~/video-scheduler/kid and grownup
+cp haunted_window_loop.mp4 ~/video-scheduler/grownup/      # scary videos
+cp friendly-ghost.mp4 ~/video-scheduler/kid/               # gentler videos
+tail -f ~/video-scheduler/scheduler.log                    # watch it pick them up
+```
+
+Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule).
 
 ## How it works
 
@@ -112,34 +129,7 @@ The output is 1080 × 1920 H.264, silent, about 28 MB. To change the look, edit 
 
 ## Set up the Mac
 
-### 1. Put the videos in place
-
-Each playlist is a folder in `~/video-scheduler/`:
-
-```
-~/video-scheduler/
-├── kid/        played during 'kid' periods
-│   ├── 1-friendly-ghost.mp4
-│   └── 2-pumpkin.mp4
-└── grownup/    played during 'grownup' periods
-    └── haunted_window_loop.mp4
-```
-
-```sh
-mkdir -p ~/video-scheduler/kid ~/video-scheduler/grownup
-cp haunted_window_loop.mp4 ~/video-scheduler/grownup/
-```
-
-- Videos play one after another, then start over from the first. Order is by file name, with numbers sorted as numbers (`2-…` before `10-…`), so a number prefix controls the order.
-- `.mp4`, `.m4v` and `.mov` files are played; anything else in the folder is ignored.
-- Videos you add or remove are picked up as the playlist moves on, without a restart.
-- A playlist with a single video simply loops it.
-- An empty folder shows black during its periods.
-
-> [!IMPORTANT]
-> Keep `~/video-scheduler` out of **Desktop**, **Documents** and **Downloads**. macOS protects those folders, and a background script can be silently refused access. It works when you test from Terminal, then shows only black after a restart.
-
-### 2. Set the schedule
+### 1. Set the schedule
 
 Edit `CONFIG.schedule` near the top of `scheduler/video_scheduler.js`. Each period has a start and stop time in 24-hour `HH:MM` and the `playlist` to play.
 
@@ -151,27 +141,76 @@ schedule: [
 ],
 ```
 
+This is the default: gentler videos in the early morning and during trick-or-treating, scarier ones once the little kids are home. Adjust the times to your street.
+
 - Outside these times the screen shows black.
 - Periods can cross midnight (`{ start: '23:00', stop: '01:00', playlist: 'grownup' }`). If periods overlap, the first one listed wins.
 - Each playlist resumes where it left off. Above, the evening `kid` period carries on from where the morning one stopped.
 - `playlist` is just a folder name, so you can add more playlists by creating another folder and naming it in the schedule.
 - A malformed entry is skipped and reported in the log.
 
-### 3. Test it (optional)
+You can change the schedule any time later; run the installer again afterwards.
 
-```sh
-osascript -l JavaScript scheduler/video_scheduler.js
-```
-
-It plays only during scheduled hours; otherwise you'll see black. Press **Control-C** to quit; if nothing happens, click the screen first. If the scheduler is already installed, stop it first (see [Day-to-day](#day-to-day)) so two copies don't fight over the screen.
-
-### 4. Install
+### 2. Install
 
 ```sh
 bash scheduler/install.sh
 ```
 
-Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, creates the `kid` and `grownup` folders, writes the launch agent with your home folder filled in, checks it, and starts it. Run it again after any change to the script or schedule.
+Don't use `sudo`. The installer:
+
+- copies the script to `~/video-scheduler/`
+- creates the `kid` and `grownup` playlist folders
+- writes the launch agent with your home folder filled in, checks it, and starts it
+
+It starts again by itself at every login. Run the installer again after any change to the script or schedule; it replaces the running copy.
+
+### 3. Add the videos
+
+Each playlist is a folder in `~/video-scheduler/`:
+
+```
+~/video-scheduler/
+├── video_scheduler.js
+├── scheduler.log
+├── kid/        played during 'kid' periods
+│   ├── 1-friendly-ghost.mp4
+│   └── 2-pumpkin.mp4
+└── grownup/    played during 'grownup' periods
+    └── haunted_window_loop.mp4
+```
+
+```sh
+cp haunted_window_loop.mp4 ~/video-scheduler/grownup/
+cp friendly-ghost.mp4 ~/video-scheduler/kid/
+```
+
+- Videos play one after another, then start over from the first. Order is by file name, with numbers sorted as numbers (`2-…` before `10-…`), so a number prefix controls the order.
+- `.mp4`, `.m4v` and `.mov` files are played; anything else in the folder is ignored.
+- New videos are picked up within a few seconds, and videos you add or remove later are picked up as the playlist moves on. No restart needed.
+- A playlist with a single video simply loops it.
+- An empty folder shows black during its periods, so fill both before Halloween night.
+
+> [!IMPORTANT]
+> Keep `~/video-scheduler` out of **Desktop**, **Documents** and **Downloads**. macOS protects those folders, and a background script can be silently refused access. Copy the videos *into* `~/video-scheduler`; don't leave them on the Desktop and link to them.
+
+### 4. Check it's working
+
+```sh
+tail -f ~/video-scheduler/scheduler.log
+```
+
+During a scheduled period you should see lines like:
+
+```
+10/31/2026, 5:00:00 PM  Period started: kid
+10/31/2026, 5:00:01 PM  kid: playing 1-friendly-ghost.mp4
+10/31/2026, 5:01:12 PM  kid: playing 2-pumpkin.mp4
+```
+
+Outside the schedule it logs `Outside schedule: showing black.` Press Control-C to stop watching the log; the scheduler keeps running.
+
+To try a playlist right now without waiting, temporarily add a period covering the current time, run the installer, and remove it again afterwards.
 
 ### 5. macOS settings
 
@@ -196,11 +235,24 @@ Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, creat
 |---|---|
 | Add, remove or reorder videos | Change the files in `~/video-scheduler/kid` or `grownup`. No restart needed |
 | Change the schedule | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
+| Get the latest version of this repo | `git pull`, then `bash scheduler/install.sh` |
 | Restart | `launchctl kickstart -k gui/$(id -u)/com.user.videoscheduler` |
 | Stop | `launchctl bootout gui/$(id -u)/com.user.videoscheduler` (starts again at next login) |
 | Remove for good | Stop it, then `rm ~/Library/LaunchAgents/com.user.videoscheduler.plist` |
 | Quit right now | Control-C on the display (click it first). Stays off until the next login or restart |
 | See what it's doing | `cat ~/video-scheduler/scheduler.log` |
+
+## Upgrading from the single-video version
+
+The first version played one file, `~/video-scheduler/current.mp4`, and its schedule entries had no `playlist`. To move to playlists:
+
+```sh
+git pull
+bash scheduler/install.sh                                         # installs the new script, creates kid/ and grownup/
+mv ~/video-scheduler/current.mp4 ~/video-scheduler/grownup/haunted_window_loop.mp4
+```
+
+Then add videos to `kid/`. If you had edited the schedule, re-apply your times in the new format (each entry needs a `playlist`) and run the installer again. Old-style entries without a `playlist` are skipped and reported in the log, not guessed at.
 
 ## Troubleshooting
 
@@ -213,7 +265,7 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records each perio
 | Log says `Skipping …` | That file is damaged or in a format macOS can't play. Re-export it as H.264 MP4; the others keep playing |
 | Black screen, log says `playing …` | Check the TV's input and brightness, and that the curtain isn't too thick |
 | Log says `Ignoring schedule entry` | Fix that entry: times must be `HH:MM` and it needs a `playlist` |
-| Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/` |
+| Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/`. See [Upgrading](#upgrading-from-the-single-video-version) |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
 | TV turns itself off in the evening | Disable the TV's auto power-off (see above) |
 | `Bootstrap failed` or "already loaded" | Run `bash scheduler/install.sh` again. It stops the old copy first |
