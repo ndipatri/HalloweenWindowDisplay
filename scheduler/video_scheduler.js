@@ -23,6 +23,11 @@ const CONFIG = {
   checkSeconds: 1,
 };
 
+// Written by the `show` command to override the schedule; checked every second.
+const OVERRIDE_PATH = CONFIG.videoRoot + '/override.json';
+// One line saying what's on screen and why; `show` prints it.
+const STATUS_PATH = CONFIG.videoRoot + '/status';
+
 const ITEM_FAILED = 2;
 const PLAYER_FAILED = 2;
 // Videos queued ahead of time, so one follows the next without a gap.
@@ -41,13 +46,22 @@ function main() {
   log('Started. Videos: ' + CONFIG.videoRoot);
 
   const playlists = {};
+  const overrideState = { warnedText: null };
   let activeName;
   let active = null;
+  let status = null;
 
   while (true) {
     keepOnPortraitScreen(app, window);
 
-    const name = activePlaylistName(schedule, new Date());
+    const choice = whatToShow(schedule, new Date(), overrideState);
+    if (choice.status !== status) {
+      status = choice.status;
+      log('Now showing: ' + status);
+      writeText(STATUS_PATH, status + '\n');
+    }
+
+    const name = choice.playlist;
     if (name !== activeName) {
       if (active) active.player.pause;
       activeName = name;
@@ -55,10 +69,8 @@ function main() {
         if (!playlists[name]) playlists[name] = createPlaylist(name);
         active = playlists[name];
         view.player = active.player;
-        log('Period started: ' + name);
       } else {
         active = null;
-        log('Outside schedule: showing black.');
       }
     }
 
@@ -117,6 +129,132 @@ function activePlaylistName(schedule, now) {
 function toMinutes(hhmm) {
   const [hours, minutes] = hhmm.split(':').map(Number);
   return hours * 60 + minutes;
+}
+
+// When the schedule next shows something different from what it shows at
+// `from`, to the minute. null if it never changes.
+function nextScheduleChange(schedule, from) {
+  const current = activePlaylistName(schedule, from);
+  const t = new Date(from.getTime());
+  t.setSeconds(0, 0);
+  for (let i = 0; i < 24 * 60; i++) {
+    t.setMinutes(t.getMinutes() + 1);
+    if (activePlaylistName(schedule, t) !== current) return new Date(t.getTime());
+  }
+  return null;
+}
+
+// ---------- What to show: override or schedule ----------
+
+// Returns { playlist, status }: the playlist to play (null = black) and a
+// one-line description of what's showing and why.
+function whatToShow(schedule, now, overrideState) {
+  const override = currentOverride(schedule, now, overrideState);
+  if (override) {
+    return {
+      playlist: override.playlist,
+      status: describe(override.playlist) + ' (override ' + override.until + ')',
+    };
+  }
+  const playlist = activePlaylistName(schedule, now);
+  const change = nextScheduleChange(schedule, now);
+  const until = change ? 'until ' + formatTime(change, now) : 'all day';
+  return {
+    playlist,
+    status: playlist
+      ? playlist + ' (scheduled ' + until + ')'
+      : 'black (outside schedule ' + until + ')',
+  };
+}
+
+function describe(playlist) {
+  return playlist === null ? 'black' : playlist;
+}
+
+// Reads the override file. Ends an override whose time is up by deleting
+// the file. Returns { playlist, until } while one is in force, else null.
+function currentOverride(schedule, now, state) {
+  const text = readText(OVERRIDE_PATH);
+  if (text === null) return null;
+
+  const parsed = parseOverride(text);
+  if (!parsed.ok) {
+    if (state.warnedText !== text) {
+      state.warnedText = text;
+      log('ERROR: Ignoring ' + OVERRIDE_PATH + ': ' + parsed.error);
+    }
+    return null;
+  }
+
+  const decision = decideOverride(parsed.value, schedule, now);
+  if (!decision.active) {
+    // Only delete it if `show` hasn't just replaced it with a new one.
+    if (readText(OVERRIDE_PATH) === text) removeFile(OVERRIDE_PATH);
+    log('Override of ' + describe(parsed.value.playlist) + ' ended: ' + decision.reason + '.');
+    return null;
+  }
+  return {
+    playlist: parsed.value.playlist,
+    until: decision.endsAt
+      ? (decision.atScheduleChange ? 'until the schedule changes at ' : 'until ') +
+        formatTime(decision.endsAt, now)
+      : 'until cleared',
+  };
+}
+
+// Override file, as written by `show`:
+//   { "playlist": "grownup" | null, "setAt": <ms>, "expires": <ms> | null,
+//     "untilCleared": true | false }
+// playlist null means black. With no `expires` and untilCleared false, the
+// override lasts until the schedule next changes after `setAt`.
+function parseOverride(text) {
+  let o;
+  try {
+    o = JSON.parse(text);
+  } catch (e) {
+    return { ok: false, error: 'not valid JSON' };
+  }
+  if (o === null || typeof o !== 'object') return { ok: false, error: 'not an object' };
+  const playlistOk =
+    o.playlist === null ||
+    (typeof o.playlist === 'string' && o.playlist.length > 0 && !o.playlist.includes('/'));
+  if (!playlistOk) return { ok: false, error: 'bad "playlist"' };
+  if (typeof o.setAt !== 'number') return { ok: false, error: 'bad "setAt"' };
+  if (o.expires !== null && o.expires !== undefined && typeof o.expires !== 'number') {
+    return { ok: false, error: 'bad "expires"' };
+  }
+  return {
+    ok: true,
+    value: {
+      playlist: o.playlist,
+      setAt: o.setAt,
+      expires: typeof o.expires === 'number' ? o.expires : null,
+      untilCleared: o.untilCleared === true,
+    },
+  };
+}
+
+// { active: true, endsAt: Date | null, atScheduleChange } or
+// { active: false, reason }.
+function decideOverride(o, schedule, now) {
+  if (o.untilCleared) return { active: true, endsAt: null, atScheduleChange: false };
+  if (o.expires !== null) {
+    return now.getTime() >= o.expires
+      ? { active: false, reason: 'time is up' }
+      : { active: true, endsAt: new Date(o.expires), atScheduleChange: false };
+  }
+  const change = nextScheduleChange(schedule, new Date(o.setAt));
+  if (change === null) return { active: true, endsAt: null, atScheduleChange: false };
+  return now.getTime() >= change.getTime()
+    ? { active: false, reason: 'the schedule changed' }
+    : { active: true, endsAt: change, atScheduleChange: true };
+}
+
+// "8:00 PM", or "Sat 8:00 PM" when it isn't today.
+function formatTime(date, now) {
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return time;
+  return date.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + time;
 }
 
 // ---------- Playlists ----------
@@ -236,6 +374,25 @@ function fileName(item) {
 
 function errorText(error) {
   return error.isNil() ? 'unknown reason' : ObjC.unwrap(error.localizedDescription);
+}
+
+// ---------- Files ----------
+
+function readText(path) {
+  const text = $.NSString.stringWithContentsOfFileEncodingError(
+    path,
+    $.NSUTF8StringEncoding,
+    null,
+  );
+  return text.isNil() ? null : ObjC.unwrap(text);
+}
+
+function writeText(path, text) {
+  $(text).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null);
+}
+
+function removeFile(path) {
+  $.NSFileManager.defaultManager.removeItemAtPathError(path, null);
 }
 
 // ---------- Logging ----------
