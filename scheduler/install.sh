@@ -16,6 +16,8 @@ domain="gui/$(id -u)"
 
 mkdir -p "$dest/kid" "$dest/grownup" "$HOME/Library/LaunchAgents"
 cp "$here/video_scheduler.js" "$dest/"
+cp "$here/show.sh" "$dest/show"
+chmod 755 "$dest/show"
 sed "s#__HOME__#$HOME#g" "$here/$label.plist" > "$plist"
 chmod 644 "$plist"
 plutil -lint "$plist"
@@ -29,6 +31,12 @@ echo "Put videos in:"
 echo "  $dest/kid"
 echo "  $dest/grownup"
 echo "They're picked up within a few seconds; no restart needed."
+echo
+echo "Override the schedule with: $dest/show"
+if ! grep -qs "video-scheduler/show" "$HOME/.zshrc"; then
+  echo "To type just 'show', run this once and open a new Terminal window:"
+  echo "  echo \"alias show='$dest/show'\" >> ~/.zshrc"
+fi
 if [ -f "$dest/current.mp4" ]; then
   echo
   echo "Note: $dest/current.mp4 is no longer used."

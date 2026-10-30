@@ -14,10 +14,11 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 4. [Make the video](#make-the-video)
 5. [Set up the Mac](#set-up-the-mac)
 6. [Set up the window](#set-up-the-window)
-7. [Day-to-day](#day-to-day)
-8. [Upgrading from the single-video version](#upgrading-from-the-single-video-version)
-9. [Troubleshooting](#troubleshooting)
-10. [Files](#files)
+7. [Override the schedule](#override-the-schedule)
+8. [Day-to-day](#day-to-day)
+9. [Upgrading from the single-video version](#upgrading-from-the-single-video-version)
+10. [Troubleshooting](#troubleshooting)
+11. [Files](#files)
 
 ## Quick start
 
@@ -29,10 +30,10 @@ cd HalloweenWindowDisplay
 bash scheduler/install.sh                                  # creates ~/video-scheduler/kid and grownup
 cp haunted_window_loop.mp4 ~/video-scheduler/grownup/      # scary videos
 cp friendly-ghost.mp4 ~/video-scheduler/kid/               # gentler videos
-tail -f ~/video-scheduler/scheduler.log                    # watch it pick them up
+~/video-scheduler/show kid 5                               # try it now: kid for 5 minutes
 ```
 
-Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule).
+Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule). To play something outside the schedule, see [Override the schedule](#override-the-schedule).
 
 ## How it works
 
@@ -49,12 +50,18 @@ flowchart TB
 
   subgraph mac["2 · Mac (runs at every login)"]
     launchd["launchd agent<br/>starts it, restarts it if it crashes"] --> caff["caffeinate<br/>keeps the Mac and display awake"]
-    caff --> sched["video_scheduler.js<br/>checks the schedule every second"]
+    caff --> sched["video_scheduler.js<br/>checks schedule and override every second"]
     folders[("~/video-scheduler/<br/>kid/ · grownup/")] --> sched
+    show["show command<br/>show grownup 30 · show schedule"] -- "writes" --> override[("override.json")]
+    override --> sched
+    sched -- "writes" --> status[("status")]
+    status -. "reads" .-> show
     sched -- "play / pause" --> queue["AVQueuePlayer<br/>one per playlist, cycles its folder"]
     sched -- "show / hide" --> win["Full-screen black window<br/>on the portrait display"]
     queue --> win
   end
+
+  phone["iPhone Shortcut<br/>Run Script over SSH"] -- "Wi-Fi" --> show
 
   subgraph room["3 · The window"]
     tv["Portrait TV (1080 × 1920)"] --> curtain["Sheer curtain"] --> street(("Street"))
@@ -69,7 +76,7 @@ flowchart TB
 Two halves:
 
 - **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 4 min 20 s loop that is mostly an empty dark window.
-- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
+- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. A `show` command overrides the schedule, from the Mac or from your phone. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
 
 ## What you need
 
@@ -159,7 +166,7 @@ bash scheduler/install.sh
 
 Don't use `sudo`. The installer:
 
-- copies the script to `~/video-scheduler/`
+- copies the script and the [`show` command](#override-the-schedule) to `~/video-scheduler/`
 - creates the `kid` and `grownup` playlist folders
 - writes the launch agent with your home folder filled in, checks it, and starts it
 
@@ -172,7 +179,9 @@ Each playlist is a folder in `~/video-scheduler/`:
 ```
 ~/video-scheduler/
 ├── video_scheduler.js
+├── show                 override command
 ├── scheduler.log
+├── status               what's on screen now (written by the scheduler)
 ├── kid/        played during 'kid' periods
 │   ├── 1-friendly-ghost.mp4
 │   └── 2-pumpkin.mp4
@@ -200,17 +209,22 @@ cp friendly-ghost.mp4 ~/video-scheduler/kid/
 tail -f ~/video-scheduler/scheduler.log
 ```
 
-During a scheduled period you should see lines like:
+You should see lines like:
 
 ```
-10/31/2026, 5:00:00 PM  Period started: kid
+10/31/2026, 5:00:00 PM  Now showing: kid (scheduled until 8:00 PM)
 10/31/2026, 5:00:01 PM  kid: playing 1-friendly-ghost.mp4
 10/31/2026, 5:01:12 PM  kid: playing 2-pumpkin.mp4
+10/31/2026, 8:00:00 PM  Now showing: grownup (scheduled until 11:00 PM)
 ```
 
-Outside the schedule it logs `Outside schedule: showing black.` Press Control-C to stop watching the log; the scheduler keeps running.
+Outside the schedule it logs, for example, `Now showing: black (outside schedule until 5:00 PM)`. Press Control-C to stop watching the log; the scheduler keeps running.
 
-To try a playlist right now without waiting, temporarily add a period covering the current time, run the installer, and remove it again afterwards.
+To see a playlist right now without waiting for its time, override the schedule for a few minutes:
+
+```sh
+~/video-scheduler/show kid 5
+```
 
 ### 5. macOS settings
 
@@ -229,10 +243,90 @@ To try a playlist right now without waiting, temporarily add a period covering t
 - **Turn off the TV's auto power-off.** Many TVs switch themselves off after about 4 hours without a remote button press. Look for "Auto Power Off", "Eco" or "4-hour off" in the TV's settings.
 - Check it from the street after dark and adjust.
 
+## Override the schedule
+
+The `show` command plays something other than what the schedule says, right now. The scheduler picks it up within a second; there's nothing to restart.
+
+```sh
+show                           # what's on screen now, and why
+show grownup 30                # grownup for 30 minutes, then back to the schedule
+show kid                       # kid until the schedule next changes
+show off                       # black until the schedule next changes
+show grownup --until-cleared   # grownup until you say otherwise
+show schedule                  # cancel any override; follow the schedule
+```
+
+```
+$ show grownup 30
+Showing grownup until 6:42 PM, then back to the schedule.
+Now showing: grownup (override until 6:42 PM)
+```
+
+How long an override lasts:
+
+| You type | It lasts until |
+|---|---|
+| `show grownup 30` | 30 minutes from now |
+| `show grownup` | The schedule next changes. At 6 pm during `kid` (5–8 pm), that's 8 pm, when `grownup` starts anyway. Outside the schedule, it's the start of the next period |
+| `show grownup --until-cleared` | You run `show schedule`, however long that is |
+
+Overrides end by themselves unless you ask otherwise. That way a forgotten override can't leave the scary videos on at 7 am. An override survives a restart of the Mac, and each playlist still resumes where it left off.
+
+`show` lives at `~/video-scheduler/show`. To type just `show`, add an alias once, then open a new Terminal window:
+
+```sh
+echo "alias show='$HOME/video-scheduler/show'" >> ~/.zshrc
+```
+
+Any playlist folder works: `show halloween-party 60` plays `~/video-scheduler/halloween-party/`.
+
+### From your phone
+
+The Mac is in a dark room behind the TV, so the handiest remote is your iPhone. The Shortcuts app can run `show` on the Mac over your home Wi-Fi. You don't need to install anything.
+
+**On the Mac**
+
+1. Open System Settings → General → Sharing, and turn on **Remote Login**.
+2. Click the **ⓘ** next to it and set "Allow access for" to **Only these users**, with just your account.
+3. Note the address shown there, for example `ssh alex@Alexs-Mac-mini.local`. You need the user name (`alex`) and host (`Alexs-Mac-mini.local`).
+
+**On the iPhone**, once per button:
+
+1. Open **Shortcuts**, tap **+**, then **Add Action**, and search for **Run Script over SSH**.
+2. Fill in:
+   - **Script:** `~/video-scheduler/show grownup 30`. Use the full path; the `show` alias doesn't apply over SSH.
+   - **Host:** `Alexs-Mac-mini.local`
+   - **User:** `alex`
+   - **Authentication:** Password, or SSH Key (see below)
+3. Add a **Show Result** action after it, so you see what `show` replied.
+4. Name the shortcut (for example "Ghost: scary 30 min"), then use **Add to Home Screen** from the share menu.
+
+A useful set of buttons:
+
+| Shortcut | Script |
+|---|---|
+| Ghost: scary 30 min | `~/video-scheduler/show grownup 30` |
+| Ghost: kids 30 min | `~/video-scheduler/show kid 30` |
+| Ghost: off | `~/video-scheduler/show off` |
+| Ghost: back to schedule | `~/video-scheduler/show schedule` |
+| Ghost: what's on? | `~/video-scheduler/show` |
+
+You can also run them with Siri: "Hey Siri, Ghost off."
+
+> [!TIP]
+> **Use an SSH key instead of storing your Mac password.** In the Run Script over SSH action, set Authentication to **SSH Key**, tap the key to generate one, then tap **Share Public Key** and choose **Copy**. With Universal Clipboard (same Apple Account, Bluetooth and Wi-Fi on), it's now on the Mac's clipboard too; otherwise AirDrop or email it to yourself and copy it there. Then on the Mac, add it to `~/.ssh/authorized_keys`:
+> ```sh
+> mkdir -p ~/.ssh && chmod 700 ~/.ssh
+> pbpaste >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+> ```
+> Remote Login lets anyone on your network try to log in to the Mac with your account. Use a strong password, and consider turning Remote Login off again after Halloween.
+
 ## Day-to-day
 
 | Task | How |
 |---|---|
+| Play something else right now | `show grownup 30`, `show off`, `show schedule` (see [Override the schedule](#override-the-schedule)) |
+| See what's on screen | `show` |
 | Add, remove or reorder videos | Change the files in `~/video-scheduler/kid` or `grownup`. No restart needed |
 | Change the schedule | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
 | Get the latest version of this repo | `git pull`, then `bash scheduler/install.sh` |
@@ -256,7 +350,7 @@ Then add videos to `kid/`. If you had edited the schedule, re-apply your times i
 
 ## Troubleshooting
 
-Start with the log: `cat ~/video-scheduler/scheduler.log`. It records each period starting and stopping, each video as it starts, and any problem with a folder or file.
+Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's showing and why whenever that changes, each video as it starts, overrides starting and ending, and any problem with a folder or file. For just the current state, run `show`.
 
 | Problem | Fix |
 |---|---|
@@ -264,6 +358,11 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records each perio
 | Log says `No videos in …` | Add `.mp4`, `.m4v` or `.mov` files to that folder. They start within a few seconds |
 | Log says `Skipping …` | That file is damaged or in a format macOS can't play. Re-export it as H.264 MP4; the others keep playing |
 | Black screen, log says `playing …` | Check the TV's input and brightness, and that the curtain isn't too thick |
+| Screen isn't following the schedule | An override is probably in force. Run `show` to check, `show schedule` to cancel it |
+| `show` says `No status yet` | The scheduler isn't running, or hasn't started since the upgrade. Run `bash scheduler/install.sh` |
+| Log says `Ignoring …/override.json` | The override file was edited by hand and is malformed. Run `show schedule` to delete it |
+| iPhone shortcut fails to connect | Check Remote Login is on, the phone is on your home Wi-Fi (not cellular), and the host and user match the Sharing settings. Try the Mac's IP address instead of its `.local` name |
+| iPhone shortcut says `show: not found` | Use the full path, `~/video-scheduler/show` |
 | Log says `Ignoring schedule entry` | Fix that entry: times must be `HH:MM` and it needs a `playlist` |
 | Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/`. See [Upgrading](#upgrading-from-the-single-video-version) |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
@@ -276,6 +375,7 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records each perio
 |---|---|
 | `scheduler/video_scheduler.js` | Plays the scheduled playlist full-screen on the portrait display |
 | `scheduler/com.user.videoscheduler.plist` | Launch agent template: starts the script at login and restarts it if it crashes |
+| `scheduler/show.sh` | The `show` command for overriding the schedule (installed as `~/video-scheduler/show`) |
 | `scheduler/install.sh` | Installs or updates the scheduler for the current user |
 | `video/build_loop.sh` | Builds the 4:20 loop from the two generated clips |
 | `docs/images/` | Frames and diagrams used in this guide |
