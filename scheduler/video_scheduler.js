@@ -6,82 +6,256 @@ ObjC.import('stdlib');
 const HOME = ObjC.unwrap($.NSHomeDirectory());
 
 const CONFIG = {
-  // Keep the video out of Desktop, Documents and Downloads. macOS can silently
-  // block a background script from reading those folders.
-  videoPath: HOME + '/video-scheduler/current.mp4',
+  // Each playlist is a folder in here, e.g. ~/video-scheduler/kid and
+  // ~/video-scheduler/grownup. Keep it out of Desktop, Documents and
+  // Downloads: macOS can silently block a background script from reading them.
+  videoRoot: HOME + '/video-scheduler',
+
+  // 24-hour HH:MM times. `playlist` is the folder to play during that period.
+  // Periods can cross midnight. If periods overlap, the first one listed wins.
   schedule: [
-    { start: '05:00', stop: '07:00' },
-    { start: '17:00', stop: '23:00' },
+    { start: '05:00', stop: '07:00', playlist: 'kid' },
+    { start: '17:00', stop: '20:00', playlist: 'kid' },
+    { start: '20:00', stop: '23:00', playlist: 'grownup' },
   ],
-  checkSeconds: 5,
+
+  videoExtensions: ['mp4', 'm4v', 'mov'],
+  checkSeconds: 1,
 };
 
-const PLAYER_ITEM_FAILED = 2;
+const ITEM_FAILED = 2;
+const PLAYER_FAILED = 2;
+// Videos queued ahead of time, so one follows the next without a gap.
+const QUEUE_AHEAD = 3;
 
 function main() {
   const app = $.NSApplication.sharedApplication;
   app.setActivationPolicy($.NSApplicationActivationPolicyAccessory);
 
   const window = createBlackWindow();
+  const view = createPlayerView();
+  window.contentView.addSubview(view);
   $.NSCursor.hide;
-  log('Started. Video: ' + CONFIG.videoPath);
 
-  let video = null;
-  let warnedMissing = false;
-  let playing = null;
+  const schedule = validSchedule(CONFIG.schedule);
+  log('Started. Videos: ' + CONFIG.videoRoot);
+
+  const playlists = {};
+  let activeName;
+  let active = null;
 
   while (true) {
     keepOnPortraitScreen(app, window);
 
-    if (!video) {
-      if (isReadable(CONFIG.videoPath)) {
-        video = createLoopingPlayer(CONFIG.videoPath);
-        window.contentView.addSubview(video.view);
-        playing = null;
-        log('Video loaded.');
-      } else if (!warnedMissing) {
-        warnedMissing = true;
-        log(
-          'ERROR: Cannot read ' + CONFIG.videoPath +
-          '. Check the file exists there. Showing black until it does.',
-        );
+    const name = activePlaylistName(schedule, new Date());
+    if (name !== activeName) {
+      if (active) active.player.pause;
+      activeName = name;
+      if (name) {
+        if (!playlists[name]) playlists[name] = createPlaylist(name);
+        active = playlists[name];
+        view.player = active.player;
+        log('Period started: ' + name);
+      } else {
+        active = null;
+        log('Outside schedule: showing black.');
       }
     }
 
-    if (video) {
-      const shouldPlay = isWithinPlayWindow(new Date());
-      if (shouldPlay !== playing) {
-        playing = shouldPlay;
-        video.view.hidden = !shouldPlay;
-        shouldPlay ? video.player.play : video.player.pause;
-        log(shouldPlay ? 'Playing.' : 'Paused (outside schedule).');
+    if (active) {
+      const hasVideo = keepPlaying(active);
+      if (active.replacedPlayer) {
+        active.replacedPlayer = false;
+        view.player = active.player;
       }
-      reportPlaybackFailure(video);
+      view.hidden = !hasVideo;
+      if (hasVideo && active.player.rate === 0) active.player.play;
+    } else {
+      view.hidden = true;
     }
 
     handleEventsFor(app, CONFIG.checkSeconds);
   }
 }
 
+// ---------- Schedule ----------
+
+function validSchedule(periods) {
+  return periods.filter((period, i) => {
+    const ok =
+      isTime(period.start) &&
+      isTime(period.stop) &&
+      typeof period.playlist === 'string' &&
+      period.playlist.length > 0 &&
+      !period.playlist.includes('/');
+    if (!ok) {
+      log(
+        'ERROR: Ignoring schedule entry ' + (i + 1) + ': ' + JSON.stringify(period) +
+        ". Expected { start: 'HH:MM', stop: 'HH:MM', playlist: 'kid' }.",
+      );
+    }
+    return ok;
+  });
+}
+
+function isTime(value) {
+  return typeof value === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function activePlaylistName(schedule, now) {
+  const current = now.getHours() * 60 + now.getMinutes();
+  const period = schedule.find((p) => {
+    const start = toMinutes(p.start);
+    const stop = toMinutes(p.stop);
+    return start <= stop
+      ? current >= start && current < stop
+      : current >= start || current < stop;
+  });
+  return period ? period.playlist : null;
+}
+
+function toMinutes(hhmm) {
+  const [hours, minutes] = hhmm.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// ---------- Playlists ----------
+
+function createPlaylist(name) {
+  return {
+    name,
+    folder: CONFIG.videoRoot + '/' + name,
+    player: newQueuePlayer(),
+    replacedPlayer: false,
+    lastQueued: null,
+    nowPlaying: null,
+    warnings: {},
+  };
+}
+
+function newQueuePlayer() {
+  return $.NSClassFromString('AVQueuePlayer').alloc.init;
+}
+
+// Keeps the playlist's queue topped up, cycling through its folder in name
+// order. Re-reads the folder each time, so added or removed videos are picked
+// up without a restart. Returns whether there is anything to show.
+function keepPlaying(playlist) {
+  if (playlist.player.status === PLAYER_FAILED) {
+    log(
+      'ERROR: The ' + playlist.name + ' player stopped working (' +
+      errorText(playlist.player.error) + '). Starting a new one.',
+    );
+    playlist.player = newQueuePlayer();
+    playlist.replacedPlayer = true;
+    playlist.nowPlaying = null;
+  }
+
+  const current = playlist.player.currentItem;
+  if (!current.isNil() && current.status === ITEM_FAILED) {
+    warnOnce(
+      playlist,
+      'bad:' + fileName(current),
+      'ERROR: Skipping ' + fileName(current) + ' in ' + playlist.name + ': ' +
+        errorText(current.error),
+    );
+    playlist.player.advanceToNextItem;
+  }
+
+  const playing = playlist.player.currentItem;
+  const playingName = playing.isNil() ? null : fileName(playing);
+  if (playingName && playingName !== playlist.nowPlaying) {
+    log(playlist.name + ': playing ' + playingName);
+  }
+  playlist.nowPlaying = playingName;
+
+  let queued = playlist.player.items.count;
+  if (queued >= QUEUE_AHEAD) return true;
+
+  const files = listVideos(playlist.folder);
+  if (files === null) {
+    warnOnce(
+      playlist,
+      'missing',
+      'ERROR: Cannot read the folder ' + playlist.folder +
+        '. Create it, and keep it out of Desktop, Documents and Downloads.',
+    );
+    return queued > 0;
+  }
+  clearWarning(playlist, 'missing');
+  if (files.length === 0) {
+    warnOnce(
+      playlist,
+      'empty',
+      'No videos in ' + playlist.folder + ' yet. Showing black until one is added.',
+    );
+    return queued > 0;
+  }
+  clearWarning(playlist, 'empty');
+
+  while (queued < QUEUE_AHEAD) {
+    const file = nextFile(files, playlist.lastQueued);
+    const url = $.NSURL.fileURLWithPath(playlist.folder + '/' + file);
+    const item = $.NSClassFromString('AVPlayerItem').playerItemWithURL(url);
+    playlist.player.insertItemAfterItem(item, null);
+    playlist.lastQueued = file;
+    queued++;
+  }
+  return true;
+}
+
+function listVideos(folder) {
+  const contents = $.NSFileManager.defaultManager.contentsOfDirectoryAtPathError(
+    folder,
+    null,
+  );
+  if (contents.isNil()) return null;
+  return ObjC.deepUnwrap(contents).filter(isVideoFile).sort(compareNames);
+}
+
+function isVideoFile(name) {
+  if (name.startsWith('.') || !name.includes('.')) return false;
+  const extension = name.split('.').pop().toLowerCase();
+  return CONFIG.videoExtensions.includes(extension);
+}
+
+// Name order, with numbers compared as numbers: 2-ghost.mp4 before 10-hand.mp4.
+function compareNames(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+// The file after `last` in name order, wrapping round to the first.
+function nextFile(files, last) {
+  if (last === null) return files[0];
+  return files.find((file) => compareNames(file, last) > 0) || files[0];
+}
+
+function fileName(item) {
+  return ObjC.unwrap(item.asset.URL.lastPathComponent);
+}
+
+function errorText(error) {
+  return error.isNil() ? 'unknown reason' : ObjC.unwrap(error.localizedDescription);
+}
+
+// ---------- Logging ----------
+
 function log(message) {
   // osascript sends console.log to stderr, which the launch agent saves to a file.
   console.log(new Date().toLocaleString() + '  ' + message);
 }
 
-function isReadable(path) {
-  return $.NSFileManager.defaultManager.isReadableFileAtPath(path);
+function warnOnce(playlist, key, message) {
+  if (playlist.warnings[key]) return;
+  playlist.warnings[key] = true;
+  log(message);
 }
 
-function reportPlaybackFailure(video) {
-  if (video.failed) return;
-  const item = video.player.currentItem;
-  if (item.isNil() || item.status !== PLAYER_ITEM_FAILED) return;
-  video.failed = true;
-  const reason = item.error.isNil()
-    ? 'unknown reason'
-    : ObjC.unwrap(item.error.localizedDescription);
-  log('ERROR: The video file could not be played: ' + reason);
+function clearWarning(playlist, key) {
+  delete playlist.warnings[key];
 }
+
+// ---------- Window and display ----------
 
 function handleEventsFor(app, seconds) {
   const until = $.NSDate.dateWithTimeIntervalSinceNow(seconds);
@@ -170,39 +344,15 @@ function createBlackWindow() {
   return window;
 }
 
-function createLoopingPlayer(path) {
-  const url = $.NSURL.fileURLWithPath(path);
-  const item = $.NSClassFromString('AVPlayerItem').playerItemWithURL(url);
-  const player = $.NSClassFromString('AVQueuePlayer').alloc.init;
-  const looper = $.NSClassFromString('AVPlayerLooper')
-    .playerLooperWithPlayerTemplateItem(player, item);
-
+function createPlayerView() {
   const view = $.NSClassFromString('AVPlayerView').alloc.initWithFrame(
     $.NSMakeRect(0, 0, 1080, 1920),
   );
   view.autoresizingMask = $.NSViewWidthSizable | $.NSViewHeightSizable;
-  view.player = player;
   view.controlsStyle = 0;
   view.videoGravity = 'AVLayerVideoGravityResizeAspect';
   view.hidden = true;
-
-  return { player, looper, view, failed: false };
-}
-
-function isWithinPlayWindow(now) {
-  const current = now.getHours() * 60 + now.getMinutes();
-  return CONFIG.schedule.some((period) => {
-    const start = toMinutes(period.start);
-    const stop = toMinutes(period.stop);
-    return start <= stop
-      ? current >= start && current < stop
-      : current >= start || current < stop;
-  });
-}
-
-function toMinutes(hhmm) {
-  const [hours, minutes] = hhmm.split(':').map(Number);
-  return hours * 60 + minutes;
+  return view;
 }
 
 main();
