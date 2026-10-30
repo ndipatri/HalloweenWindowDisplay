@@ -12,7 +12,7 @@ set -euo pipefail
 
 walk="${1:?usage: build_loop.sh walk.mp4 hand.mp4 [output.mp4]}"
 hand="${2:?usage: build_loop.sh walk.mp4 hand.mp4 [output.mp4]}"
-out="${3:-current.mp4}"
+out="${3:-haunted_window_loop.mp4}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

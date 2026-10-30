@@ -2,7 +2,7 @@
 
 A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. Most of the time the window is just dark, so people who catch her aren't sure what they saw.
 
-It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays an AI-generated video on a schedule.
+It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
 
 <p align="center"><img src="docs/images/hero.jpg" width="300" alt="Dark silhouette of a woman with her palm pressed against the glass"></p>
 
@@ -27,22 +27,23 @@ flowchart TB
     hf --> hand["hand.mp4 (12 s)"]
     walk --> build["build_loop.sh (ffmpeg)<br/>lower 20% · flicker · glitch · black gaps"]
     hand --> build
-    build --> video["current.mp4 (4:20 loop)"]
+    build --> video["haunted_window_loop.mp4 (4:20)"]
   end
 
   subgraph mac["2 · Mac (runs at every login)"]
     launchd["launchd agent<br/>starts it, restarts it if it crashes"] --> caff["caffeinate<br/>keeps the Mac and display awake"]
-    caff --> sched["video_scheduler.js<br/>checks the schedule every 5 s"]
-    sched -- "play / pause" --> looper["AVPlayerLooper<br/>gapless loop"]
+    caff --> sched["video_scheduler.js<br/>checks the schedule every second"]
+    folders[("~/video-scheduler/<br/>kid/ · grownup/")] --> sched
+    sched -- "play / pause" --> queue["AVQueuePlayer<br/>one per playlist, cycles its folder"]
     sched -- "show / hide" --> win["Full-screen black window<br/>on the portrait display"]
-    looper --> win
+    queue --> win
   end
 
   subgraph room["3 · The window"]
     tv["Portrait TV (1080 × 1920)"] --> curtain["Sheer curtain"] --> street(("Street"))
   end
 
-  video -- "copy to ~/video-scheduler/" --> looper
+  video -- "copy into kid/ or grownup/" --> folders
   win -- "HDMI" --> tv
 ```
 
@@ -51,14 +52,14 @@ flowchart TB
 Two halves:
 
 - **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 4 min 20 s loop that is mostly an empty dark window.
-- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window, plays the loop during the scheduled hours, and shows plain black the rest of the time. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
+- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
 
 ## What you need
 
 - A TV or monitor that can stand vertically (this build uses 1080 × 1920).
 - A Mac connected to it over HDMI. Any Mac that runs a recent macOS works.
 - A sheer white or grey curtain for the window.
-- To make or change the video: a [Higgsfield](https://higgsfield.ai) account (about 512 credits for the two clips) and ffmpeg (`brew install ffmpeg`). Skip this if you already have `current.mp4`.
+- To make or change the video: a [Higgsfield](https://higgsfield.ai) account (about 512 credits for the two clips) and ffmpeg (`brew install ffmpeg`). Skip this if you already have your videos.
 
 ## Make the video
 
@@ -88,7 +89,7 @@ What made the prompts work:
 ### 2. Build the loop
 
 ```sh
-bash video/build_loop.sh walk.mp4 hand.mp4 current.mp4
+bash video/build_loop.sh walk.mp4 hand.mp4 haunted_window_loop.mp4
 ```
 
 This takes a few minutes and does four things.
@@ -111,28 +112,50 @@ The output is 1080 × 1920 H.264, silent, about 28 MB. To change the look, edit 
 
 ## Set up the Mac
 
-### 1. Put the video in place
+### 1. Put the videos in place
 
-```sh
-mkdir -p ~/video-scheduler
-cp current.mp4 ~/video-scheduler/current.mp4
+Each playlist is a folder in `~/video-scheduler/`:
+
+```
+~/video-scheduler/
+├── kid/        played during 'kid' periods
+│   ├── 1-friendly-ghost.mp4
+│   └── 2-pumpkin.mp4
+└── grownup/    played during 'grownup' periods
+    └── haunted_window_loop.mp4
 ```
 
+```sh
+mkdir -p ~/video-scheduler/kid ~/video-scheduler/grownup
+cp haunted_window_loop.mp4 ~/video-scheduler/grownup/
+```
+
+- Videos play one after another, then start over from the first. Order is by file name, with numbers sorted as numbers (`2-…` before `10-…`), so a number prefix controls the order.
+- `.mp4`, `.m4v` and `.mov` files are played; anything else in the folder is ignored.
+- Videos you add or remove are picked up as the playlist moves on, without a restart.
+- A playlist with a single video simply loops it.
+- An empty folder shows black during its periods.
+
 > [!IMPORTANT]
-> Keep the video out of **Desktop**, **Documents** and **Downloads**. macOS protects those folders, and a background script can be silently refused access. It works when you test from Terminal, then shows only black after a restart.
+> Keep `~/video-scheduler` out of **Desktop**, **Documents** and **Downloads**. macOS protects those folders, and a background script can be silently refused access. It works when you test from Terminal, then shows only black after a restart.
 
 ### 2. Set the schedule
 
-Edit `CONFIG.schedule` near the top of `scheduler/video_scheduler.js`. Use 24-hour `HH:MM` times. Periods can cross midnight (`{ start: '23:00', stop: '01:00' }`).
+Edit `CONFIG.schedule` near the top of `scheduler/video_scheduler.js`. Each period has a start and stop time in 24-hour `HH:MM` and the `playlist` to play.
 
 ```js
 schedule: [
-  { start: '05:00', stop: '07:00' },
-  { start: '17:00', stop: '23:00' },
+  { start: '05:00', stop: '07:00', playlist: 'kid' },
+  { start: '17:00', stop: '20:00', playlist: 'kid' },
+  { start: '20:00', stop: '23:00', playlist: 'grownup' },
 ],
 ```
 
-Outside these times the screen shows black. Each period picks up the video where the last one paused.
+- Outside these times the screen shows black.
+- Periods can cross midnight (`{ start: '23:00', stop: '01:00', playlist: 'grownup' }`). If periods overlap, the first one listed wins.
+- Each playlist resumes where it left off. Above, the evening `kid` period carries on from where the morning one stopped.
+- `playlist` is just a folder name, so you can add more playlists by creating another folder and naming it in the schedule.
+- A malformed entry is skipped and reported in the log.
 
 ### 3. Test it (optional)
 
@@ -148,7 +171,7 @@ It plays only during scheduled hours; otherwise you'll see black. Press **Contro
 bash scheduler/install.sh
 ```
 
-Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, writes the launch agent with your home folder filled in, checks it, and starts it. Run it again after any change to the script or schedule.
+Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, creates the `kid` and `grownup` folders, writes the launch agent with your home folder filled in, checks it, and starts it. Run it again after any change to the script or schedule.
 
 ### 5. macOS settings
 
@@ -171,7 +194,7 @@ Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, write
 
 | Task | How |
 |---|---|
-| Change the video | Replace `~/video-scheduler/current.mp4`, then restart |
+| Add, remove or reorder videos | Change the files in `~/video-scheduler/kid` or `grownup`. No restart needed |
 | Change the schedule | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
 | Restart | `launchctl kickstart -k gui/$(id -u)/com.user.videoscheduler` |
 | Stop | `launchctl bootout gui/$(id -u)/com.user.videoscheduler` (starts again at next login) |
@@ -181,13 +204,16 @@ Don't use `sudo`. The installer copies the script to `~/video-scheduler/`, write
 
 ## Troubleshooting
 
-Start with the log: `cat ~/video-scheduler/scheduler.log`. It records when the scheduler starts, plays and pauses, and any problem with the video.
+Start with the log: `cat ~/video-scheduler/scheduler.log`. It records each period starting and stopping, each video as it starts, and any problem with a folder or file.
 
 | Problem | Fix |
 |---|---|
-| Log says `Cannot read …/current.mp4` | The video isn't at that path, or it's in a protected folder. Copy it to `~/video-scheduler/current.mp4`. It starts within a few seconds |
-| Log says `could not be played` | The file is damaged or in a format macOS can't play. Re-export as H.264 MP4 |
-| Black screen, log says `Playing.` | Check the TV's input and brightness, and that the curtain isn't too thick |
+| Log says `Cannot read the folder …` | The playlist folder doesn't exist, is misspelled in the schedule, or is in a protected folder. Run `bash scheduler/install.sh` to create `kid` and `grownup` |
+| Log says `No videos in …` | Add `.mp4`, `.m4v` or `.mov` files to that folder. They start within a few seconds |
+| Log says `Skipping …` | That file is damaged or in a format macOS can't play. Re-export it as H.264 MP4; the others keep playing |
+| Black screen, log says `playing …` | Check the TV's input and brightness, and that the curtain isn't too thick |
+| Log says `Ignoring schedule entry` | Fix that entry: times must be `HH:MM` and it needs a `playlist` |
+| Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/` |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
 | TV turns itself off in the evening | Disable the TV's auto power-off (see above) |
 | `Bootstrap failed` or "already loaded" | Run `bash scheduler/install.sh` again. It stops the old copy first |
@@ -196,7 +222,7 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records when the s
 
 | Path | What it is |
 |---|---|
-| `scheduler/video_scheduler.js` | Plays the video full-screen on the portrait display, on a schedule |
+| `scheduler/video_scheduler.js` | Plays the scheduled playlist full-screen on the portrait display |
 | `scheduler/com.user.videoscheduler.plist` | Launch agent template: starts the script at login and restarts it if it crashes |
 | `scheduler/install.sh` | Installs or updates the scheduler for the current user |
 | `video/build_loop.sh` | Builds the 4:20 loop from the two generated clips |
