@@ -60,12 +60,11 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 |---|---|---|
 | `kid` | `fuzzy_creatures.mp4`: a gang of shaggy, googly-eyed fuzzy creatures runs around the room, then crowds the window, faces pressed to the glass | 0:20 |
 | `kid` | `mochi_ghost_dog.mp4`: Mochi, a real fluffy white dog, trots up to the window and turns into a friendly ghost-dog with glowing green eyes and little horns, then floats away | 0:20 |
-| `kid` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
 | `grownup` | `jump_scare.mp4`: a pale, gaunt figure stands motionless far back in the dark for a long moment, then suddenly charges and slams against the glass, its hollow-eyed, screaming face filling the window. No blood | 0:20 |
 | `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
 | `grownup` | `fuzzy_creatures.mp4`: the same fuzzy creatures | 0:20 |
 | `grownup` | `mochi_ghost_dog.mp4`: the same Mochi | 0:20 |
-| `grownup` | `lady_silouette_long.mp4`: the same woman | 1:33 |
+| `grownup` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
 
 They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, Mochi and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes.
 
@@ -189,7 +188,8 @@ The videos are kept in this repo, one folder per playlist, and copied to the Mac
 ```
 HalloweenWindowDisplay/playlists/        in the repo: the master copy
 ├── kid/                                 played during 'kid' periods
-│   └── lady_silouette_long.mp4
+│   ├── fuzzy_creatures.mp4
+│   └── mochi_ghost_dog.mp4
 └── grownup/                             played during 'grownup' periods
     ├── big_green_monster.mp4
     └── lady_silouette_long.mp4
