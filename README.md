@@ -54,6 +54,7 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 | `kid` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
 | `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
 | `grownup` | `fuzzy_creatures.mp4`: the same fuzzy creatures | 0:20 |
+| `grownup` | `mochi_ghost_dog.mp4`: the same Mochi | 0:20 |
 | `grownup` | `lady_silouette_long.mp4`: the same woman | 1:33 |
 
 They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures and Mochi fill the whole frame.
