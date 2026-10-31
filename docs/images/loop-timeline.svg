@@ -1,45 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 236" width="1000" height="236" font-family="Helvetica, Arial, sans-serif">
 <rect width="1000" height="236" fill="#141414"/>
-<text x="40" y="34" fill="#eeeeee" font-size="18" font-weight="700">The 4:20 loop: mostly an empty window</text>
-<rect x="40.0" y="150" width="88.4" height="44" fill="#262626"/>
-<rect x="128.4" y="150" width="70.9" height="44" fill="#d4a72c"/>
-<rect x="199.3" y="150" width="141.5" height="44" fill="#262626"/>
-<rect x="340.8" y="150" width="3.0" height="44" fill="#a78bfa"/>
-<rect x="342.3" y="150" width="106.1" height="44" fill="#262626"/>
-<rect x="448.4" y="150" width="42.6" height="44" fill="#d9534f"/>
-<rect x="491.0" y="150" width="123.8" height="44" fill="#262626"/>
-<rect x="614.8" y="150" width="3.0" height="44" fill="#a78bfa"/>
-<rect x="616.3" y="150" width="70.7" height="44" fill="#262626"/>
-<rect x="687.1" y="150" width="70.9" height="44" fill="#4fb3b5"/>
-<rect x="757.9" y="150" width="106.1" height="44" fill="#262626"/>
-<rect x="864.1" y="150" width="42.6" height="44" fill="#d9534f"/>
-<rect x="906.7" y="150" width="53.3" height="44" fill="#262626"/>
-<line x1="163.9" y1="142" x2="163.9" y2="150" stroke="#d4a72c" stroke-width="1.5"/>
-<text x="163.9" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Walk past</text>
-<text x="163.9" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:25</text>
-<line x1="341.6" y1="92" x2="341.6" y2="150" stroke="#a78bfa" stroke-width="1.5"/>
-<text x="341.6" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Glitch</text>
-<text x="341.6" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">1:25</text>
-<line x1="469.7" y1="142" x2="469.7" y2="150" stroke="#d9534f" stroke-width="1.5"/>
-<text x="469.7" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Hand on glass</text>
-<text x="469.7" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">1:55</text>
-<line x1="615.6" y1="92" x2="615.6" y2="150" stroke="#a78bfa" stroke-width="1.5"/>
-<text x="615.6" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Glitch</text>
-<text x="615.6" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">2:42</text>
-<line x1="722.5" y1="142" x2="722.5" y2="150" stroke="#4fb3b5" stroke-width="1.5"/>
-<text x="722.5" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Walk, reversed</text>
-<text x="722.5" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">3:03</text>
-<line x1="885.4" y1="92" x2="885.4" y2="150" stroke="#d9534f" stroke-width="1.5"/>
-<text x="885.4" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Hand on glass</text>
-<text x="885.4" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">3:53</text>
+<text x="40" y="34" fill="#eeeeee" font-size="18" font-weight="700">The 1:33 loop: she keeps coming back</text>
+<rect x="40.0" y="150" width="19.8" height="44" fill="#262626"/>
+<rect x="59.8" y="150" width="198.1" height="44" fill="#d4a72c"/>
+<rect x="257.8" y="150" width="49.4" height="44" fill="#262626"/>
+<rect x="307.3" y="150" width="4.5" height="44" fill="#a78bfa"/>
+<rect x="311.8" y="150" width="39.5" height="44" fill="#262626"/>
+<rect x="351.3" y="150" width="119.0" height="44" fill="#d9534f"/>
+<rect x="470.3" y="150" width="59.3" height="44" fill="#262626"/>
+<rect x="529.7" y="150" width="4.5" height="44" fill="#a78bfa"/>
+<rect x="534.2" y="150" width="29.7" height="44" fill="#262626"/>
+<rect x="563.9" y="150" width="198.1" height="44" fill="#4fb3b5"/>
+<rect x="761.9" y="150" width="49.4" height="44" fill="#262626"/>
+<rect x="811.3" y="150" width="119.0" height="44" fill="#d9534f"/>
+<rect x="930.3" y="150" width="29.7" height="44" fill="#262626"/>
+<line x1="158.8" y1="142" x2="158.8" y2="150" stroke="#d4a72c" stroke-width="1.5"/>
+<text x="158.8" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Walk past</text>
+<text x="158.8" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:02</text>
+<line x1="309.5" y1="92" x2="309.5" y2="150" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="309.5" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Glitch</text>
+<text x="309.5" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:27</text>
+<line x1="410.8" y1="142" x2="410.8" y2="150" stroke="#d9534f" stroke-width="1.5"/>
+<text x="410.8" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Hand on glass</text>
+<text x="410.8" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:32</text>
+<line x1="531.9" y1="92" x2="531.9" y2="150" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="531.9" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Glitch</text>
+<text x="531.9" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:50</text>
+<line x1="662.9" y1="142" x2="662.9" y2="150" stroke="#4fb3b5" stroke-width="1.5"/>
+<text x="662.9" y="122" fill="#eeeeee" font-size="14" text-anchor="middle">Walk, reversed</text>
+<text x="662.9" y="139" fill="#9a9a9a" font-size="12.5" text-anchor="middle">0:53</text>
+<line x1="870.8" y1="92" x2="870.8" y2="150" stroke="#d9534f" stroke-width="1.5"/>
+<text x="870.8" y="72" fill="#eeeeee" font-size="14" text-anchor="middle">Hand on glass</text>
+<text x="870.8" y="89" fill="#9a9a9a" font-size="12.5" text-anchor="middle">1:18</text>
 <text x="40.0" y="214" fill="#777" font-size="11" text-anchor="middle">0:00</text>
-<text x="146.1" y="214" fill="#777" font-size="11" text-anchor="middle">0:30</text>
-<text x="252.2" y="214" fill="#777" font-size="11" text-anchor="middle">1:00</text>
-<text x="358.4" y="214" fill="#777" font-size="11" text-anchor="middle">1:30</text>
-<text x="464.5" y="214" fill="#777" font-size="11" text-anchor="middle">2:00</text>
-<text x="570.6" y="214" fill="#777" font-size="11" text-anchor="middle">2:30</text>
-<text x="676.7" y="214" fill="#777" font-size="11" text-anchor="middle">3:00</text>
-<text x="782.8" y="214" fill="#777" font-size="11" text-anchor="middle">3:30</text>
-<text x="889.0" y="214" fill="#777" font-size="11" text-anchor="middle">4:00</text>
-<rect x="40" y="178" width="0" height="0"/>
+<text x="188.3" y="214" fill="#777" font-size="11" text-anchor="middle">0:15</text>
+<text x="336.5" y="214" fill="#777" font-size="11" text-anchor="middle">0:30</text>
+<text x="484.8" y="214" fill="#777" font-size="11" text-anchor="middle">0:45</text>
+<text x="633.0" y="214" fill="#777" font-size="11" text-anchor="middle">1:00</text>
+<text x="781.3" y="214" fill="#777" font-size="11" text-anchor="middle">1:15</text>
+<text x="929.6" y="214" fill="#777" font-size="11" text-anchor="middle">1:30</text>
 </svg>

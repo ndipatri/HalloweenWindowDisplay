@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the 4 min 20 s haunted-window loop from the two AI-generated clips.
+# Builds the 1 min 33 s haunted-window loop from the two AI-generated clips.
 #
 #   bash video/build_loop.sh walk.mp4 hand.mp4 [output.mp4]
 #
@@ -12,7 +12,7 @@ set -euo pipefail
 
 walk="${1:?usage: build_loop.sh walk.mp4 hand.mp4 [output.mp4]}"
 hand="${2:?usage: build_loop.sh walk.mp4 hand.mp4 [output.mp4]}"
-out="${3:-haunted_window_loop.mp4}"
+out="${3:-lady_silouette_long.mp4}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -37,26 +37,27 @@ ffmpeg -v error -y -ss 9 -i "$walk" -frames:v 1 \
 ffmpeg -v error -y -loop 1 -i "$work/glitch.png" -t 0.42 -vf "eq=brightness=-0.03" \
   "${ENC[@]}" "$work/glitch.mp4"
 
-for s in 15 20 25 30 35 40; do
+for s in 2 3 4 5 6; do
   ffmpeg -v error -y -f lavfi -i "color=black:s=1080x1920:r=24" -t "$s" \
     "${ENC[@]}" "$work/black$s.mp4"
 done
 
-# Mostly empty window, with six appearances spread out.
+# Six appearances with short, uneven gaps of empty window between them
+# (2-6 s, plus the black each clip starts and ends with).
 cat > "$work/list.txt" <<EOF
-file black25.mp4
+file black2.mp4
 file walk.mp4
-file black40.mp4
+file black5.mp4
 file glitch.mp4
-file black30.mp4
+file black4.mp4
 file hand.mp4
-file black35.mp4
+file black6.mp4
 file glitch.mp4
-file black20.mp4
+file black3.mp4
 file reverse.mp4
-file black30.mp4
+file black5.mp4
 file hand.mp4
-file black15.mp4
+file black3.mp4
 EOF
 
 echo "Joining..."

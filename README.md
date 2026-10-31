@@ -43,7 +43,7 @@ flowchart TB
     hf --> hand["hand.mp4 (12 s)"]
     walk --> build["build_loop.sh (ffmpeg)<br/>lower 20% · flicker · glitch · black gaps"]
     hand --> build
-    build --> video["haunted_window_loop.mp4 (4:20)"]
+    build --> video["lady_silouette_long.mp4 (1:33)"]
   end
 
   subgraph mac["2 · Mac (runs at every login)"]
@@ -78,7 +78,7 @@ flowchart TB
 
 Two halves:
 
-- **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 4 min 20 s loop that is mostly an empty dark window.
+- **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 1 min 33 s loop: she appears, vanishes for a few seconds, and appears again.
 - **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. The videos live in this repo; at every login the Mac pulls the latest and copies them into its playlist folders. A `show` command overrides the schedule, from the Mac or from your phone. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
 
 ## What you need
@@ -116,7 +116,7 @@ What made the prompts work:
 ### 2. Build the loop
 
 ```sh
-bash video/build_loop.sh walk.mp4 hand.mp4 haunted_window_loop.mp4
+bash video/build_loop.sh walk.mp4 hand.mp4 lady_silouette_long.mp4
 ```
 
 This takes a few minutes and does four things.
@@ -131,9 +131,9 @@ This takes a few minutes and does four things.
 
 <img src="docs/images/glitch-flash.jpg" width="440" alt="A normal frame next to the glitch frame">
 
-**Spaces everything out with black.** The window is empty about three-quarters of the time. One of her appearances is the walk clip played backwards, so her movement looks subtly wrong.
+**Spaces everything out with black.** Between appearances the window is empty for a few seconds, never more than about 9, and the gaps are uneven so it doesn't feel mechanical. (An earlier 4:20 version left up to 40 seconds of dead space; that turned out to be too much.) One of her appearances is the walk clip played backwards, so her movement looks subtly wrong.
 
-![Timeline of the 4:20 loop showing six short appearances separated by long black gaps](docs/images/loop-timeline.svg)
+![Timeline of the 1:33 loop showing six appearances separated by short black gaps](docs/images/loop-timeline.svg)
 
 The output is 1080 × 1920 H.264, silent, about 28 MB. To change the look, edit `SHIFT`, `FLICKER` or the playlist near the bottom of the script.
 
@@ -185,11 +185,10 @@ The videos are kept in this repo, one folder per playlist, and copied to the Mac
 ```
 HalloweenWindowDisplay/playlists/        in the repo: the master copy
 ├── kid/                                 played during 'kid' periods
-│   ├── 1-friendly-ghost.mp4
-│   └── 2-pumpkin.mp4
+│   └── lady_silouette_long.mp4
 └── grownup/                             played during 'grownup' periods
-    ├── haunted_window_loop.mp4
-    └── neon_monster.mp4
+    ├── big_green_monster.mp4
+    └── lady_silouette_long.mp4
 
 ~/video-scheduler/                       on the Mac: what actually plays
 ├── kid/ · grownup/                      copies of the playlists above
@@ -411,5 +410,5 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | `scheduler/sync_videos.sh` | Pulls the repo and copies `playlists/` into `~/video-scheduler` (installed as `~/video-scheduler/sync`) |
 | `scheduler/install.sh` | Installs or updates the scheduler for the current user |
 | `playlists/` | The videos, one folder per playlist |
-| `video/build_loop.sh` | Builds the 4:20 loop from the two generated clips |
+| `video/build_loop.sh` | Builds the 1:33 loop from the two generated clips |
 | `docs/images/` | Frames and diagrams used in this guide |
