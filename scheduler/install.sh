@@ -39,10 +39,23 @@ trap 'rm -f "$new_plist"' EXIT
 sed "s#__HOME__#$HOME#g" "$here/$label.plist" > "$new_plist"
 plutil -lint "$new_plist" >/dev/null
 
+repo="$(cd "$here/.." && pwd)"
+case "$repo" in
+  "$HOME/Desktop"* | "$HOME/Documents"* | "$HOME/Downloads"*)
+    echo "Warning: this repo is in a folder macOS protects ($repo)." >&2
+    echo "The scheduler may not be allowed to read it at login, so videos won't sync." >&2
+    echo "Move it, e.g. to ~/HalloweenWindowDisplay, and run this again." >&2
+    ;;
+esac
+
 mkdir -p "$dest/kid" "$dest/grownup" "$HOME/Library/LaunchAgents"
 cp "$here/video_scheduler.js" "$dest/"
 cp "$here/show.sh" "$dest/show"
-chmod 755 "$dest/show"
+cp "$here/start.sh" "$dest/start"
+sed "s#__REPO__#$repo#g" "$here/sync_videos.sh" > "$dest/sync"
+chmod 755 "$dest/show" "$dest/start" "$dest/sync"
+# Sync now (not only at the next login), since the user is here to see it.
+rm -f "$dest/.last-sync"
 
 if is_loaded && cmp -s "$new_plist" "$plist"; then
   # Same launch settings, so the job definition stays loaded and only the
@@ -64,10 +77,8 @@ else
 fi
 
 echo "Installed. Log: $dest/scheduler.log"
-echo "Put videos in:"
-echo "  $dest/kid"
-echo "  $dest/grownup"
-echo "They're picked up within a few seconds; no restart needed."
+echo "Videos come from $repo/playlists/ (kid/, grownup/, ...)."
+echo "They're synced into $dest at every login; to sync now: $dest/sync"
 echo
 echo "Override the schedule with: $dest/show"
 if ! grep -qs "video-scheduler/show" "$HOME/.zshrc"; then

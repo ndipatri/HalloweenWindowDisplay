@@ -22,15 +22,13 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 ## Quick start
 
-If you already have your videos, this is the whole Mac setup. Run it in Terminal, without `sudo`:
+The videos are in this repo, so this is the whole Mac setup. Run it in Terminal, without `sudo`:
 
 ```sh
-git clone https://github.com/ndipatri/HalloweenWindowDisplay.git
-cd HalloweenWindowDisplay
-bash scheduler/install.sh                                  # creates ~/video-scheduler/kid and grownup
-cp haunted_window_loop.mp4 ~/video-scheduler/grownup/      # scary videos
-cp friendly-ghost.mp4 ~/video-scheduler/kid/               # gentler videos
-~/video-scheduler/show kid 5                               # try it now: kid for 5 minutes
+git clone https://github.com/ndipatri/HalloweenWindowDisplay.git ~/HalloweenWindowDisplay
+cd ~/HalloweenWindowDisplay
+bash scheduler/install.sh             # installs, copies the videos into ~/video-scheduler, starts
+~/video-scheduler/show kid 5          # try it now: kid for 5 minutes
 ```
 
 Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule). To play something outside the schedule, see [Override the schedule](#override-the-schedule).
@@ -50,8 +48,12 @@ flowchart TB
 
   subgraph mac["2 · Mac (runs at every login)"]
     launchd["launchd agent<br/>starts it, restarts it if it crashes"] --> caff["caffeinate<br/>keeps the Mac and display awake"]
-    caff --> sched["video_scheduler.js<br/>checks schedule and override every second"]
-    folders[("~/video-scheduler/<br/>kid/ · grownup/")] --> sched
+    caff --> start
+    sched["video_scheduler.js<br/>checks schedule and override every second"]
+    start["start<br/>sync videos, then run the scheduler"] --> sched
+    sync["sync<br/>git pull · copy new/changed videos"] -- "writes" --> folders[("~/video-scheduler/<br/>kid/ · grownup/")]
+    start --> sync
+    folders --> sched
     show["show command<br/>show grownup 30 · show schedule"] -- "writes" --> override[("override.json")]
     override --> sched
     sched -- "writes" --> status[("status")]
@@ -67,7 +69,8 @@ flowchart TB
     tv["Portrait TV (1080 × 1920)"] --> curtain["Sheer curtain"] --> street(("Street"))
   end
 
-  video -- "copy into kid/ or grownup/" --> folders
+  video -- "commit to playlists/grownup/" --> github[("GitHub repo<br/>playlists/kid/ · playlists/grownup/")]
+  github -- "git pull" --> sync
   win -- "HDMI" --> tv
 ```
 
@@ -76,7 +79,7 @@ flowchart TB
 Two halves:
 
 - **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 4 min 20 s loop that is mostly an empty dark window.
-- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. A `show` command overrides the schedule, from the Mac or from your phone. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
+- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. The videos live in this repo; at every login the Mac pulls the latest and copies them into its playlist folders. A `show` command overrides the schedule, from the Mac or from your phone. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
 
 ## What you need
 
@@ -166,42 +169,64 @@ bash scheduler/install.sh
 
 Don't use `sudo`. The installer:
 
-- copies the script and the [`show` command](#override-the-schedule) to `~/video-scheduler/`
+- copies the scheduler, the [`show` command](#override-the-schedule) and the [`sync` command](#3-add-the-videos) to `~/video-scheduler/`
 - creates the `kid` and `grownup` playlist folders
-- writes the launch agent with your home folder filled in, checks it, and starts it
+- writes the launch agent with your home folder filled in, checks it, and starts it, which also copies the videos from the repo
 
-It starts again by itself at every login. Run the installer again after any change to the script or schedule. It restarts the running copy with the new version; videos and any override are kept.
+It starts again by itself at every login, syncing the videos first. Run the installer again after any change to the script or schedule. It restarts the running copy with the new version; any override is kept.
+
+> [!IMPORTANT]
+> Keep the repo itself out of **Desktop**, **Documents** and **Downloads** (for example at `~/HalloweenWindowDisplay`). The installer warns you if it isn't: at login, macOS may not let the scheduler read those folders, so videos wouldn't sync.
 
 ### 3. Add the videos
 
-Each playlist is a folder in `~/video-scheduler/`:
+The videos are kept in this repo, one folder per playlist, and copied to the Mac:
 
 ```
-~/video-scheduler/
-├── video_scheduler.js
-├── show                 override command
-├── scheduler.log
-├── status               what's on screen now (written by the scheduler)
-├── kid/        played during 'kid' periods
+HalloweenWindowDisplay/playlists/        in the repo: the master copy
+├── kid/                                 played during 'kid' periods
 │   ├── 1-friendly-ghost.mp4
 │   └── 2-pumpkin.mp4
-└── grownup/    played during 'grownup' periods
-    └── haunted_window_loop.mp4
+└── grownup/                             played during 'grownup' periods
+    ├── haunted_window_loop.mp4
+    └── neon_monster.mp4
+
+~/video-scheduler/                       on the Mac: what actually plays
+├── kid/ · grownup/                      copies of the playlists above
+├── .removed/                            videos taken out of the repo, set aside
+├── video_scheduler.js · start · sync · show
+├── scheduler.log
+├── status                               what's on screen now (written by the scheduler)
+└── override.json                        only while an override is in force (written by show)
 ```
 
+**To add, replace or remove a video**, change it in the repo and push. On the Mac:
+
 ```sh
-cp haunted_window_loop.mp4 ~/video-scheduler/grownup/
-cp friendly-ghost.mp4 ~/video-scheduler/kid/
+cd ~/HalloweenWindowDisplay
+cp ~/Downloads/new-ghost.mp4 playlists/kid/
+git add playlists && git commit -m "Add new-ghost" && git push
+~/video-scheduler/sync          # or wait for the next login
 ```
+
+`sync` pulls the latest from GitHub, then for each folder in `playlists/`:
+
+- copies in videos that are new or changed;
+- moves videos that are no longer in the repo to `~/video-scheduler/.removed/<playlist>/`. It never deletes anything.
+
+Playlist folders that aren't in the repo are left alone, so you can still keep a local-only playlist. The running scheduler picks the changes up by itself. If GitHub can't be reached, or doesn't answer within a minute, `sync` uses the videos already in the repo and the display carries on; it's all in the log.
+
+> [!WARNING]
+> Once `playlists/kid/` exists in the repo, it's the master copy: kid videos on the Mac that aren't in it are moved to `.removed/` at the next sync. Commit all your videos before relying on sync.
+
+At login it syncs at most once every 10 minutes, so a scheduler that keeps crashing doesn't keep hitting GitHub; `~/video-scheduler/sync` always syncs. GitHub refuses files over 100 MB, so keep each video under that (the ones here are 18–28 MB).
 
 - Videos play one after another, then start over from the first. Order is by file name, with numbers sorted as numbers (`2-…` before `10-…`), so a number prefix controls the order.
 - `.mp4`, `.m4v` and `.mov` files are played; anything else in the folder is ignored.
 - New videos are picked up within a few seconds, and videos you add or remove later are picked up as the playlist moves on. No restart needed.
+- Videos are copied in under a hidden name and renamed into place, so a half-copied file is never played.
 - A playlist with a single video simply loops it.
 - An empty folder shows black during its periods, so fill both before Halloween night.
-
-> [!IMPORTANT]
-> Keep `~/video-scheduler` out of **Desktop**, **Documents** and **Downloads**. macOS protects those folders, and a background script can be silently refused access. Copy the videos *into* `~/video-scheduler`; don't leave them on the Desktop and link to them.
 
 ### 4. Check it's working
 
@@ -327,7 +352,9 @@ You can also run them with Siri: "Hey Siri, Ghost off."
 |---|---|
 | Play something else right now | `show grownup 30`, `show off`, `show schedule` (see [Override the schedule](#override-the-schedule)) |
 | See what's on screen | `show` |
-| Add, remove or reorder videos | Change the files in `~/video-scheduler/kid` or `grownup`. No restart needed |
+| Add, remove or reorder videos | Change them in the repo's `playlists/` folder, commit and push, then `~/video-scheduler/sync` (or wait for the next login) |
+| Get the latest videos now | `~/video-scheduler/sync` |
+| Undo a removal | Move the file back from `~/video-scheduler/.removed/` and put it back in the repo |
 | Change the schedule | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
 | Get the latest version of this repo | `git pull`, then `bash scheduler/install.sh` |
 | Restart | `launchctl kickstart -k gui/$(id -u)/com.user.videoscheduler` |
@@ -359,6 +386,9 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | Log says `Skipping …` | That file is damaged or in a format macOS can't play. Re-export it as H.264 MP4; the others keep playing |
 | Black screen, log says `playing …` | Check the TV's input and brightness, and that the curtain isn't too thick |
 | Screen isn't following the schedule | An override is probably in force. Run `show` to check, `show schedule` to cancel it |
+| Log says `Couldn't pull from GitHub` | The Mac is offline or GitHub can't be reached; it plays the videos it already has. Check the network, then run `~/video-scheduler/sync`. If the reason mentions local changes, see [Updating](#day-to-day) |
+| A video I added doesn't play | Check it's committed and pushed (`git status`), then run `~/video-scheduler/sync` and look for `Copied …` |
+| A video disappeared from the Mac | It isn't in the repo's `playlists/` folder, so sync moved it to `~/video-scheduler/.removed/`. Add it to the repo |
 | `show` says `No status yet` | The scheduler isn't running, or hasn't started since the upgrade. Run `bash scheduler/install.sh` |
 | Log says `Ignoring …/override.json` | The override file was edited by hand and is malformed. Run `show schedule` to delete it |
 | iPhone shortcut fails to connect | Check Remote Login is on, the phone is on your home Wi-Fi (not cellular), and the host and user match the Sharing settings. Try the Mac's IP address instead of its `.local` name |
@@ -377,6 +407,9 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | `scheduler/video_scheduler.js` | Plays the scheduled playlist full-screen on the portrait display |
 | `scheduler/com.user.videoscheduler.plist` | Launch agent template: starts the script at login and restarts it if it crashes |
 | `scheduler/show.sh` | The `show` command for overriding the schedule (installed as `~/video-scheduler/show`) |
+| `scheduler/start.sh` | Run at login: syncs the videos, then starts the scheduler (installed as `~/video-scheduler/start`) |
+| `scheduler/sync_videos.sh` | Pulls the repo and copies `playlists/` into `~/video-scheduler` (installed as `~/video-scheduler/sync`) |
 | `scheduler/install.sh` | Installs or updates the scheduler for the current user |
+| `playlists/` | The videos, one folder per playlist |
 | `video/build_loop.sh` | Builds the 4:20 loop from the two generated clips |
 | `docs/images/` | Frames and diagrams used in this guide |
