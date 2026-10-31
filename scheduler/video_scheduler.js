@@ -15,8 +15,8 @@ const CONFIG = {
   // Periods can cross midnight. If periods overlap, the first one listed wins.
   schedule: [
     { start: '05:00', stop: '07:00', playlist: 'kid' },
-    { start: '17:00', stop: '20:00', playlist: 'kid' },
-    { start: '20:00', stop: '23:00', playlist: 'grownup' },
+    { start: '17:00', stop: '19:00', playlist: 'kid' },
+    { start: '19:00', stop: '23:00', playlist: 'grownup' },
   ],
 
   videoExtensions: ['mp4', 'm4v', 'mov'],
