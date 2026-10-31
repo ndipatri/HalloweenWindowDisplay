@@ -70,21 +70,20 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 
 ### What it cost
 
-About **$47–56 in Higgsfield credits**, plus a **Claude subscription** (from $20 a month). Prices as of October 2026.
+**About $47 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
 
-**Higgsfield** charges credits per generation; editing afterwards costs nothing. Four generations were made:
+**Higgsfield** charges per generation; editing afterwards costs nothing. Four generations were made:
 
-| Generation | Credits | ≈ Cost |
-|---|---|---|
-| Woman walking, first try (too small, discarded) | 320 | $13–16 |
-| Woman walking, second try (used) | 320 | $13–16 |
-| Woman, hand on the glass | 192 | $8–9 |
-| Neon monster | 320 | $13–16 |
-| **Total** | **1,152** | **$47–56** |
+| Generation | Cost (USD) |
+|---|---|
+| Woman walking, first try (too small, discarded) | $13.07 |
+| Woman walking, second try (used) | $13.07 |
+| Woman, hand on the glass | $7.84 |
+| Neon monster | $13.07 |
+| **Total** | **$47.04** |
 
-- By video: the woman's loop cost 832 credits (≈ $34–41, including the discarded try) and the monster 320 (≈ $13–16).
-- Credits came with the **Plus** plan at **$49 a month**. The account received 1,200 credits for that, about 4¢ each; Higgsfield's published plan is 1,000 credits, about 4.9¢ each. Hence the ranges.
-- One 20-second 1080p Seedance 2.5 clip is 320 credits; a 12-second one is 192, about 16 credits per second.
+- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**.
+- Higgsfield sells credits. These came with the **Plus plan, $49 a month for 1,200 credits**, so each credit is about $0.04. A 1080p Seedance 2.5 clip costs about **$0.65 per second**: $13.07 for 20 seconds, $7.84 for 12.
 - Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
 
 **Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
