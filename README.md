@@ -4,7 +4,16 @@ A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes
 
 It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
 
-<p align="center"><img src="docs/images/hero.jpg" width="300" alt="Dark silhouette of a woman with her palm pressed against the glass"></p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/images/from-the-street.jpg" width="300" alt="At night from the street: an upstairs window glows, with the dark silhouette of a woman standing in it"></td>
+    <td align="center"><img src="docs/images/hero.jpg" width="300" alt="Close-up of the video: the woman's silhouette with her palm pressed against the glass"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>What trick-or-treaters see from the street</em></td>
+    <td align="center"><em>What's playing on the TV</em></td>
+  </tr>
+</table>
 
 **Contents**
 
