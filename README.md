@@ -1,6 +1,6 @@
 # Halloween Window Display
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them.
+A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't.
 
 It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
 
@@ -61,12 +61,13 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 | `kid` | `fuzzy_creatures.mp4`: a gang of shaggy, googly-eyed fuzzy creatures runs around the room, then crowds the window, faces pressed to the glass | 0:20 |
 | `kid` | `mochi_ghost_dog.mp4`: Mochi, a real fluffy white dog, trots up to the window and turns into a friendly ghost-dog with glowing green eyes and little horns, then floats away | 0:20 |
 | `kid` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
+| `grownup` | `jump_scare.mp4`: a pale, gaunt figure stands motionless far back in the dark for a long moment, then suddenly charges and slams against the glass, its hollow-eyed, screaming face filling the window. No blood | 0:20 |
 | `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
 | `grownup` | `fuzzy_creatures.mp4`: the same fuzzy creatures | 0:20 |
 | `grownup` | `mochi_ghost_dog.mp4`: the same Mochi | 0:20 |
 | `grownup` | `lady_silouette_long.mp4`: the same woman | 1:33 |
 
-They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures and Mochi fill the whole frame.
+They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, Mochi and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes.
 
 ### How they were made
 
@@ -82,9 +83,9 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 
 ### What it cost
 
-**About $83 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
+**About $100 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
 
-**Higgsfield** charges per generation; editing afterwards costs nothing. Six generations were made:
+**Higgsfield** charges per generation; editing afterwards costs nothing. Seven generations were made:
 
 | Generation | Cost (USD) |
 |---|---|
@@ -94,10 +95,11 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 | Neon monster | $13.07 |
 | Fuzzy creatures | $17.78 |
 | Mochi the ghost-dog | $17.78 |
-| **Total** | **$82.60** |
+| Jump scare | $17.78 |
+| **Total** | **$100.38** |
 
-- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**.
-- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures and Mochi used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second).
+- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**, the jump scare **$17.78**.
+- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures, Mochi and the jump scare used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second).
 - Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
 
 **Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
@@ -114,6 +116,10 @@ All plans include connectors such as Higgsfield. A long working session like thi
 Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-pricing-explained) · [Claude plans & pricing](https://claude.com/pricing)
 
 ### The prompts
+
+**Jump scare (20 s)**
+
+> Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a pitch-dark room. The video begins on an empty, fully black frame. Slowly, far at the very back of the darkness, a tall pale gaunt figure becomes barely visible, standing perfectly still, arms hanging limp, head slightly tilted, faint cold grey light on its pale skin, so faint you are not sure it is there. It stays completely motionless for a long, tense moment. Then, without warning, it suddenly sprints straight at the camera at terrifying, unnatural speed, jerky and twitching, and SLAMS against the glass, extremely close to camera: its face fills the entire frame, an emaciated ash-white face with cracked dry skin, completely black hollow eyes with no pupils, jaw stretched impossibly wide open in a silent scream, stringy dark hair, long bony spidery fingers splayed and slapping against the glass on both sides of the face. It stays pressed against the glass, twitching violently, head jerking, staring straight into the viewer. Then it snaps backward into the darkness in an instant and is gone, leaving pitch black. The final seconds are an empty, fully black frame, identical to the opening. Horror jump scare, terrifying, sudden, cold desaturated grey tones on pure black, high contrast, no blood, no gore, no wounds, no text, no other people, no camera movement.
 
 **Mochi the ghost-dog (20 s)**, with a photo of Mochi attached as the reference image
 
