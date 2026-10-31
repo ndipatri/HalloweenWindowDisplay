@@ -149,8 +149,8 @@ Edit `CONFIG.schedule` near the top of `scheduler/video_scheduler.js`. Each peri
 ```js
 schedule: [
   { start: '05:00', stop: '07:00', playlist: 'kid' },
-  { start: '17:00', stop: '19:00', playlist: 'kid' },
-  { start: '19:00', stop: '23:00', playlist: 'grownup' },
+  { start: '17:00', stop: '19:30', playlist: 'kid' },
+  { start: '19:30', stop: '23:00', playlist: 'grownup' },
 ],
 ```
 
@@ -240,10 +240,10 @@ tail -f ~/video-scheduler/scheduler.log
 You should see lines like:
 
 ```
-10/31/2026, 5:00:00 PM  Now showing: kid (scheduled until 7:00 PM)
+10/31/2026, 5:00:00 PM  Now showing: kid (scheduled until 7:30 PM)
 10/31/2026, 5:00:01 PM  kid: playing 1-friendly-ghost.mp4
 10/31/2026, 5:01:12 PM  kid: playing 2-pumpkin.mp4
-10/31/2026, 7:00:00 PM  Now showing: grownup (scheduled until 11:00 PM)
+10/31/2026, 7:30:00 PM  Now showing: grownup (scheduled until 11:00 PM)
 ```
 
 Outside the schedule it logs, for example, `Now showing: black (outside schedule until 5:00 PM)`. Press Control-C to stop watching the log; the scheduler keeps running.
@@ -295,7 +295,7 @@ How long an override lasts:
 | You type | It lasts until |
 |---|---|
 | `show grownup 30` | 30 minutes from now |
-| `show grownup` | The schedule next changes. At 6 pm during `kid` (5–7 pm), that's 7 pm, when `grownup` starts anyway. Outside the schedule, it's the start of the next period |
+| `show grownup` | The schedule next changes. At 6 pm during `kid` (5–7:30 pm), that's 7:30 pm, when `grownup` starts anyway. Outside the schedule, it's the start of the next period |
 | `show grownup --until-cleared` | You run `show schedule`, however long that is |
 
 Overrides end by themselves unless you ask otherwise. That way a forgotten override can't leave the scary videos on at 7 am. An override survives a restart of the Mac, and each playlist still resumes where it left off.
