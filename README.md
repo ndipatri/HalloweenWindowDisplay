@@ -1,6 +1,6 @@
 # Halloween Window Display
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. Later in the evening, a glowing neon monster joins her.
+A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, and later in the evening a glowing neon monster joins them.
 
 It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
 
@@ -50,11 +50,13 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 
 | Playlist | Video | Length |
 |---|---|---|
+| `kid` | `fuzzy_creatures.mp4`: a gang of shaggy, googly-eyed fuzzy creatures runs around the room, then crowds the window, faces pressed to the glass | 0:20 |
 | `kid` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
 | `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
+| `grownup` | `fuzzy_creatures.mp4`: the same fuzzy creatures | 0:20 |
 | `grownup` | `lady_silouette_long.mp4`: the same woman | 1:33 |
 
-They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump.
+They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures fill the whole frame.
 
 ### How they were made
 
@@ -70,9 +72,9 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 
 ### What it cost
 
-**About $47 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
+**About $65 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
 
-**Higgsfield** charges per generation; editing afterwards costs nothing. Four generations were made:
+**Higgsfield** charges per generation; editing afterwards costs nothing. Five generations were made:
 
 | Generation | Cost (USD) |
 |---|---|
@@ -80,10 +82,11 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 | Woman walking, second try (used) | $13.07 |
 | Woman, hand on the glass | $7.84 |
 | Neon monster | $13.07 |
-| **Total** | **$47.04** |
+| Fuzzy creatures | $17.78 |
+| **Total** | **$64.82** |
 
-- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**.
-- Higgsfield sells credits. These came with the **Plus plan, $49 a month for 1,200 credits**, so each credit is about $0.04. A 1080p Seedance 2.5 clip costs about **$0.65 per second**: $13.07 for 20 seconds, $7.84 for 12.
+- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**.
+- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second).
 - Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
 
 **Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
@@ -100,6 +103,10 @@ All plans include connectors such as Higgsfield. A long working session like thi
 Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-pricing-explained) · [Claude plans & pricing](https://claude.com/pricing)
 
 ### The prompts
+
+**Fuzzy creatures (20 s)**
+
+> Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a pitch-dark room. The video begins on an empty, fully black frame. A gang of six shaggy, fuzzy, handmade puppet-like creatures appears in the darkness of the room: long wild shaggy fur in vivid saturated colors, one lime green, one hot pink, one electric blue, one bright orange, one purple, one yellow; big round googly eyes with small black pupils, wide floppy felt mouths, some with little horns, antennae or droopy ears, gangly arms. They are lit only by soft colored rim light against pitch black. They scamper and run around the room behind the glass, tumbling, bouncing, chasing each other and bumping into one another, playful and chaotic. Then all at once they notice the window, freeze, and rush forward together, converging on the glass and crowding against it, extremely close to camera: their fuzzy faces fill the entire frame from edge to edge, squished together, fur pressed against the glass, big googly eyes peering out at the street, blinking, mouths agape, jostling for space, mischievous and curious. They hold there, staring out. Then they slowly back away together, retreating into the darkness of the room, shrinking and fading until they dissolve completely into the black. The final seconds are an empty, fully black frame, identical to the opening. Handcrafted fuzzy puppet aesthetic, playful but eerie Halloween mood, high contrast, saturated colors on pure black, no text, no humans, no camera movement.
 
 **Woman, walk (20 s)**
 
