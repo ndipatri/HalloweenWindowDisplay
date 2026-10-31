@@ -24,7 +24,7 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 ![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Mac](docs/images/physical-setup.svg)
 
-A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. A schedule decides what plays when: the `kid` playlist early in the evening, the `grownup` playlist later, and plain black the rest of the time. The videos are kept in this repo, and the Mac pulls the latest at every login. A `show` command overrides the schedule, from the Mac or from your phone.
+A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. A schedule decides what plays when: the `kid` playlist early in the evening, the `grownup` playlist later, and plain black the rest of the time. The videos are kept in this repo, and the Mac pulls the latest at every login. A `show` command overrides the schedule.
 
 ## Quick start
 
@@ -44,7 +44,6 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 - A TV or monitor that can stand vertically (this build uses 1080 × 1920).
 - A Mac connected to it over HDMI. Any Mac that runs a recent macOS works.
 - A sheer white or grey curtain for the window.
-- Optional: an iPhone, to [switch videos from your phone](#from-your-phone).
 
 ## The videos
 
@@ -280,47 +279,6 @@ echo "alias show='$HOME/video-scheduler/show'" >> ~/.zshrc
 
 Any playlist folder works: `show halloween-party 60` plays `~/video-scheduler/halloween-party/`.
 
-### From your phone
-
-The Mac is in a dark room behind the TV, so the handiest remote is your iPhone. The Shortcuts app can run `show` on the Mac over your home Wi-Fi. You don't need to install anything.
-
-**On the Mac**
-
-1. Open System Settings → General → Sharing, and turn on **Remote Login**.
-2. Click the **ⓘ** next to it and set "Allow access for" to **Only these users**, with just your account.
-3. Note the address shown there, for example `ssh alex@Alexs-Mac-mini.local`. You need the user name (`alex`) and host (`Alexs-Mac-mini.local`).
-
-**On the iPhone**, once per button:
-
-1. Open **Shortcuts**, tap **+**, then **Add Action**, and search for **Run Script over SSH**.
-2. Fill in:
-   - **Script:** `~/video-scheduler/show grownup 30`. Use the full path; the `show` alias doesn't apply over SSH.
-   - **Host:** `Alexs-Mac-mini.local`
-   - **User:** `alex`
-   - **Authentication:** Password, or SSH Key (see below)
-3. Add a **Show Result** action after it, so you see what `show` replied.
-4. Name the shortcut (for example "Ghost: scary 30 min"), then use **Add to Home Screen** from the share menu.
-
-A useful set of buttons:
-
-| Shortcut | Script |
-|---|---|
-| Ghost: scary 30 min | `~/video-scheduler/show grownup 30` |
-| Ghost: kids 30 min | `~/video-scheduler/show kid 30` |
-| Ghost: off | `~/video-scheduler/show off` |
-| Ghost: back to schedule | `~/video-scheduler/show schedule` |
-| Ghost: what's on? | `~/video-scheduler/show` |
-
-You can also run them with Siri: "Hey Siri, Ghost off."
-
-> [!TIP]
-> **Use an SSH key instead of storing your Mac password.** In the Run Script over SSH action, set Authentication to **SSH Key**, tap the key to generate one, then tap **Share Public Key** and choose **Copy**. With Universal Clipboard (same Apple Account, Bluetooth and Wi-Fi on), it's now on the Mac's clipboard too; otherwise AirDrop or email it to yourself and copy it there. Then on the Mac, add it to `~/.ssh/authorized_keys`:
-> ```sh
-> mkdir -p ~/.ssh && chmod 700 ~/.ssh
-> pbpaste >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
-> ```
-> Remote Login lets anyone on your network try to log in to the Mac with your account. Use a strong password, and consider turning Remote Login off again after Halloween.
-
 ## Day-to-day
 
 | Task | How |
@@ -366,8 +324,6 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | A video disappeared from the Mac | It isn't in the repo's `playlists/` folder, so sync moved it to `~/video-scheduler/.removed/`. Add it to the repo |
 | `show` says `No status yet` | The scheduler isn't running, or hasn't started since the upgrade. Run `bash scheduler/install.sh` |
 | Log says `Ignoring …/override.json` | The override file was edited by hand and is malformed. Run `show schedule` to delete it |
-| iPhone shortcut fails to connect | Check Remote Login is on, the phone is on your home Wi-Fi (not cellular), and the host and user match the Sharing settings. Try the Mac's IP address instead of its `.local` name |
-| iPhone shortcut says `show: not found` | Use the full path, `~/video-scheduler/show` |
 | Log says `Ignoring schedule entry` | Fix that entry: times must be `HH:MM` and it needs a `playlist` |
 | Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/`. See [Upgrading](#upgrading-from-the-single-video-version) |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
