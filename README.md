@@ -66,7 +66,39 @@ The videos were made in a conversation with [Claude](https://claude.ai), Anthrop
 4. **Iterate on feedback.** "She should be much bigger, right at the window" led to a new prompt. "Lower her 20%, the window isn't at floor level" and "make it scarier" led to editing rather than regenerating: Claude used ffmpeg, in Higgsfield's cloud sandbox, to lower the picture, add a flicker and glitch flashes, and join the woman's two clips into one loop. The new hand-on-the-glass clip was the only extra generation. "Too much dead space" cut the loop from 4:20 to 1:33.
 5. **Ship it.** Claude committed the finished videos here, along with the scheduler, installer and this README.
 
-All in, the generations cost about 1,150 Higgsfield credits: two attempts at the walk, the hand clip and the monster. Everything after generation was free editing. To make new videos the same way, you need a Higgsfield account, and ffmpeg (`brew install ffmpeg`) to run `video/build_loop.sh`.
+To make new videos the same way, you need a Higgsfield account, a Claude plan, and ffmpeg (`brew install ffmpeg`) to run `video/build_loop.sh`.
+
+### What it cost
+
+About **$47–56 in Higgsfield credits**, plus a **Claude subscription** (from $20 a month). Prices as of October 2026.
+
+**Higgsfield** charges credits per generation; editing afterwards costs nothing. Four generations were made:
+
+| Generation | Credits | ≈ Cost |
+|---|---|---|
+| Woman walking, first try (too small, discarded) | 320 | $13–16 |
+| Woman walking, second try (used) | 320 | $13–16 |
+| Woman, hand on the glass | 192 | $8–9 |
+| Neon monster | 320 | $13–16 |
+| **Total** | **1,152** | **$47–56** |
+
+- By video: the woman's loop cost 832 credits (≈ $34–41, including the discarded try) and the monster 320 (≈ $13–16).
+- Credits came with the **Plus** plan at **$49 a month**. The account received 1,200 credits for that, about 4¢ each; Higgsfield's published plan is 1,000 credits, about 4.9¢ each. Hence the ranges.
+- One 20-second 1080p Seedance 2.5 clip is 320 credits; a 12-second one is 192, about 16 credits per second.
+- Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
+
+**Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
+
+| Plan | Price | Usage |
+|---|---|---|
+| Free | $0 | Limited |
+| Pro | $20/month ($17/month billed yearly) | Baseline |
+| Max | $100/month | 5× Pro |
+| Ultra | $200/month | 10× Pro |
+
+All plans include connectors such as Higgsfield. A long working session like this one, spread over a couple of days, can reach Pro's usage limits; a higher plan gives more room.
+
+Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-pricing-explained) · [Claude plans & pricing](https://claude.com/pricing)
 
 ### The prompts
 
