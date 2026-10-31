@@ -1,6 +1,6 @@
 # Halloween Window Display
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. Most of the time the window is just dark, so people who catch her aren't sure what they saw.
+A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. Later in the evening, a glowing neon monster joins her.
 
 It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
 
@@ -8,10 +8,10 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 **Contents**
 
-1. [Quick start](#quick-start)
-2. [How it works](#how-it-works)
+1. [How it works](#how-it-works)
+2. [Quick start](#quick-start)
 3. [What you need](#what-you-need)
-4. [Make the video](#make-the-video)
+4. [The videos](#the-videos)
 5. [Set up the Mac](#set-up-the-mac)
 6. [Set up the window](#set-up-the-window)
 7. [Override the schedule](#override-the-schedule)
@@ -19,6 +19,12 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 9. [Upgrading from the single-video version](#upgrading-from-the-single-video-version)
 10. [Troubleshooting](#troubleshooting)
 11. [Files](#files)
+
+## How it works
+
+![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Mac](docs/images/physical-setup.svg)
+
+A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. A schedule decides what plays when: the `kid` playlist early in the evening, the `grownup` playlist later, and plain black the rest of the time. The videos are kept in this repo, and the Mac pulls the latest at every login. A `show` command overrides the schedule, from the Mac or from your phone.
 
 ## Quick start
 
@@ -33,109 +39,48 @@ bash scheduler/install.sh             # installs, copies the videos into ~/video
 
 Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule). To play something outside the schedule, see [Override the schedule](#override-the-schedule).
 
-## How it works
-
-```mermaid
-flowchart TB
-  subgraph make["1 · Make the video (once)"]
-    prompts["Text prompts"] --> hf["Higgsfield · Seedance 2.5"]
-    hf --> walk["walk.mp4 (20 s)"]
-    hf --> hand["hand.mp4 (12 s)"]
-    walk --> build["build_loop.sh (ffmpeg)<br/>lower 20% · flicker · glitch · black gaps"]
-    hand --> build
-    build --> video["lady_silouette_long.mp4 (1:33)"]
-  end
-
-  subgraph mac["2 · Mac (runs at every login)"]
-    launchd["launchd agent<br/>starts it, restarts it if it crashes"] --> caff["caffeinate<br/>keeps the Mac and display awake"]
-    caff --> start
-    sched["video_scheduler.js<br/>checks schedule and override every second"]
-    start["start<br/>sync videos, then run the scheduler"] --> sched
-    sync["sync<br/>git pull · copy new/changed videos"] -- "writes" --> folders[("~/video-scheduler/<br/>kid/ · grownup/")]
-    start --> sync
-    folders --> sched
-    show["show command<br/>show grownup 30 · show schedule"] -- "writes" --> override[("override.json")]
-    override --> sched
-    sched -- "writes" --> status[("status")]
-    status -. "reads" .-> show
-    sched -- "play / pause" --> queue["AVQueuePlayer<br/>one per playlist, cycles its folder"]
-    sched -- "show / hide" --> win["Full-screen black window<br/>on the portrait display"]
-    queue --> win
-  end
-
-  phone["iPhone Shortcut<br/>Run Script over SSH"] -- "Wi-Fi" --> show
-
-  subgraph room["3 · The window"]
-    tv["Portrait TV (1080 × 1920)"] --> curtain["Sheer curtain"] --> street(("Street"))
-  end
-
-  video -- "commit to playlists/grownup/" --> github[("GitHub repo<br/>playlists/kid/ · playlists/grownup/")]
-  github -- "git pull" --> sync
-  win -- "HDMI" --> tv
-```
-
-![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Mac](docs/images/physical-setup.svg)
-
-Two halves:
-
-- **The video** is made once. An AI video model generates two short clips of a silhouette, and an ffmpeg script turns them into a 1 min 33 s loop: she appears, vanishes for a few seconds, and appears again.
-- **The scheduler** runs on the Mac. A launch agent starts it at login. It covers the portrait display with a black window. Each scheduled period names a playlist, `kid` or `grownup`, and during that period it cycles through every video in that playlist's folder. Outside the schedule it shows plain black. The videos live in this repo; at every login the Mac pulls the latest and copies them into its playlist folders. A `show` command overrides the schedule, from the Mac or from your phone. It uses macOS's built-in video player, so there's nothing to install apart from this repo.
-
 ## What you need
 
 - A TV or monitor that can stand vertically (this build uses 1080 × 1920).
 - A Mac connected to it over HDMI. Any Mac that runs a recent macOS works.
 - A sheer white or grey curtain for the window.
-- To make or change the video: a [Higgsfield](https://higgsfield.ai) account (about 512 credits for the two clips) and ffmpeg (`brew install ffmpeg`). Skip this if you already have your videos.
+- Optional: an iPhone, to [switch videos from your phone](#from-your-phone).
 
-## Make the video
+## The videos
 
-### 1. Generate the two clips
+| Playlist | Video | Length |
+|---|---|---|
+| `kid` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
+| `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
+| `grownup` | `lady_silouette_long.mp4`: the same woman | 1:33 |
 
-Both clips were made with **Seedance 2.5** on Higgsfield: text-to-video, 9:16, 1080p, no audio, high bitrate.
+They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump.
 
-**Walk clip** (20 s, 320 credits). She walks in close to the glass, crosses, pauses facing out, leaves, comes back, then walks away into the room and fades out.
+### How they were made
+
+The videos were made in a conversation with [Claude](https://claude.ai), Anthropic's AI assistant, connected to [Higgsfield](https://higgsfield.ai), an AI video service, through Higgsfield's connector (MCP). The person described what they wanted in plain words and reacted to each result; Claude turned that into prompts, generations and edits, and they went back and forth until it looked right:
+
+1. **Describe the idea.** For example: "a woman who's just a dark silhouette, on black, walking in and out of frame, on a portrait TV in my window."
+2. **Claude writes the prompt and generates.** It picked the model (Seedance 2.5, text-to-video), set the format (9:16, 1080p, 12–20 s, no audio), checked the credit cost, wrote the detailed prompt below, and started the generation on Higgsfield.
+3. **Check the result.** Claude pulled frames from the clips to check the figure filled the frame and each clip started and ended on black, and the person watched them.
+4. **Iterate on feedback.** "She should be much bigger, right at the window" led to a new prompt. "Lower her 20%, the window isn't at floor level" and "make it scarier" led to editing rather than regenerating: Claude used ffmpeg, in Higgsfield's cloud sandbox, to lower the picture, add a flicker and glitch flashes, and join the woman's two clips into one loop. The new hand-on-the-glass clip was the only extra generation. "Too much dead space" cut the loop from 4:20 to 1:33.
+5. **Ship it.** Claude committed the finished videos here, along with the scheduler, installer and this README.
+
+All in, the generations cost about 1,150 Higgsfield credits: two attempts at the walk, the hand clip and the monster. Everything after generation was free editing. To make new videos the same way, you need a Higgsfield account, and ffmpeg (`brew install ffmpeg`) to run `video/build_loop.sh`.
+
+### The prompts
+
+**Woman, walk (20 s)**
 
 > Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a dark room, and the woman stands directly against the glass, extremely close to camera. Her figure is huge and fills the entire height of the frame: the top of her head touches the top edge of the frame and her body extends down past the bottom edge. She is a solid jet-black silhouette, a featureless dark shape with only a faint soft grey rim of backlight tracing her outline: long hair, shoulders, a long dress. No face, no eyes, no details, no color. The video begins on an empty, fully black frame. She slowly steps in from the left edge, close to the glass and still filling the full frame height, drifts across, stops in the center facing the viewer as if pressed to the window staring out, sways slightly and tilts her head, then slides out of frame on the right. She re-enters from the right, again full height and close to the glass, then turns and slowly walks back into the darkness of the room, shrinking and fading until she dissolves into the black. The final seconds are an empty, fully black frame, identical to the opening. Slow, eerie, ghostly, unhurried, smooth movement. Minimal, haunting, high contrast, no text, no other people, no camera movement.
 
-![Six frames from the walk clip](docs/images/walk-sequence.jpg)
-
-**Hand clip** (12 s, 192 credits). She comes up to the glass, stands unnaturally still, then raises a hand and presses her palm flat against it.
+**Woman, hand on the glass (12 s)**
 
 > Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a dark room. The video begins on an empty, fully black frame. A woman slowly emerges out of the darkness and stops directly against the glass, extremely close to camera, her figure huge and filling the entire height of the frame: the top of her head touches the top edge of the frame and her body extends past the bottom edge. She is a solid jet-black silhouette, a featureless dark shape with only a faint soft grey rim of backlight tracing her outline: long tangled hair, shoulders, a long dress. No face, no eyes, no details, no color. She stands perfectly, unnaturally still. Then her head slowly tilts downward, as if she has noticed someone on the street below. She slowly raises one hand and presses her palm flat against the glass, fingers spread, the hand silhouette large in the frame. She holds there, motionless. Suddenly her head snaps sharply to one side with a jerky, unnatural movement. Then she slowly sinks backward into the darkness and dissolves completely into the black. The final second is an empty, fully black frame. Eerie, unsettling, horror, high contrast, no text, no other people, no camera movement.
 
-![Six frames from the hand clip](docs/images/hand-sequence.jpg)
+**Monster (20 s)**
 
-What made the prompts work:
-
-- **"Against the glass … fills the entire height of the frame."** The first attempt had her standing halfway back in the room, which looked too small from the street.
-- **A faint grey rim of backlight.** A pure black figure on a black background is invisible. The rim is what people see.
-- **Starts and ends on an empty black frame.** That's what lets the clips join, and the whole thing loop, without a visible jump.
-- AI models don't always follow every beat of a prompt. Watch each clip before building, and regenerate if a key moment is missing.
-
-### 2. Build the loop
-
-```sh
-bash video/build_loop.sh walk.mp4 hand.mp4 lady_silouette_long.mp4
-```
-
-This takes a few minutes and does four things.
-
-**Lowers her by 20%.** The window sill is well above the floor of the room, so a figure standing on the bottom edge of the screen looks like she's floating. The script crops the bottom fifth and adds black at the top.
-
-<img src="docs/images/shift-before-after.jpg" width="440" alt="The same frame before and after lowering by 20%">
-
-**Adds a flicker.** An uneven shimmer on her outline, like a dying bulb, with a split-second near-blackout every so often.
-
-**Adds glitch flashes.** For 0.4 seconds she's suddenly much closer, then gone. It's brief enough that people doubt they saw it.
-
-<img src="docs/images/glitch-flash.jpg" width="440" alt="A normal frame next to the glitch frame">
-
-**Spaces everything out with black.** Between appearances the window is empty for a few seconds, never more than about 9, and the gaps are uneven so it doesn't feel mechanical. (An earlier 4:20 version left up to 40 seconds of dead space; that turned out to be too much.) One of her appearances is the walk clip played backwards, so her movement looks subtly wrong.
-
-![Timeline of the 1:33 loop showing six appearances separated by short black gaps](docs/images/loop-timeline.svg)
-
-The output is 1080 × 1920 H.264, silent, about 28 MB. To change the look, edit `SHIFT`, `FLICKER` or the playlist near the bottom of the script.
+> Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a pitch-dark room. The video begins on an empty, fully black frame. A tall, gaunt, terrifying monster slowly steps in from the left edge, directly against the glass, extremely close to camera. It is huge and fills the entire height of the frame: the top of its head touches the top edge of the frame and its body extends down past the bottom edge. The monster is vividly colorful against the blackness: slick iridescent skin shifting from toxic green to deep violet and magenta, glowing bioluminescent orange stripes and spots pulsing along its ribs and long arms, a crest of jagged cyan spines down its back, a wide mouth of crooked needle teeth, and two large glowing yellow eyes. Long spindly fingers with hooked claws. It is lit only by its own glow and a faint colored rim light, everything around it pitch black. It moves slowly and unnaturally, with jerky, twitching steps. It drifts across, stops in the center facing the viewer as if staring out the window, cocks its head, slowly breathes, then slides out of frame on the right. It re-enters from the right, close to the glass and still filling the full frame height, then turns and slowly retreats backward into the darkness of the room, shrinking as its glow dims until it dissolves completely into the black. The final seconds are an empty, fully black frame, identical to the opening. Eerie, menacing, horror, high contrast, saturated neon colors on pure black, no text, no other creatures or people, no camera movement.
 
 ## Set up the Mac
 
