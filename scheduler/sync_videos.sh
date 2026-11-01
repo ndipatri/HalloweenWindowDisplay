@@ -1,15 +1,16 @@
 #!/bin/bash
-# Updates the playlist folders in ~/video-scheduler from this repo's
+# Updates the video folders in ~/video-scheduler from this repo's
 # playlists/ folder. Installed as ~/video-scheduler/sync.
 #
 #   sync            pull the latest from GitHub, then copy the videos
 #   sync --no-pull  copy the videos from the repo as it is
 #
-# For each folder in playlists/ (kid, grownup, ...):
+# For each folder under playlists/ (halloween, halloween/grownup, ...):
 #   - videos that are new or changed in the repo are copied in
 #   - videos that are no longer in the repo are moved to
-#     ~/video-scheduler/.removed/<playlist>/, never deleted
-# Playlist folders that aren't in the repo are left alone.
+#     ~/video-scheduler/.removed/<folder>/, never deleted
+# Inside a folder the repo has, a subfolder it no longer has is set aside
+# too. Top-level folders that aren't in the repo are left alone.
 #
 # The running scheduler picks the changes up by itself; no restart needed.
 # If GitHub can't be reached, it copies from the repo as it already is.
@@ -65,9 +66,9 @@ copy_videos() {
     return
   fi
   local copied=0 set_aside=0 dir name dest file base
-  for dir in "$src"/*/; do
-    [ -d "$dir" ] || continue
-    name="$(basename "$dir")"
+  # Every folder under playlists/, at any depth: halloween, halloween/grownup...
+  while IFS= read -r name; do
+    dir="$src/$name/"
     dest="$root/$name"
     mkdir -p "$dest"
 
@@ -95,7 +96,25 @@ copy_videos() {
       log "Moved $name/$base to .removed/$name/ (no longer in the repo)"
       set_aside=$((set_aside + 1))
     done
-  done
+  done < <(cd "$src" && find . -mindepth 1 -type d ! -path '*/.*' | sed 's|^\./||' | sort)
+
+  # Inside a top-level folder the repo has (a season), a subfolder the repo
+  # no longer has is set aside too, e.g. halloween/grownup deleted from the
+  # repo. Top-level folders the repo doesn't have are left alone.
+  local top
+  while IFS= read -r name; do
+    top="${name%%/*}"
+    [ -d "$src/$top" ] && [ ! -d "$src/$name" ] || continue
+    for file in "$root/$name"/*; do
+      base="$(basename "$file")"
+      [ -f "$file" ] && is_video "$base" || continue
+      mkdir -p "$root/.removed/$name"
+      mv -f "$file" "$root/.removed/$name/$base"
+      log "Moved $name/$base to .removed/$name/ (folder no longer in the repo)"
+      set_aside=$((set_aside + 1))
+    done
+  done < <(cd "$root" && find . -mindepth 2 -type d ! -path '*/.*' | sed 's|^\./||' | sort)
+
   log "Done: $copied copied, $set_aside moved aside."
 }
 

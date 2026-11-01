@@ -2,7 +2,7 @@
 
 A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't.
 
-It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening.
+It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. Videos are grouped into seasons (Halloween, Thanksgiving, Christmas…), so each plays only during its part of the year.
 
 <table align="center">
   <tr>
@@ -25,7 +25,7 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 6. [Set up the window](#set-up-the-window)
 7. [Override the schedule](#override-the-schedule)
 8. [Day-to-day](#day-to-day)
-9. [Upgrading from the single-video version](#upgrading-from-the-single-video-version)
+9. [Upgrading to seasons](#upgrading-to-seasons)
 10. [Troubleshooting](#troubleshooting)
 11. [Files](#files)
 
@@ -33,7 +33,7 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 ![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Mac](docs/images/physical-setup.svg)
 
-A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. A schedule decides what plays when: the `kid` playlist early in the evening, the `grownup` playlist later, and plain black the rest of the time. The videos are kept in this repo, and the Mac pulls the latest at every login. A `show` command overrides the schedule.
+A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. The date picks the season (Halloween in October, and so on), and a daily schedule picks the hours: the `kid` playlist early in the evening, the `grownup` playlist later, and plain black the rest of the time. The videos are kept in this repo, and the Mac pulls the latest at every login. A `show` command overrides the schedule.
 
 ## Quick start
 
@@ -46,7 +46,7 @@ bash scheduler/install.sh             # installs, copies the videos into ~/video
 ~/video-scheduler/show kid 5          # try it now: kid for 5 minutes
 ```
 
-Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the schedule](#1-set-the-schedule). To play something outside the schedule, see [Override the schedule](#override-the-schedule).
+Then rotate the display to portrait, turn on automatic login, and turn off the TV's auto power-off ([details](#5-macos-settings)). To change the hours, see [Set the seasons and the schedule](#1-set-the-seasons-and-the-schedule). To play something outside the schedule, see [Override the schedule](#override-the-schedule).
 
 ## What you need
 
@@ -56,15 +56,17 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 
 ## The videos
 
-| Playlist | Video | Length |
-|---|---|---|
-| `kid` | `fuzzy_creatures.mp4`: a gang of shaggy, googly-eyed fuzzy creatures runs around the room, then crowds the window, faces pressed to the glass | 0:20 |
-| `kid` | `mochi_ghost_dog.mp4`: Mochi, a real fluffy white dog, trots up to the window and turns into a friendly ghost-dog with glowing green eyes and little horns, then floats away | 0:20 |
-| `grownup` | `jump_scare.mp4`: a pale, gaunt figure stands motionless far back in the dark for a long moment, then suddenly charges and slams against the glass, its hollow-eyed, screaming face filling the window. No blood | 0:20 |
-| `grownup` | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
-| `grownup` | `fuzzy_creatures.mp4`: the same fuzzy creatures | 0:20 |
-| `grownup` | `mochi_ghost_dog.mp4`: the same Mochi | 0:20 |
-| `grownup` | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
+All in the **Halloween** season (October 1–31):
+
+| Folder | Plays | Video | Length |
+|---|---|---|---|
+| `halloween/` | all evening | `fuzzy_creatures.mp4`: a gang of shaggy, googly-eyed fuzzy creatures runs around the room, then crowds the window, faces pressed to the glass | 0:20 |
+| `halloween/` | all evening | `mochi_ghost_dog.mp4`: Mochi, a real fluffy white dog, trots up to the window and turns into a friendly ghost-dog with glowing green eyes and little horns, then floats away | 0:20 |
+| `halloween/grownup/` | grownup only | `big_green_monster.mp4`: a glowing neon monster comes right up to the glass and stares out | 0:20 |
+| `halloween/grownup/` | grownup only | `jump_scare.mp4`: a pale, gaunt figure stands motionless far back in the dark for a long moment, then suddenly charges and slams against the glass, its hollow-eyed, screaming face filling the window. No blood | 0:20 |
+| `halloween/grownup/` | grownup only | `lady_silouette_long.mp4`: a shadowy woman walks past, presses her hand to the glass, and keeps coming back | 1:33 |
+
+So during the `kid` hours it's the fuzzy creatures and Mochi; during `grownup` hours, all five. Thanksgiving and Christmas don't have videos yet, so the window stays black in November and December until some are added.
 
 They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, Mochi and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes.
 
@@ -142,9 +144,27 @@ Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-p
 
 ## Set up the Mac
 
-### 1. Set the schedule
+### 1. Set the seasons and the schedule
 
-Edit `CONFIG.schedule` near the top of `scheduler/video_scheduler.js`. Each period has a start and stop time in 24-hour `HH:MM` and the `playlist` to play.
+Both are near the top of `scheduler/video_scheduler.js`.
+
+**Seasons** say which folder of videos plays on which days:
+
+```js
+seasons: [
+  { name: 'halloween',    from: '10-01', to: '10-31' },
+  { name: 'thanksgiving', from: '11-01', to: '11-30' },
+  { name: 'christmas',    from: '12-01', to: '12-31' },
+],
+```
+
+- `name` is the season's folder in `playlists/`; `from` and `to` are month-day, and both days count.
+- A season can wrap the new year: `{ name: 'winter', from: '12-15', to: '01-06' }`.
+- If seasons overlap, the first one listed wins. On a day no season covers, the window stays black.
+- The season changes at midnight.
+- With no seasons at all (`seasons: []`), playlist folders sit directly in `playlists/` and play all year.
+
+**The schedule** says when the screen is on each day, and which playlist plays. Each period has a start and stop time in 24-hour `HH:MM` and the `playlist` to play.
 
 ```js
 schedule: [
@@ -158,11 +178,12 @@ This is the default: gentler videos in the early morning and during trick-or-tre
 
 - Outside these times the screen shows black.
 - Periods can cross midnight (`{ start: '23:00', stop: '01:00', playlist: 'grownup' }`). If periods overlap, the first one listed wins.
+- During a period, the videos directly in today's season folder play, **plus** any in that season's subfolder named after the playlist, e.g. `halloween/grownup/`. The subfolder is optional: a season with no subfolders plays the same videos all evening.
 - Each playlist resumes where it left off. Above, the evening `kid` period carries on from where the morning one stopped.
-- `playlist` is just a folder name, so you can add more playlists by creating another folder and naming it in the schedule.
+- `playlist` is just a name, so you can add more playlists by naming one in the schedule and giving seasons a subfolder for it.
 - A malformed entry is skipped and reported in the log.
 
-You can change the schedule any time later; run the installer again afterwards.
+You can change the seasons or the schedule any time later; run the installer again afterwards.
 
 ### 2. Install
 
@@ -173,7 +194,6 @@ bash scheduler/install.sh
 Don't use `sudo`. The installer:
 
 - copies the scheduler, the [`show` command](#override-the-schedule) and the [`sync` command](#3-add-the-videos) to `~/video-scheduler/`
-- creates the `kid` and `grownup` playlist folders
 - writes the launch agent with your home folder filled in, checks it, and starts it, which also copies the videos from the repo
 
 It starts again by itself at every login, syncing the videos first. Run the installer again after any change to the script or schedule. It restarts the running copy with the new version; any override is kept.
@@ -183,19 +203,22 @@ It starts again by itself at every login, syncing the videos first. Run the inst
 
 ### 3. Add the videos
 
-The videos are kept in this repo, one folder per playlist, and copied to the Mac:
+The videos are kept in this repo, one folder per season, and copied to the Mac:
 
 ```
 HalloweenWindowDisplay/playlists/        in the repo: the master copy
-├── kid/                                 played during 'kid' periods
-│   ├── fuzzy_creatures.mp4
-│   └── mochi_ghost_dog.mp4
-└── grownup/                             played during 'grownup' periods
-    ├── big_green_monster.mp4
-    └── lady_silouette_long.mp4
+├── halloween/                           Oct 1–31
+│   ├── fuzzy_creatures.mp4              ← every scheduled period
+│   ├── mochi_ghost_dog.mp4
+│   └── grownup/                         ← 'grownup' periods only (optional)
+│       ├── big_green_monster.mp4
+│       ├── jump_scare.mp4
+│       └── lady_silouette_long.mp4
+├── thanksgiving/                        Nov 1–30
+└── christmas/                           Dec 1–31
 
 ~/video-scheduler/                       on the Mac: what actually plays
-├── kid/ · grownup/                      copies of the playlists above
+├── halloween/ · thanksgiving/ · …       copies of the seasons above
 ├── .removed/                            videos taken out of the repo, set aside
 ├── video_scheduler.js · start · sync · show
 ├── scheduler.log
@@ -207,20 +230,20 @@ HalloweenWindowDisplay/playlists/        in the repo: the master copy
 
 ```sh
 cd ~/HalloweenWindowDisplay
-cp ~/Downloads/new-ghost.mp4 playlists/kid/
+cp ~/Downloads/new-ghost.mp4 playlists/halloween/          # or playlists/halloween/grownup/
 git add playlists && git commit -m "Add new-ghost" && git push
 ~/video-scheduler/sync          # or wait for the next login
 ```
 
-`sync` pulls the latest from GitHub, then for each folder in `playlists/`:
+`sync` pulls the latest from GitHub, then for each folder under `playlists/` (seasons and their subfolders):
 
 - copies in videos that are new or changed;
-- moves videos that are no longer in the repo to `~/video-scheduler/.removed/<playlist>/`. It never deletes anything.
+- moves videos that are no longer in the repo, including a whole subfolder deleted from a season, to `~/video-scheduler/.removed/`. It never deletes anything.
 
-Playlist folders that aren't in the repo are left alone, so you can still keep a local-only playlist. The running scheduler picks the changes up by itself. If GitHub can't be reached, or doesn't answer within a minute, `sync` uses the videos already in the repo and the display carries on; it's all in the log.
+Top-level folders that aren't in the repo are left alone, so you can still keep a local-only season. The running scheduler picks the changes up by itself. If GitHub can't be reached, or doesn't answer within a minute, `sync` uses the videos already in the repo and the display carries on; it's all in the log.
 
 > [!WARNING]
-> Once `playlists/kid/` exists in the repo, it's the master copy: kid videos on the Mac that aren't in it are moved to `.removed/` at the next sync. Commit all your videos before relying on sync.
+> Once a season folder (say `playlists/christmas/`) exists in the repo, it's the master copy: videos in that season on the Mac that aren't in the repo are moved to `.removed/` at the next sync. Commit all your videos before relying on sync.
 
 At login it syncs at most once every 10 minutes, so a scheduler that keeps crashing doesn't keep hitting GitHub; `~/video-scheduler/sync` always syncs. GitHub refuses files over 100 MB, so keep each video under that (the ones here are 18–28 MB).
 
@@ -229,7 +252,7 @@ At login it syncs at most once every 10 minutes, so a scheduler that keeps crash
 - New videos are picked up within a few seconds, and videos you add or remove later are picked up as the playlist moves on. No restart needed.
 - Videos are copied in under a hidden name and renamed into place, so a half-copied file is never played.
 - A playlist with a single video simply loops it.
-- An empty folder shows black during its periods, so fill both before Halloween night.
+- A season with no videos shows black during its periods.
 
 ### 4. Check it's working
 
@@ -240,13 +263,13 @@ tail -f ~/video-scheduler/scheduler.log
 You should see lines like:
 
 ```
-10/31/2026, 5:00:00 PM  Now showing: kid (scheduled until 7:30 PM)
-10/31/2026, 5:00:01 PM  kid: playing 1-friendly-ghost.mp4
-10/31/2026, 5:01:12 PM  kid: playing 2-pumpkin.mp4
-10/31/2026, 7:30:00 PM  Now showing: grownup (scheduled until 11:00 PM)
+10/31/2026, 5:00:00 PM  Now showing: halloween/kid (scheduled until 7:30 PM)
+10/31/2026, 5:00:01 PM  halloween/kid: playing fuzzy_creatures.mp4
+10/31/2026, 5:00:21 PM  halloween/kid: playing mochi_ghost_dog.mp4
+10/31/2026, 7:30:00 PM  Now showing: halloween/grownup (scheduled until 11:00 PM)
 ```
 
-Outside the schedule it logs, for example, `Now showing: black (outside schedule until 5:00 PM)`. Press Control-C to stop watching the log; the scheduler keeps running.
+Outside the schedule it logs, for example, `Now showing: black (outside schedule until 5:00 PM)`, and on a day no season covers, `black (no season today, Jan 15)`. Press Control-C to stop watching the log; the scheduler keeps running.
 
 To see a playlist right now without waiting for its time, override the schedule for a few minutes:
 
@@ -279,6 +302,8 @@ The `show` command plays something other than what the schedule says, right now.
 show                           # what's on screen now, and why
 show grownup 30                # grownup for 30 minutes, then back to the schedule
 show kid                       # kid until the schedule next changes
+show christmas/kid 5           # preview another season's kid videos for 5 minutes
+show christmas 5               # preview just a season's own videos
 show off                       # black until the schedule next changes
 show grownup --until-cleared   # grownup until you say otherwise
 show schedule                  # cancel any override; follow the schedule
@@ -287,7 +312,7 @@ show schedule                  # cancel any override; follow the schedule
 ```
 $ show grownup 30
 Showing grownup until 6:42 PM, then back to the schedule.
-Now showing: grownup (override until 6:42 PM)
+Now showing: halloween/grownup (override until 6:42 PM)
 ```
 
 How long an override lasts:
@@ -306,7 +331,7 @@ Overrides end by themselves unless you ask otherwise. That way a forgotten overr
 echo "alias show='$HOME/video-scheduler/show'" >> ~/.zshrc
 ```
 
-Any playlist folder works: `show halloween-party 60` plays `~/video-scheduler/halloween-party/`.
+A plain playlist name (`kid`, `grownup`) means today's season's. To check another season's videos before its dates, name it: `show christmas/grownup 5`. `show` warns about a name that matches no folder, which is usually a typo.
 
 ## Day-to-day
 
@@ -314,10 +339,12 @@ Any playlist folder works: `show halloween-party 60` plays `~/video-scheduler/ha
 |---|---|
 | Play something else right now | `show grownup 30`, `show off`, `show schedule` (see [Override the schedule](#override-the-schedule)) |
 | See what's on screen | `show` |
-| Add, remove or reorder videos | Change them in the repo's `playlists/` folder, commit and push, then `~/video-scheduler/sync` (or wait for the next login) |
+| Add, remove or reorder videos | Change them in the repo's `playlists/<season>/` folder, commit and push, then `~/video-scheduler/sync` (or wait for the next login) |
+| Add a season | Create `playlists/<name>/` with videos, add `{ name, from, to }` to `CONFIG.seasons`, push, then `bash scheduler/install.sh` |
+| Preview a season early | `show christmas 5`, or `show christmas/grownup 5` |
 | Get the latest videos now | `~/video-scheduler/sync` |
 | Undo a removal | Move the file back from `~/video-scheduler/.removed/` and put it back in the repo |
-| Change the schedule | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
+| Change the schedule or season dates | Edit `scheduler/video_scheduler.js`, then run `bash scheduler/install.sh` |
 | Get the latest version of this repo | `git pull`, then `bash scheduler/install.sh` |
 | Restart | `launchctl kickstart -k gui/$(id -u)/com.user.videoscheduler` |
 | Stop | `launchctl bootout gui/$(id -u)/com.user.videoscheduler` (starts again at next login) |
@@ -325,17 +352,15 @@ Any playlist folder works: `show halloween-party 60` plays `~/video-scheduler/ha
 | Quit right now | Control-C on the display (click it first). Stays off until the next login or restart |
 | See what it's doing | `cat ~/video-scheduler/scheduler.log` |
 
-## Upgrading from the single-video version
+## Upgrading to seasons
 
-The first version played one file, `~/video-scheduler/current.mp4`, and its schedule entries had no `playlist`. To move to playlists:
+Before seasons, videos sat in `playlists/kid/` and `playlists/grownup/`. Those moved into `playlists/halloween/` (videos that were in both) and `playlists/halloween/grownup/`. On the Mac:
 
 ```sh
-git pull
-bash scheduler/install.sh                                         # installs the new script, creates kid/ and grownup/
-mv ~/video-scheduler/current.mp4 ~/video-scheduler/grownup/haunted_window_loop.mp4
+cd ~/HalloweenWindowDisplay && git pull && bash scheduler/install.sh
 ```
 
-Then add videos to `kid/`. If you had edited the schedule, re-apply your times in the new format (each entry needs a `playlist`) and run the installer again. Old-style entries without a `playlist` are skipped and reported in the log, not guessed at.
+Sync copies the season folders across. The old `~/video-scheduler/kid/` and `grownup/` no longer play; the installer lists them so you can delete them. If you had edited the schedule, re-apply your times after pulling.
 
 ## Troubleshooting
 
@@ -343,8 +368,9 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 
 | Problem | Fix |
 |---|---|
-| Log says `Cannot read the folder …` | The playlist folder doesn't exist, is misspelled in the schedule, or is in a protected folder. Run `bash scheduler/install.sh` to create `kid` and `grownup` |
-| Log says `No videos in …` | Add `.mp4`, `.m4v` or `.mov` files to that folder. They start within a few seconds |
+| Log says `No folder …, so showing black` | That season has no folder on the Mac: either it has no videos yet (expected), or its name doesn't match `CONFIG.seasons`. Check `playlists/<season>/` is in the repo and run `~/video-scheduler/sync` |
+| Status says `no season today` | No season in `CONFIG.seasons` covers today's date. Add one, or extend a season's dates |
+| Log says `No videos for …` | That season (and its playlist subfolder) has no `.mp4`, `.m4v` or `.mov` files yet. Add some to the repo and sync |
 | Log says `Skipping …` | That file is damaged or in a format macOS can't play. Re-export it as H.264 MP4; the others keep playing |
 | Black screen, log says `playing …` | Check the TV's input and brightness, and that the curtain isn't too thick |
 | Screen isn't following the schedule | An override is probably in force. Run `show` to check, `show schedule` to cancel it |
@@ -353,8 +379,7 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | A video disappeared from the Mac | It isn't in the repo's `playlists/` folder, so sync moved it to `~/video-scheduler/.removed/`. Add it to the repo |
 | `show` says `No status yet` | The scheduler isn't running, or hasn't started since the upgrade. Run `bash scheduler/install.sh` |
 | Log says `Ignoring …/override.json` | The override file was edited by hand and is malformed. Run `show schedule` to delete it |
-| Log says `Ignoring schedule entry` | Fix that entry: times must be `HH:MM` and it needs a `playlist` |
-| Old `current.mp4` no longer plays | Move it into `kid/` or `grownup/`. See [Upgrading](#upgrading-from-the-single-video-version) |
+| Log says `Ignoring schedule entry` or `Ignoring season entry` | Fix that entry: times must be `HH:MM` with a `playlist`; seasons need a `name` and real `MM-DD` dates |
 | Nothing on the TV at all; the Mac desktop shows | The display isn't rotated to portrait, or the agent isn't running: `launchctl print gui/$(id -u)/com.user.videoscheduler` |
 | TV turns itself off in the evening | Disable the TV's auto power-off (see above) |
 | `Bootstrap failed: 5: Input/output error` | An older installer started the new copy before the old one had stopped. `git pull` and run `bash scheduler/install.sh` again |
@@ -364,12 +389,13 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 
 | Path | What it is |
 |---|---|
-| `scheduler/video_scheduler.js` | Plays the scheduled playlist full-screen on the portrait display |
+| `scheduler/video_scheduler.js` | Plays the season's scheduled playlist full-screen on the portrait display |
 | `scheduler/com.user.videoscheduler.plist` | Launch agent template: starts the script at login and restarts it if it crashes |
 | `scheduler/show.sh` | The `show` command for overriding the schedule (installed as `~/video-scheduler/show`) |
 | `scheduler/start.sh` | Run at login: syncs the videos, then starts the scheduler (installed as `~/video-scheduler/start`) |
 | `scheduler/sync_videos.sh` | Pulls the repo and copies `playlists/` into `~/video-scheduler` (installed as `~/video-scheduler/sync`) |
 | `scheduler/install.sh` | Installs or updates the scheduler for the current user |
-| `playlists/` | The videos, one folder per playlist |
+| `scheduler/tests/` | Tests for the scheduler's logic: `node scheduler/tests/scheduler.test.js` |
+| `playlists/` | The videos, one folder per season, with optional playlist subfolders |
 | `video/build_loop.sh` | Builds the 1:33 loop from the two generated clips |
 | `docs/images/` | Frames and diagrams used in this guide |
