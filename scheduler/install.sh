@@ -48,7 +48,7 @@ case "$repo" in
     ;;
 esac
 
-mkdir -p "$dest/kid" "$dest/grownup" "$HOME/Library/LaunchAgents"
+mkdir -p "$dest" "$HOME/Library/LaunchAgents"
 cp "$here/video_scheduler.js" "$dest/"
 cp "$here/show.sh" "$dest/show"
 cp "$here/start.sh" "$dest/start"
@@ -77,7 +77,7 @@ else
 fi
 
 echo "Installed. Log: $dest/scheduler.log"
-echo "Videos come from $repo/playlists/ (kid/, grownup/, ...)."
+echo "Videos come from $repo/playlists/ (one folder per season)."
 echo "They're synced into $dest at every login; to sync now: $dest/sync"
 echo
 echo "Override the schedule with: $dest/show"
@@ -85,9 +85,17 @@ if ! grep -qs "video-scheduler/show" "$HOME/.zshrc"; then
   echo "To type just 'show', run this once and open a new Terminal window:"
   echo "  echo \"alias show='$dest/show'\" >> ~/.zshrc"
 fi
-if [ -f "$dest/current.mp4" ]; then
+# Leftovers from before seasons: playlist folders directly in ~/video-scheduler.
+old=""
+for f in kid grownup; do
+  [ -d "$dest/$f" ] || continue
+  ls "$repo/playlists/$f" 2>/dev/null | grep -qiE '\.(mp4|m4v|mov)$' && continue
+  old="$old $dest/$f"
+done
+[ -f "$dest/current.mp4" ] && old="$old $dest/current.mp4"
+if [ -n "$old" ]; then
   echo
-  echo "Note: $dest/current.mp4 is no longer used."
-  echo "Move it into kid/ or grownup/, for example:"
-  echo "  mv \"$dest/current.mp4\" \"$dest/grownup/\""
+  echo "Note: these are from an older version and no longer play (the videos"
+  echo "now come from season folders). Delete them when you're happy:"
+  echo " $old"
 fi

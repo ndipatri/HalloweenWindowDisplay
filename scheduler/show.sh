@@ -4,11 +4,13 @@
 #   show                          what's on screen now, and why
 #   show grownup                  play grownup until the schedule next changes
 #   show kid 30                   play kid for 30 minutes, then back to the schedule
+#   show christmas/kid 5          preview another season's kid videos for 5 minutes
+#   show christmas 5              preview just a season's own videos
 #   show off                      black until the schedule next changes
 #   show grownup --until-cleared  play grownup until you run `show schedule`
 #   show schedule                 cancel the override and follow the schedule
 #
-# `kid`, `grownup` or any other playlist folder in ~/video-scheduler works.
+# A plain playlist name (kid, grownup) means today's season's.
 # The scheduler picks the change up within a second; no restart needed.
 set -euo pipefail
 
@@ -17,7 +19,7 @@ override="$root/override.json"
 status_file="$root/status"
 
 usage() {
-  sed -n '4,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '4,14p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -85,16 +87,32 @@ if [ "$target" = "off" ] || [ "$target" = "black" ]; then
   label="black"
 else
   case "$target" in
-    */* | .*) echo "Not a playlist name: $target" >&2; exit 1 ;;
+    */*/* | .* | */.* | */ | *'"'* | *\\*)
+      echo "Not a playlist name: $target (use kid, christmas or christmas/kid)" >&2
+      exit 1 ;;
   esac
-  if [ ! -d "$root/$target" ]; then
-    echo "No playlist folder $root/$target" >&2
-    echo "Playlists: $(cd "$root" && ls -d */ 2>/dev/null | tr -d / | tr '\n' ' ')" >&2
-    exit 1
-  fi
-  if ! ls "$root/$target" | grep -qiE '\.(mp4|m4v|mov)$'; then
-    echo "Warning: $root/$target has no videos, so this will show black." >&2
-  fi
+  folders="$(cd "$root" && ls -d */ 2>/dev/null | tr -d / | tr '\n' ' ')"
+  case "$target" in
+    */*)
+      # season/playlist: the season folder must exist; the playlist
+      # subfolder is optional (without it, the season's own videos play).
+      season="${target%%/*}"
+      if [ ! -d "$root/$season" ]; then
+        echo "No folder $root/$season. Folders: $folders" >&2
+        exit 1
+      fi
+      [ -d "$root/$target" ] || echo "Note: $season has no ${target#*/}/ subfolder, so this plays just $season's own videos." >&2
+      ;;
+    *)
+      # A season (or, without seasons, a playlist) folder, a playlist folder
+      # in some season, or a playlist named in the schedule. Anything else is
+      # probably a typo.
+      if [ ! -d "$root/$target" ] && ! ls -d "$root"/*/"$target"/ >/dev/null 2>&1 &&
+        ! grep -q "playlist: '$target'" "$root/video_scheduler.js" 2>/dev/null; then
+        echo "Note: no folder is called $target, so this plays just today's season's own videos. Folders: $folders" >&2
+      fi
+      ;;
+  esac
   playlist_json="\"$target\""
   label="$target"
 fi
