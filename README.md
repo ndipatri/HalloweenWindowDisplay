@@ -49,7 +49,7 @@ Every video belongs to a season: a folder in [`playlists/`](playlists/) with a d
 | Season | Dates | Folder | Videos |
 |---|---|---|---|
 | Halloween | Oct 1–31 | `playlists/halloween/` | 2 for all evening, plus 3 more in `grownup/` for grownup hours ([list](#the-videos)) |
-| Thanksgiving | Nov 1–30 | `playlists/thanksgiving/` | 2 for all evening: a fall dusk scene and Mochi the pilgrim ([list](#the-videos)) |
+| Thanksgiving | Nov 1–30 | `playlists/thanksgiving/` | 2 for all evening: a fall sunset into night and Mochi the pilgrim ([list](#the-videos)) |
 | Christmas | Dec 1–31 | `playlists/christmas/` | None yet: the window stays black |
 
 ### How a season is set up
@@ -145,10 +145,10 @@ So during the `kid` hours it's the fuzzy creatures and Mochi; during `grownup` h
 
 | Folder | Plays | Video | Length |
 |---|---|---|---|
-| `thanksgiving/` | all evening | `fall_dusk.mp4`: a classic autumn dusk: the sun sinks into the hills behind red maples losing their leaves, wind blows leaves across the window and ripples the long grass, the sky glows orange and violet | 0:15 |
+| `thanksgiving/` | all evening | `fall_dusk.mp4`: a classic autumn dusk: the sun sinks into the hills behind red maples losing their leaves, wind blows leaves across the window and ripples the long grass, then the sun slips below the hills, the sky fades through purple to deep blue, and a pale moon rises over the field | 0:25 |
 | `thanksgiving/` | all evening | `mochi_pilgrim.mp4`: Mochi trots up in a little pilgrim hat, gazes out at the street, then spots a floating roast drumstick and chases it out of frame | 0:20 |
 
-They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, both Mochis and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes, and the Thanksgiving videos have none because they're meant to be cozy, not spooky. The fall dusk scene fades in from black and out to black so it loops smoothly, and was cropped slightly to remove a window frame the model drew around it.
+They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, both Mochis and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes, and the Thanksgiving videos have none because they're meant to be cozy, not spooky. The fall dusk scene is two generations, the 15-second dusk and a 10-second extension that carries it on into night, joined with a short dissolve. It fades in from black and out to black so it loops smoothly, and was cropped slightly to remove a window frame the model drew around it.
 
 ### How they were made
 
@@ -164,9 +164,9 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 
 ### What it cost
 
-**About $133 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
+**About $143 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
 
-**Higgsfield** charges per generation; editing afterwards costs nothing. Nine generations were made:
+**Higgsfield** charges per generation; editing afterwards costs nothing. Ten generations were made:
 
 | Generation | Cost (USD) |
 |---|---|
@@ -179,10 +179,11 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 | Jump scare | $17.78 |
 | Mochi the pilgrim | $18.82 |
 | Fall dusk (15 s) | $14.12 |
-| **Total** | **$133.32** |
+| Fall dusk, extended into night (10 s) | $9.41 |
+| **Total** | **$142.73** |
 
-- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**, the jump scare **$17.78**, Mochi the pilgrim **$18.82**, the fall dusk **$14.12**.
-- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures, Mochi and the jump scare used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second), and Mochi the pilgrim and the fall dusk a **500-credit top-up for $29.41** (about $0.059 each). The fall dusk is 15 seconds, so it took 240 credits rather than 320.
+- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**, the jump scare **$17.78**, Mochi the pilgrim **$18.82**, the fall dusk **$23.53** (dusk plus the night extension).
+- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures, Mochi and the jump scare used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second), and Mochi the pilgrim and the fall dusk a **500-credit top-up for $29.41** (about $0.059 each). The fall dusk is 15 seconds, so it took 240 credits rather than 320, and its 10-second night extension 160, from a second 500-credit top-up.
 - Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
 
 **Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
@@ -205,6 +206,10 @@ Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-p
 > Static locked-off camera, vertical frame, a classic New England autumn landscape at dusk, seen as if looking out of a window. In the foreground and middle ground, tall old maple and oak trees in full fall color, deep red, burnt orange and gold, already half bare, with dark branches showing through. Beyond them a gently rolling field of long golden grass and a distant line of hills. The sun is low and failing, a large soft orange disc sinking toward the hills, casting long shadows and a warm red-orange glow across the horizon, the sky fading from amber near the horizon to deep violet and dusky blue above, a few streaky clouds lit pink and orange. A steady autumn wind blows: branches sway, leaves loosen and break away from the trees, and many red, orange and yellow leaves drift, flutter and tumble through the air across the frame, some passing close to the camera, the long grass ripples in waves. Slowly, over the clip, the light dims a little as the sun sinks lower. Peaceful, nostalgic, cinematic, rich warm colors, photorealistic, no people, no animals, no buildings, no text, no camera movement.
 
 "Seen as if looking out of a window" made the model draw a window frame; leave it out next time.
+
+**Fall dusk, extended into night (10 s)**, Seedance 2.5's video-extension mode, continuing forward from the end of the dusk clip
+
+> Continue the same shot exactly: the same static locked-off camera, the same autumn landscape with the red maples, the rolling golden field and the distant hills, the same framing. The sun keeps sinking and slips completely below the hills; the last sliver of orange disappears. The red-orange glow on the horizon fades to a thin band of deep amber, then to dusky purple and finally deep navy blue night. The trees and hills turn into dark silhouettes against the sky. Stars slowly appear and twinkle across the darkening sky, and a soft pale moon glows low in the sky, casting faint silver light on the field. The wind keeps blowing: branches sway, and leaves keep drifting and tumbling through the air, now catching faint moonlight. Ends on a calm, peaceful, dark autumn night. Smooth, gradual, photorealistic, no people, no animals, no buildings, no text, no camera movement.
 
 **Mochi the pilgrim (20 s)**, with the same photo of Mochi as the reference image
 
