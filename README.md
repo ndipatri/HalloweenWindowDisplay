@@ -1,6 +1,6 @@
 # Halloween Window Display
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't.
+A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat.
 
 It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. Videos are grouped into seasons (Halloween, Thanksgiving, Christmas…), so each plays only during its part of the year.
 
@@ -49,7 +49,7 @@ Every video belongs to a season: a folder in [`playlists/`](playlists/) with a d
 | Season | Dates | Folder | Videos |
 |---|---|---|---|
 | Halloween | Oct 1–31 | `playlists/halloween/` | 2 for all evening, plus 3 more in `grownup/` for grownup hours ([list](#the-videos)) |
-| Thanksgiving | Nov 1–30 | `playlists/thanksgiving/` | None yet: the window stays black |
+| Thanksgiving | Nov 1–30 | `playlists/thanksgiving/` | 1 for all evening: Mochi the pilgrim ([list](#the-videos)) |
 | Christmas | Dec 1–31 | `playlists/christmas/` | None yet: the window stays black |
 
 ### How a season is set up
@@ -129,7 +129,7 @@ Then rotate the display to portrait, turn on automatic login, and turn off the T
 
 ## The videos
 
-All in the [Halloween season](#seasons) (October 1–31):
+**[Halloween](#seasons)** (October 1–31):
 
 | Folder | Plays | Video | Length |
 |---|---|---|---|
@@ -141,7 +141,13 @@ All in the [Halloween season](#seasons) (October 1–31):
 
 So during the `kid` hours it's the fuzzy creatures and Mochi; during `grownup` hours, all five.
 
-They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, Mochi and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes.
+**[Thanksgiving](#seasons)** (November 1–30):
+
+| Folder | Plays | Video | Length |
+|---|---|---|---|
+| `thanksgiving/` | all evening | `mochi_pilgrim.mp4`: Mochi trots up in a little pilgrim hat, gazes out at the street, then spots a floating roast drumstick and chases it out of frame | 0:20 |
+
+They're in [`playlists/`](playlists/), 1080 × 1920, silent, and each starts and ends on black so it loops without a visible jump. The woman and the monster are lowered 20% on screen so they stand at window height; the fuzzy creatures, both Mochis and the jump scare fill the whole frame. The jump scare has no flicker, so nothing spoils the still build-up or the moment it strikes, and Mochi the pilgrim has none because Thanksgiving is meant to be cozy, not spooky.
 
 ### How they were made
 
@@ -157,9 +163,9 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 
 ### What it cost
 
-**About $100 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
+**About $119 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of October 2026.
 
-**Higgsfield** charges per generation; editing afterwards costs nothing. Seven generations were made:
+**Higgsfield** charges per generation; editing afterwards costs nothing. Eight generations were made:
 
 | Generation | Cost (USD) |
 |---|---|
@@ -170,10 +176,11 @@ To make new videos the same way, you need a Higgsfield account, a Claude plan, a
 | Fuzzy creatures | $17.78 |
 | Mochi the ghost-dog | $17.78 |
 | Jump scare | $17.78 |
-| **Total** | **$100.38** |
+| Mochi the pilgrim | $18.82 |
+| **Total** | **$119.20** |
 
-- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**, the jump scare **$17.78**.
-- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures, Mochi and the jump scare used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second).
+- By video: the woman's loop cost **$33.97** (including the discarded try), the monster **$13.07**, the fuzzy creatures **$17.78**, Mochi **$17.78**, the jump scare **$17.78**, Mochi the pilgrim **$18.82**.
+- Higgsfield sells credits, and every 20-second 1080p Seedance 2.5 clip costs the same 320 credits; the dollar cost depends on how the credits were bought. The first four used credits from the **Plus plan, $49 a month for 1,200 credits** (about $0.04 each, or $0.65 per second of video). The fuzzy creatures, Mochi and the jump scare used a **1,000-credit top-up for $55.56** (about $0.056 each, or $0.89 per second), and Mochi the pilgrim a **500-credit top-up for $29.41** (about $0.059 each).
 - Free after generation: lowering the picture 20%, the flicker and glitch flashes, fading the monster's top edge, and cutting the loop from 4:20 to 1:33.
 
 **Claude** is a flat monthly subscription, not charged per video, so the conversation that wrote the prompts, checked and edited the videos, and wrote the scheduler, installer and this README cost nothing beyond the plan:
@@ -190,6 +197,10 @@ All plans include connectors such as Higgsfield. A long working session like thi
 Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-pricing-explained) · [Claude plans & pricing](https://claude.com/pricing)
 
 ### The prompts
+
+**Mochi the pilgrim (20 s)**, with the same photo of Mochi as the reference image
+
+> The dog is the small white fluffy dog from the reference image: curly bright white coat, round fluffy head, floppy ears, dark round eyes, black button nose, plumed curly tail. Keep his exact look and breed. Ignore the room, couch and poster in the reference. Static locked-off camera, vertical frame, pure black background, no environment, no floor. The camera is right at a window looking into a dark room. The video begins on an empty, fully black frame. The little white dog appears far back in the darkness, warmly lit by a soft golden autumn glow, wearing a small black pilgrim hat with a shiny gold buckle, and happily trots toward the window, tail wagging, ears bouncing. He arrives right at the glass, extremely close to camera, his fluffy face filling most of the frame under the little pilgrim hat, nose pressed to the glass, big hopeful eyes, tilting his head at the street, adorable and funny. Then a golden roasted turkey drumstick floats slowly through the air just in front of him. His eyes lock onto it, his ears perk up, and he spins around and bounds off after it, chasing it excitedly out of frame. The frame fades back into darkness. The final seconds are an empty, fully black frame, identical to the opening. Warm cozy Thanksgiving mood, playful and funny, kid-friendly, warm golden and amber light on pure black, high contrast, no text, no humans, no other animals, no camera movement.
 
 **Jump scare (20 s)**
 
@@ -270,6 +281,7 @@ HalloweenWindowDisplay/playlists/        in the repo: the master copy
 │       ├── jump_scare.mp4
 │       └── lady_silouette_long.mp4
 ├── thanksgiving/                        Nov 1–30
+│   └── mochi_pilgrim.mp4
 └── christmas/                           Dec 1–31
 
 ~/video-scheduler/                       on the Mac: what actually plays
