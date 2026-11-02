@@ -172,6 +172,7 @@ Changes show on the TV within a couple of seconds. They end by themselves, so a 
 | Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
+| See what it did last week | `ssh tvbox.local`, then `less ~/video-scheduler/scheduler.log.1` (the box keeps about a month of logs) |
 
 Videos removed from the repo aren't deleted from the box; they're moved to `~/video-scheduler/.removed/`.
 

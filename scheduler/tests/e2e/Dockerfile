@@ -20,7 +20,7 @@ RUN apt-get update -qq \
 # runs apt-get itself), plus tools only the test uses: ffmpeg to make test
 # clips and read frames, git for sync, systemd for systemd-analyze, procps.
 RUN apt-get update -qq \
- && apt-get install -y -qq --no-install-recommends mpv nodejs git ffmpeg systemd procps >/dev/null \
+ && apt-get install -y -qq --no-install-recommends mpv nodejs git logrotate ffmpeg systemd procps >/dev/null \
  && rm -rf /var/lib/apt/lists/*
 
 # The person's user, as Raspberry Pi Imager creates it (sudo asks for no
