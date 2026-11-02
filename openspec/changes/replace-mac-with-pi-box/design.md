@@ -29,17 +29,24 @@ See proposal.md - Why. Today `scheduler/video_scheduler.js` mixes two things: th
 - **The logic moves as it is.** Each function keeps its name and body, wrapped in a factory over `io` in place of the JXA globals. Rejected: rewriting it for mpv, which would change what the 26 tests prove.
 - **The playlist queue keeps the same shape over mpv.** `keepPlaying(playlist, mpv)` keeps three videos queued, in name order and round and round. It removes the videos already played from mpv's playlist, logs each one as it starts, and skips a failed one (mpv's `end-file` event with an error). Switching playlists stops mpv and queues the new playlist. A playlist that comes back starts again at the video it was on, the closest mpv gets to the Mac pausing one queue per playlist. Rejected: one mpv per playlist, which would mean several processes holding the screen.
 - **The scheduler tests keep their names.** Their loader requires `logic.js` with fake `io`, and the six playback tests drive a fake mpv instead of a fake AVQueuePlayer, checking the same order, folders and log lines.
-- **mpv settings:** `--idle --force-window` (black when nothing plays), `--fullscreen`, `--vo=gpu --gpu-context=drm` (straight to the TV, no desktop), `--video-rotate=<config>`, `--no-audio`, `--hwdec=auto-safe`, `--prefetch-playlist` (the next video is ready), `--no-osc --osd-level=0`, and `--input-ipc-server`. The Pi 5 decodes H.264 in software, which is fine for one 1080p 24 fps video at a time.
+- **mpv settings:** `--idle --force-window` (black when nothing plays), `--fullscreen`, `--vo=gpu --gpu-context=drm` (straight to the TV, no desktop), `--video-rotate=<config>`, `--no-audio`, `--hwdec=auto-safe`, `--prefetch-playlist` (the next video is ready), `--no-osc --osd-level=0`, `--no-input-default-bindings --input-terminal=no` (no keyboard control: the socket is the only way in), `--cursor-autohide=always`, `--msg-level=all=warn` (only warnings and errors in the log), and `--input-ipc-server=/run/tvbox/mpv.sock` (`mpvSocket` in `config.js`; systemd's `RuntimeDirectory=tvbox` creates `/run/tvbox` for the player's user). The Pi 5 decodes H.264 in software, which is fine for one 1080p 24 fps video at a time.
 - **The clock check** is whether `/run/systemd/timesync/synchronized` exists. systemd-timesyncd creates it once the time is set from the network. It's a file, so tests fake it. Rejected: a fixed wait after boot, which says nothing about whether the time is right.
 - **If mpv exits,** the player logs it and exits with code 1. systemd (`Restart=always`) starts the player again with a fresh mpv. Rejected: restarting mpv inside the player, which duplicates what systemd already does.
-- **The website runs in the player's process** on port 80 (`AmbientCapabilities=CAP_NET_BIND_SERVICE`, so it doesn't need root). It writes `override.json` in the format `show` wrote, so `parseOverride` and the overrides spec apply unchanged. Its replies use `show`'s wording, changed only where `show` named a command.
+- **An error inside one tick** (an mpv command refused, say) is logged as `ERROR: …` and the player carries on with the next tick a second later. Rejected: exiting on any error, which would turn a passing hiccup into a restart and a black screen.
+- **The website runs in the player's process** on port 80 (`AmbientCapabilities=CAP_NET_BIND_SERVICE`, so it doesn't need root). It writes `override.json` in the format `show` wrote, so `parseOverride` and the overrides spec apply unchanged. Its replies use `show`'s wording, changed only where `show` named a command. If the website can't start (port 80 taken, say), that is logged as `ERROR: Website on port …` and the videos keep playing: the TV matters more than the page. Once listening, it logs `Website: http://<hostname>.local/`.
 - **The log** stays `~/video-scheduler/scheduler.log`: systemd appends the player's and the sync's output to it. The status file stays `~/video-scheduler/status`.
 - **Sync** is `sync_videos.sh`, unchanged, installed as `~/video-scheduler/sync` and run by `tvbox-sync.timer` 1 minute after boot and then hourly.
-- **Setup copies the code** into `~/video-scheduler/app/`, so a `git pull` by sync can't change running code. Setup does:
+- **Setup copies the code** into `/opt/tvbox`, so a `git pull` by sync can't change running code. Rejected: `~/video-scheduler/app/`, because every folder in the video folder is offered on the website as a season to preview. Setup does:
   - installs the apt packages (`mpv`, `nodejs`, `git`);
   - adds the user to the `video` and `render` groups;
-  - sets the time zone and enables timesyncd;
-  - writes the units, enables them, and restarts the player.
+  - sets the time zone (`TVBOX_TIMEZONE`, default America/New_York) and turns on network time;
+  - copies `config.js`, `logic.js`, `mpv.js`, `player.js` and `website.js` to `/opt/tvbox`;
+  - writes `~/video-scheduler/sync` from `sync_videos.sh` with the repo's path filled in;
+  - writes the three units from `scheduler/systemd/` and enables them;
+  - runs one sync, so the videos are there before the first play;
+  - starts the hourly timer and restarts the player.
+
+  It checks Node is 18 or later, and refuses to run without `sudo` or as root directly (the box must run as the person's user).
 
   It's safe to rerun.
 

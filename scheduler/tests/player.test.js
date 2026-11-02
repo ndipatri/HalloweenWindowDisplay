@@ -111,6 +111,26 @@ test('the box shows black outside the schedule', async () => {
   assert.equal(b.files[ROOT + '/status'], 'black (outside schedule until Wed 5:00 AM)\n');
 });
 
+test('the box shows black on a day with no season', async () => {
+  const b = box({ halloween: ['fuzzy.mp4'] });
+  b.now = new Date(2026, 0, 15, 18, 0);
+  await b.tick();
+  assert.equal(b.mpv.playing(), null);
+  assert.deepEqual(b.rel(), []);
+  assert.equal(b.files[ROOT + '/status'], 'black (no season today, Jan 15)\n');
+});
+
+test('the box shows black while an override chooses black', async () => {
+  const b = box({ halloween: ['fuzzy.mp4'] });
+  await b.tick();
+  assert.ok(b.mpv.playing());
+  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: null, setAt: +b.now, expires: null, untilCleared: true });
+  await b.tick();
+  assert.equal(b.mpv.playing(), null);
+  assert.deepEqual(b.rel(), []);
+  assert.equal(b.files[ROOT + '/status'], 'black (override until cleared)\n');
+});
+
 // ---- Black until the clock is set ----
 
 test('the box stays black until the clock is set', async () => {

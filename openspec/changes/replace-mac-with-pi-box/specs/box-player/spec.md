@@ -44,6 +44,18 @@ The box SHALL show black, with mpv stopped, outside the schedule, on a day with 
 - **THEN** mpv is stopped with an empty playlist
 - **AND** the status is `black (outside schedule until Wed 5:00 AM)`
 
+#### Scenario: the box shows black on a day with no season
+- **GIVEN** the shipped schedule and seasons, a `halloween` folder with videos, and the clock set
+- **WHEN** the box runs at 6:00 PM on Thursday, Jan 15, 2026
+- **THEN** mpv is stopped with an empty playlist
+- **AND** the status is `black (no season today, Jan 15)`
+
+#### Scenario: the box shows black while an override chooses black
+- **GIVEN** the shipped schedule and seasons, kid playing at 6:00 PM on Oct 20, 2026, and the clock set
+- **WHEN** an override to black until cleared is written and the box runs again
+- **THEN** mpv is stopped with an empty playlist
+- **AND** the status is `black (override until cleared)`
+
 ### Requirement: Black until the clock is set
 The box SHALL show black and play nothing until the system says its clock has been set from the network, and SHALL then follow the schedule.
 

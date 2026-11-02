@@ -10,7 +10,8 @@ Running the window from a Mac means keeping a whole computer logged in behind th
 - A website on the box replaces `show`: it shows what's on screen and why, and changes what plays for a while, or goes back to the schedule.
 - The same `sync` script keeps the videos up to date from GitHub, now every hour.
 - `scheduler/setup.sh` sets up a fresh Raspberry Pi in one run.
-- The README and both skills describe the box instead of the Mac.
+- The README, the playlists README, both skills and the setup diagram (`docs/images/physical-setup.svg`) describe the box instead of the Mac.
+- The `window-display` OpenSpec schema and `openspec/config.yaml` describe the box: its constraints (Node from apt with no npm packages, mpv, `sudo` only for setup), box-only checks in place of Mac-only ones, and a `## Getting it onto the box` section in place of `## Getting it onto the Mac`. The overrides spec's Purpose names the website.
 
 ## Capabilities
 
@@ -24,8 +25,10 @@ Running the window from a Mac means keeping a whole computer logged in behind th
 ## Impact
 
 - `scheduler/`: `video_scheduler.js`, `show.sh`, `start.sh`, `install.sh` and the launchd plist are removed. Added: `config.js`, `logic.js`, `mpv.js`, `player.js`, `website.js`, `setup.sh`, and systemd units. `sync_videos.sh` is unchanged.
-- `scheduler/tests/`: the scheduler tests load the Node modules. New `player.test.js` and `website.test.js`.
-- On the box: the mpv, nodejs and git packages from apt, and three systemd units.
+- `scheduler/tests/`: the scheduler tests load the Node modules. New `player.test.js`, `website.test.js`, and `fake_mpv.js` (the tests' stand-in for mpv).
+- On the box: the mpv, nodejs and git packages from apt, the code in `/opt/tvbox`, and three systemd units.
+- `openspec/`: the schema, its design and tasks templates, `config.yaml`, and the overrides spec's Purpose.
+- `docs/images/physical-setup.svg`, `README.md`, `playlists/README.md`, and both skills in `.claude/skills/`.
 - The Mac keeps playing the version it last installed until it's unplugged.
 
 ## Assumed product decisions

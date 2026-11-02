@@ -38,6 +38,12 @@
 - [x] 6.4 Add the scenario-to-test tables below
 - [x] 6.5 Run `openspec validate replace-mac-with-pi-box --strict` and verify it is valid
 
+## 7. Bringing the artifacts in line with what was built
+
+- [x] 7.1 Add the scenarios the requirements promised but no test checked: black on a day with no season, black while an override chooses black, the website saying the box hasn't started, and refusing minutes that aren't a whole number above zero; verify `node openspec/check-scenarios.js replace-mac-with-pi-box` lists all four as missing a test before their tests exist
+- [x] 7.2 Write their tests. The behaviour was already built, so they passed at once; verify instead that each fails when the code it depends on is broken (no-season day still plays, overrides ignored, the page's not-started text removed, a status invented when there is none, any or fractional minutes accepted). Each did.
+- [x] 7.3 Correct design.md (the code goes to `/opt/tvbox`, not `~/video-scheduler/app/`, and why), and add the mpv control socket and remaining mpv options, the tick and website error handling, and setup's full steps; add the schema, config, diagram and docs changes to the proposal; verify `openspec validate replace-mac-with-pi-box --strict`
+
 New scenarios, the test that enforces each (same name), and a break that makes it fail:
 
 | Scenario (= test name) | Test file | Fails when |
@@ -64,6 +70,10 @@ New scenarios, the test that enforces each (same name), and a break that makes i
 | the website refuses a season that has no folder | `scheduler/tests/website.test.js` | site: season folder not checked |
 | the website lists what it can show | `scheduler/tests/website.test.js` | site: previews without subfolders |
 | the website page offers each choice | `scheduler/tests/website.test.js` | site: page without 60 minutes |
+| the box shows black on a day with no season | `scheduler/tests/player.test.js` | no-season day still plays |
+| the box shows black while an override chooses black | `scheduler/tests/player.test.js` | overrides ignored |
+| the website says when the box has not started yet | `scheduler/tests/website.test.js` | status invented when missing |
+| the website refuses minutes that aren't a whole number above zero | `scheduler/tests/website.test.js` | fractions accepted |
 
 Existing scenarios, now enforced against the Node modules in `scheduler/tests/scheduler.test.js`, with a break in `logic.js` that makes each fail:
 

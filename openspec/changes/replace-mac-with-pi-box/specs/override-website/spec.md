@@ -12,6 +12,12 @@ The website SHALL show the box's current status line, and say when the box has n
 - **WHEN** the website is asked for the status
 - **THEN** it answers with that status line
 
+#### Scenario: the website says when the box has not started yet
+- **GIVEN** no status file
+- **WHEN** the website is asked for the status
+- **THEN** it answers with no status line
+- **AND** its page shows `The box has not started yet.` when there is no status line
+
 ### Requirement: Overrides for a while
 The website SHALL write an override in the same format the box reads, for a playlist name, a season, a season/playlist, or black, lasting until the schedule changes, for a number of minutes, or until switched back, and SHALL say in plain words what it did.
 
@@ -66,6 +72,12 @@ The website SHALL refuse, without writing an override, a name that is not a play
 - **GIVEN** no `easter` folder
 - **WHEN** the website is asked to show `easter/kid`
 - **THEN** the request is refused with `No easter folder on the box`
+- **AND** no override file is written
+
+#### Scenario: the website refuses minutes that aren't a whole number above zero
+- **GIVEN** no override file
+- **WHEN** the website is asked to show `kid` for 0, then -5, then 2.5, then `soon` minutes
+- **THEN** each request is refused with `Not a number of minutes`
 - **AND** no override file is written
 
 ### Requirement: Lists the choices

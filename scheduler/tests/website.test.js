@@ -52,6 +52,14 @@ test('the website shows what is on screen now', () => {
   assert.equal(r.json.status, 'halloween/kid (scheduled until 7:30 PM)');
 });
 
+test('the website says when the box has not started yet', () => {
+  const s = site();
+  const r = s.call('GET', '/api/status');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.status, null);
+  assert.ok(s.call('GET', '/').body.includes("r.status || 'The box has not started yet.'"));
+});
+
 // ---- Overrides for a while ----
 
 test('the website plays a playlist until the schedule changes', () => {
@@ -123,6 +131,16 @@ test('the website refuses a season that has no folder', () => {
   const r = show(s, { target: 'easter/kid', until: 'schedule' });
   assert.equal(r.status, 400);
   assert.ok(r.json.error.startsWith('No easter folder on the box'), r.json.error);
+  assert.equal(s.override(), null);
+});
+
+test("the website refuses minutes that aren't a whole number above zero", () => {
+  const s = site();
+  for (const until of [0, -5, 2.5, 'soon']) {
+    const r = show(s, { target: 'kid', until });
+    assert.equal(r.status, 400, String(until));
+    assert.ok(r.json.error.startsWith('Not a number of minutes'), r.json.error);
+  }
   assert.equal(s.override(), null);
 });
 
