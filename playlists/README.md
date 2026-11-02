@@ -13,4 +13,4 @@ The Mac copies these into `~/video-scheduler/` at every login, or when you run `
 - They play in file-name order, season and subfolder videos mixed; a number prefix (`1-`, `2-`, …) sets the order.
 - Videos that start and end on black loop without a visible jump.
 
-See the main [README](../README.md#3-add-the-videos).
+See the main [README](../README.md).
