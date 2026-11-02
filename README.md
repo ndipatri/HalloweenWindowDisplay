@@ -42,14 +42,14 @@ The videos are kept in this repo, and the Mac pulls the latest at every login. A
 
 ## Seasons
 
-Every video belongs to a season: a folder in [`playlists/`](playlists/) with a date range. The display only plays a season's videos on its dates, so the window can change with the holidays without anyone touching the Mac.
+Every video belongs to a season: a folder in [`playlists/`](playlists/) with a date range, optionally narrowed to certain weekdays plus extra days. The display only plays a season's videos on its days, so the window can change with the holidays without anyone touching the Mac.
 
 ### Seasons set up today
 
 | Season | Dates | Folder | Videos |
 |---|---|---|---|
 | Halloween | Oct 1–31 | `playlists/halloween/` | 2 for all evening, plus 3 more in `grownup/` for grownup hours ([list](#the-videos)) |
-| Thanksgiving | Nov 1–30 | `playlists/thanksgiving/` | 2 for all evening: a fall sunset into night and Mochi the pilgrim ([list](#the-videos)) |
+| Thanksgiving | Fridays and Saturdays from Nov 1 until Thanksgiving, plus the day before and Thanksgiving Day | `playlists/thanksgiving/` | 2 for all evening: a fall sunset into night and Mochi the pilgrim ([list](#the-videos)) |
 | Christmas | Dec 1–31 | `playlists/christmas/` | None yet: the window stays black |
 
 ### How a season is set up
@@ -60,13 +60,35 @@ A season is two things: an entry with its dates, and a folder of videos.
 
 ```js
 seasons: [
-  { name: 'halloween',    from: '10-01', to: '10-31' },
-  { name: 'thanksgiving', from: '11-01', to: '11-30' },
-  { name: 'christmas',    from: '12-01', to: '12-31' },
+  { name: 'halloween', from: '10-01', to: '10-31' },
+  {
+    name: 'thanksgiving',
+    from: '11-01',
+    to: '11-4thu',                     // Thanksgiving: the 4th Thursday in November
+    days: ['fri', 'sat'],              // only Friday and Saturday nights in between
+    alsoOn: ['11-4thu-1', '11-4thu'],  // plus the day before and Thanksgiving Day
+  },
+  { name: 'christmas', from: '12-01', to: '12-31' },
 ],
 ```
 
-`name` is the folder name in `playlists/`. `from` and `to` are month-day, and both days count.
+| Setting | Meaning |
+|---|---|
+| `name` | The folder name in `playlists/`. |
+| `from`, `to` | The first and last day. Both days count. |
+| `days` | Optional. Only these weekdays between `from` and `to`: `'sun'` … `'sat'`, or full names like `'friday'`. Without it, every day. |
+| `alsoOn` | Optional. Extra days that play whatever the weekday, even outside `from`–`to`. |
+
+A day can be written like this:
+
+| Written | Means | Example |
+|---|---|---|
+| `'MM-DD'` | That date every year | `'12-24'` |
+| `'MM-<n><weekday>'` | The nth weekday of the month, so it's right every year; `last` for the last one | `'11-4thu'` Thanksgiving, `'05-lastmon'` Memorial Day |
+| either, with `+N` or `-N` | That many days later or earlier | `'11-4thu-1'` the day before Thanksgiving |
+| `'YYYY-MM-DD'` | One day, one year only (`alsoOn` only) | `'2026-11-14'` for a party |
+
+So in 2026 Thanksgiving plays Nov 6, 7, 13, 14, 20, 21, then 25 and 26, and in 2027 it moves with the holiday to Nov 5, 6, 12, 13, 19, 20, 24 and 25. Every other day in November is black.
 
 **2. Its videos**, in `playlists/<name>/`:
 
@@ -92,7 +114,7 @@ A season with no subfolders plays the same videos all evening. A subfolder can b
 
 **Rules**
 
-- The season changes at midnight.
+- The season changes at midnight, so with `days: ['fri', 'sat']` a period running past midnight on Saturday stops at midnight.
 - A season can run across New Year: `{ name: 'winter', from: '12-15', to: '01-06' }`.
 - If two seasons overlap, the first one listed wins, so a short season (say `{ name: 'christmas-eve', from: '12-24', to: '12-24' }`) listed first takes over just its days.
 - On a day no season covers, or in a season with no videos yet, the window stays black.
@@ -257,6 +279,7 @@ This is the default: gentler videos in the early morning and during trick-or-tre
 
 - Outside these times the screen shows black.
 - Periods can cross midnight (`{ start: '23:00', stop: '01:00', playlist: 'grownup' }`). If periods overlap, the first one listed wins.
+- A period can be limited to some weekdays: `{ start: '09:00', stop: '11:00', playlist: 'kid', days: ['sat', 'sun'] }` adds weekend mornings. A period that crosses midnight belongs to the day it starts on. To choose which *days* the window is on at all, set `days` and `alsoOn` on the [season](#how-a-season-is-set-up) instead.
 - During a period, today's season's own videos play, plus any in its subfolder named after the playlist, e.g. `halloween/grownup/` ([details](#how-a-season-is-set-up)).
 - Each playlist resumes where it left off. Above, the evening `kid` period carries on from where the morning one stopped.
 - `playlist` is just a name, so you can add more playlists by naming one in the schedule and giving seasons a subfolder for it.
@@ -293,7 +316,7 @@ HalloweenWindowDisplay/playlists/        in the repo: the master copy
 │       ├── big_green_monster.mp4
 │       ├── jump_scare.mp4
 │       └── lady_silouette_long.mp4
-├── thanksgiving/                        Nov 1–30
+├── thanksgiving/                        Fri & Sat until Thanksgiving, then Wed & Thu
 │   ├── fall_dusk.mp4
 │   └── mochi_pilgrim.mp4
 └── christmas/                           Dec 1–31

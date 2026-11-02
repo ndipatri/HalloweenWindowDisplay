@@ -11,14 +11,31 @@ const CONFIG = {
   // a background script from reading them.
   videoRoot: HOME + '/video-scheduler',
 
-  // Which season folder plays on which days. Month-day dates, both inclusive;
-  // a season can wrap the new year (from: '12-15', to: '01-06'). If seasons
-  // overlap, the first one listed wins. On a day no season covers, the screen
-  // stays black. With an empty list, playlist folders sit directly in
-  // videoRoot (e.g. ~/video-scheduler/kid) and play all year.
+  // Which season folder plays on which days. On a day no season covers, the
+  // screen stays black. If seasons overlap, the first one listed wins. With
+  // an empty list, playlist folders sit directly in videoRoot
+  // (e.g. ~/video-scheduler/kid) and play all year.
+  //   from, to   first and last day, both inclusive. A season can wrap the
+  //              new year (from: '12-15', to: '01-06').
+  //   days       optional: only these weekdays between from and to,
+  //              e.g. ['fri', 'sat'].
+  //   alsoOn     optional: extra days that play whatever the weekday, even
+  //              outside from..to.
+  // A day is written 'MM-DD' ('11-25'), or as the nth weekday of a month so
+  // it's right every year: '11-4thu' is the 4th Thursday in November
+  // (Thanksgiving), '05-lastmon' the last Monday in May. Add or subtract
+  // days with +N or -N: '11-4thu-1' is the day before Thanksgiving. In
+  // alsoOn, a one-off day can be given with its year: '2026-11-14'.
   seasons: [
     { name: 'halloween', from: '10-01', to: '10-31' },
-    { name: 'thanksgiving', from: '11-01', to: '11-30' },
+    // Friday and Saturday until Thanksgiving, then the day before and the day itself.
+    {
+      name: 'thanksgiving',
+      from: '11-01',
+      to: '11-4thu',
+      days: ['fri', 'sat'],
+      alsoOn: ['11-4thu-1', '11-4thu'],
+    },
     { name: 'christmas', from: '12-01', to: '12-31' },
   ],
 
@@ -26,7 +43,9 @@ const CONFIG = {
   // the videos directly in today's season folder play, plus any in its
   // subfolder named after `playlist` (e.g. halloween/grownup/). The subfolder
   // is optional. Periods can cross midnight. If periods overlap, the first
-  // one listed wins.
+  // one listed wins. A period can be limited to some weekdays with
+  // days: ['sat', 'sun'] (a period that crosses midnight belongs to the day
+  // it starts on).
   schedule: [
     { start: '05:00', stop: '07:00', playlist: 'kid' },
     { start: '17:00', stop: '19:30', playlist: 'kid' },
@@ -61,7 +80,7 @@ function main() {
   log('Started. Videos: ' + CONFIG.videoRoot);
   log(
     seasons.length
-      ? 'Seasons: ' + seasons.map((s) => s.name + ' ' + s.from + '..' + s.to).join(', ')
+      ? 'Seasons: ' + seasons.map(describeSeason).join('; ')
       : 'No seasons: playlists play all year.',
   );
 
@@ -119,15 +138,19 @@ function validSchedule(periods) {
       isTime(period.stop) &&
       typeof period.playlist === 'string' &&
       period.playlist.length > 0 &&
-      !period.playlist.includes('/');
+      !period.playlist.includes('/') &&
+      (period.days === undefined || parseWeekdays(period.days) !== null);
     if (!ok) {
       log(
         'ERROR: Ignoring schedule entry ' + (i + 1) + ': ' + JSON.stringify(period) +
-        ". Expected { start: 'HH:MM', stop: 'HH:MM', playlist: 'kid' }.",
+        ". Expected { start: 'HH:MM', stop: 'HH:MM', playlist: 'kid' }, optionally" +
+        " with days: ['fri', 'sat'].",
       );
     }
     return ok;
-  });
+  }).map((period) =>
+    period.days === undefined ? period : Object.assign({}, period, { weekdays: parseWeekdays(period.days) }),
+  );
 }
 
 function isTime(value) {
@@ -136,12 +159,15 @@ function isTime(value) {
 
 function activePlaylistName(schedule, now) {
   const current = now.getHours() * 60 + now.getMinutes();
+  const today = now.getDay();
+  const yesterday = (today + 6) % 7;
+  const on = (p, weekday) => !p.weekdays || p.weekdays.includes(weekday);
   const period = schedule.find((p) => {
     const start = toMinutes(p.start);
     const stop = toMinutes(p.stop);
-    return start <= stop
-      ? current >= start && current < stop
-      : current >= start || current < stop;
+    if (start <= stop) return current >= start && current < stop && on(p, today);
+    // Crosses midnight: the part after midnight belongs to yesterday's period.
+    return (current >= start && on(p, today)) || (current < stop && on(p, yesterday));
   });
   return period ? period.playlist : null;
 }
@@ -153,18 +179,120 @@ function toMinutes(hhmm) {
 
 // ---------- Seasons ----------
 
+// Checks each season and adds parsed versions of its days: fromDay/toDay
+// and each of alsoOnDays are functions from a year to { year, month, day }
+// (null if there's no such day that year), weekdays a list of 0-6 (Sunday 0).
 function validSeasons(seasons) {
-  return (seasons || []).filter((season, i) => {
-    const ok =
-      isFolderName(season.name) && isMonthDay(season.from) && isMonthDay(season.to);
-    if (!ok) {
+  const out = [];
+  (seasons || []).forEach((season, i) => {
+    const error = seasonError(season);
+    if (error) {
       log(
         'ERROR: Ignoring season entry ' + (i + 1) + ': ' + JSON.stringify(season) +
-        ". Expected { name: 'halloween', from: 'MM-DD', to: 'MM-DD' }.",
+        ': ' + error + ". Expected { name: 'halloween', from: 'MM-DD', to: 'MM-DD' }," +
+        " optionally with days: ['fri', 'sat'] and alsoOn: ['11-4thu'].",
       );
+      return;
     }
-    return ok;
+    out.push(Object.assign({}, season, {
+      fromDay: parseDay(season.from, false),
+      toDay: parseDay(season.to, false),
+      weekdays: season.days === undefined ? null : parseWeekdays(season.days),
+      alsoOnDays: (season.alsoOn || []).map((d) => parseDay(d, true)),
+    }));
   });
+  return out;
+}
+
+function seasonError(season) {
+  if (!season || typeof season !== 'object') return 'not an object';
+  if (!isFolderName(season.name)) return 'bad name';
+  if (!parseDay(season.from, false)) return 'bad from';
+  if (!parseDay(season.to, false)) return 'bad to';
+  if (season.days !== undefined && parseWeekdays(season.days) === null) return 'bad days';
+  if (season.alsoOn !== undefined) {
+    if (!Array.isArray(season.alsoOn)) return 'alsoOn should be a list';
+    const bad = season.alsoOn.find((d) => !parseDay(d, true));
+    if (bad !== undefined) return 'bad alsoOn day ' + JSON.stringify(bad);
+  }
+  return null;
+}
+
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// ['fri', 'Saturday'] -> [5, 6]; null if anything isn't a weekday.
+function parseWeekdays(days) {
+  if (!Array.isArray(days) || days.length === 0) return null;
+  const full = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const out = [];
+  for (const d of days) {
+    const name = typeof d === 'string' ? d.trim().toLowerCase() : '';
+    const n = WEEKDAYS.includes(name) ? WEEKDAYS.indexOf(name) : full.indexOf(name);
+    if (n < 0) return null;
+    out.push(n);
+  }
+  return out;
+}
+
+// Parses a day written as 'MM-DD', 'MM-<n><weekday>' ('11-4thu', '05-lastmon'),
+// either with an optional '+N'/'-N' days, or (if withYear) 'YYYY-MM-DD'.
+// Returns a function from a year to { year, month, day } (null if the day
+// doesn't exist that year, e.g. 02-29), or null if the text is invalid.
+function parseDay(text, withYear) {
+  if (typeof text !== 'string') return null;
+  const t = text.trim().toLowerCase();
+  let m = withYear && /^(\d{4})-(\d\d)-(\d\d)$/.exec(t);
+  if (m) {
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    if (!isMonthDay(m[2] + '-' + m[3])) return null;
+    return (year) => (year === y && validDate(y, mo, d) ? { year: y, month: mo, day: d } : null);
+  }
+  m = /^(\d\d)-(\d\d|[1-5](?:st|nd|rd|th)?|last)(sun|mon|tue|wed|thu|fri|sat)?([+-]\d+)?$/.exec(t);
+  if (!m) return null;
+  const month = Number(m[1]);
+  if (month < 1 || month > 12) return null;
+  const offset = m[4] ? Number(m[4]) : 0;
+  let base;
+  if (/^\d\d$/.test(m[2]) && m[3] === undefined) {
+    if (!isMonthDay(m[1] + '-' + m[2])) return null;
+    const day = Number(m[2]);
+    base = (year) => (validDate(year, month, day) ? new Date(year, month - 1, day) : null);
+  } else {
+    if (m[3] === undefined || /^\d\d$/.test(m[2])) return null;
+    const weekday = WEEKDAYS.indexOf(m[3]);
+    const nth = m[2] === 'last' ? -1 : parseInt(m[2], 10);
+    base = (year) => nthWeekday(year, month, nth, weekday);
+  }
+  return (year) => {
+    const d = base(year);
+    if (!d) return null;
+    d.setDate(d.getDate() + offset);
+    return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+  };
+}
+
+function validDate(year, month, day) {
+  const d = new Date(year, month - 1, day);
+  return d.getMonth() === month - 1;
+}
+
+// The nth (1-5, or -1 for last) given weekday of a month, or null.
+function nthWeekday(year, month, nth, weekday) {
+  if (nth === -1) {
+    const d = new Date(year, month, 0); // last day of the month
+    d.setDate(d.getDate() - ((d.getDay() - weekday + 7) % 7));
+    return d;
+  }
+  const d = new Date(year, month - 1, 1);
+  d.setDate(1 + ((weekday - d.getDay() + 7) % 7) + (nth - 1) * 7);
+  return d.getMonth() === month - 1 ? d : null;
+}
+
+function describeSeason(s) {
+  let text = s.name + ' ' + s.from + '..' + s.to;
+  if (s.days) text += ' ' + s.days.join('/');
+  if (s.alsoOn && s.alsoOn.length) text += ' plus ' + s.alsoOn.join(', ');
+  return text;
 }
 
 function isFolderName(value) {
@@ -178,17 +306,30 @@ function isMonthDay(value) {
   return month >= 1 && month <= 12 && day >= 1 && day <= daysIn[month - 1];
 }
 
-// The season covering `date`, or null. Dates are inclusive, and a season
-// whose `to` is before its `from` wraps the new year.
+// The season covering `date`, or null. A season covers a day in from..to
+// (inclusive; a season whose `to` is before its `from` wraps the new year)
+// that is one of its `days`, and every day in `alsoOn`.
 function activeSeason(seasons, date) {
-  const today = (date.getMonth() + 1) * 100 + date.getDate();
-  const asNumber = (md) => Number(md.replace('-', ''));
-  const season = seasons.find((s) => {
-    const from = asNumber(s.from);
-    const to = asNumber(s.to);
-    return from <= to ? today >= from && today <= to : today >= from || today <= to;
-  });
+  const season = seasons.find((s) => seasonCovers(s, date));
   return season ? season.name : null;
+}
+
+function seasonCovers(s, date) {
+  const year = date.getFullYear();
+  const today = (date.getMonth() + 1) * 100 + date.getDate();
+  const sameDay = (d) =>
+    d && d.year === year && d.month * 100 + d.day === today;
+  if (s.alsoOnDays.some((f) => sameDay(f(year)))) return true;
+  if (s.weekdays && !s.weekdays.includes(date.getDay())) return false;
+  // from and to as month-day numbers in this year (a nth-weekday day
+  // moves from year to year). A day with an offset that lands in another
+  // year (e.g. '01-01-1') is taken by its month and day.
+  const from = s.fromDay(year);
+  const to = s.toDay(year);
+  if (!from || !to) return false; // e.g. 02-29 in a year without one
+  const f = from.month * 100 + from.day;
+  const t = to.month * 100 + to.day;
+  return f <= t ? today >= f && today <= t : today >= f || today <= t;
 }
 
 // Turns a playlist name into what to play: 'kid' becomes today's season
