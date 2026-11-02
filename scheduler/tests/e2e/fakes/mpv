@@ -1,0 +1,5 @@
+#!/bin/bash
+# Wraps the real mpv: there is no TV in the test container, so after the
+# box's own options, draw each frame to a PNG in /tmp/e2e/frames instead.
+# mpv takes the last value given for an option, so these win.
+exec /usr/bin/mpv "$@" --vo=image --vo-image-format=png --vo-image-outdir=/tmp/e2e/frames

@@ -214,10 +214,21 @@ artifacts:
         write one scenario per state.
 
       Window display box-only behaviour: what only the real Raspberry Pi can
-      show (the TV picture, the rotation, smooth playback, systemd starting the
-      services at boot, the network) is not a scenario, because no test can
-      enforce it. Put it in design.md, and its check in tasks.md's `## Workflow
-      follow-up`.
+      show (the TV picture, smooth playback at full size, mpv's output straight
+      to the screen, systemd starting the services at boot, the network) is not
+      a scenario, because no test can enforce it. Put it in design.md, and its
+      check in tasks.md's `## Workflow follow-up`.
+
+      Window display rehearsal: between the Node tests and the Pi there is
+      `scheduler/tests/e2e/box.e2e.sh`, an end-to-end rehearsal on the box's
+      own OS (Debian 13 on arm64 with the Raspberry Pi archive, in Docker). It
+      runs the real `setup.sh`, sync, player, website and mpv (drawing frames
+      to images), and checks what the person would see: the status, the log,
+      the frames and their rotation, black, and recovering when mpv stops.
+      It does not replace scenario tests: every scenario is still a Node test
+      of the same name. Behaviour that only the rehearsal can reach (packages,
+      setup on the real OS, the units, mpv's real output) stays out of the
+      specs, and design.md says which rehearsal check covers it.
 
       Window display product decisions: before finishing this artifact, list the
       decisions the brief leaves open that would change what is shown or
@@ -264,10 +275,12 @@ artifacts:
 
       Good design docs explain the "why" behind technical decisions.
 
-      Window display constraints: the box is a Raspberry Pi running Raspberry Pi
-      OS Lite. The scheduler, player and website run under the Node.js that
-      Raspberry Pi OS installs with apt (18 or later), with no npm packages:
-      only Node's built-in modules. Video plays through mpv. Only
+      Window display constraints: the box is a Raspberry Pi 5 running the latest
+      Raspberry Pi OS Lite (64-bit): today Debian 13 (trixie) on arm64, with
+      Node.js 20 and mpv 0.40 from Debian and ffmpeg from the Raspberry Pi
+      archive. The scheduler, player and website run under that Node.js
+      (setup.sh requires 18 or later), with no npm packages: only Node's
+      built-in modules. Video plays through mpv. Only
       `scheduler/setup.sh` runs with `sudo`; everything else runs as the
       person's user. The box must keep playing when it is offline or GitHub is
       unreachable. Follow the window-display-schedule skill for how the
@@ -279,6 +292,12 @@ artifacts:
       run against fake commands. When a scenario cannot be reached that way,
       change the design until it can, or move the behaviour out of the specs
       as box-only.
+
+      Window display rehearsal in the design: say whether the change touches
+      what the rehearsal runs (`setup.sh`, `sync_videos.sh`, the systemd units,
+      `player.js`, `mpv.js`, `website.js`, the apt packages, or the box's OS
+      version). If it does, name the rehearsal checks that cover it, and the
+      new check `scheduler/tests/e2e/inside.sh` needs for behaviour it adds.
 
       Window display rollout: add a `## Getting it onto the box` section. Say
       whether the change needs setup rerun on the box (`cd ~/HalloweenWindowDisplay
@@ -383,7 +402,12 @@ artifacts:
            reason, and fix it, since it does not enforce its scenario.
         4. Add a table to tasks.md mapping each scenario to its test file, listing
            a scenario only after its test passed the disable check.
-        5. Run `openspec validate <change> --strict` and fix what it reports.
+        5. When the change touches what the rehearsal runs (see design.md),
+           add the new checks to `scheduler/tests/e2e/inside.sh`, run
+           `bash scheduler/tests/e2e/box.e2e.sh` (Docker; slow under arm64
+           emulation), and confirm every check passes. Record the result line
+           (`N passed, 0 failed`) in the task.
+        6. Run `openspec validate <change> --strict` and fix what it reports.
       - `## Workflow follow-up` always ends with getting the change onto the box,
         from design.md's `## Getting it onto the box`: after the PR is merged, the
         person runs `cd ~/HalloweenWindowDisplay && git pull && sudo bash
@@ -414,9 +438,10 @@ apply:
        ask the user before editing it: the tests are the agreed definition
        of the behaviour. Renaming a test breaks its link to its scenario, so
        rename both together, only with the user's agreement.
-    4. Do the verification group, including the disable check and the
-       scenario-to-test table. It is not optional and does not need the
-       user's approval.
+    4. Do the verification group, including the disable check, the
+       scenario-to-test table and, when design.md says the change touches
+       what it runs, the rehearsal on the box's OS. None of it is optional,
+       and none of it needs the user's approval.
     5. Ship as the window-display-schedule skill describes (branch, commit,
        push, PR through `gh api`; merge only when asked), and end by telling
        the person how to get the change onto the box.
