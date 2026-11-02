@@ -1,0 +1,14 @@
+# Updates the videos from GitHub. Run by tvbox-sync.timer; installed by
+# setup.sh, which fills in the __NAMES__.
+[Unit]
+Description=Window display: update the videos from GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+Environment=HOME=__HOME__
+ExecStart=__HOME__/video-scheduler/sync
+StandardOutput=append:__HOME__/video-scheduler/scheduler.log
+StandardError=append:__HOME__/video-scheduler/scheduler.log

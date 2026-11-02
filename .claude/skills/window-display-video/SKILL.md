@@ -5,7 +5,7 @@ description: "Make a new video for the HalloweenWindowDisplay portrait window TV
 
 # Window display video
 
-Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) in an upstairs window, seen from the street at night. A Mac runs a scheduler that plays season folders (`playlists/<season>/`, optional `<season>/<playlist>/` subfolders such as `grownup/`) on a schedule; it syncs videos from the repo at login or via `~/video-scheduler/sync`. For changing seasons or the schedule, use the window-display-schedule skill.
+Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) in an upstairs window, seen from the street at night. A Raspberry Pi box ("the box") plugged into the TV plays season folders (`playlists/<season>/`, optional `<season>/<playlist>/` subfolders such as `grownup/`) on a schedule through mpv; it syncs videos from the repo a minute after boot and then hourly. For changing seasons or the schedule, use the window-display-schedule skill.
 
 ## 1. Agree the idea and the cost
 
@@ -109,4 +109,4 @@ Settings each current video was finished with:
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
-- Tell the person the Mac picks it up at next login, or now with `~/video-scheduler/sync`, and how to preview it: `show <season> 10` (or `show <season>/<playlist> 10`).
+- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to preview it: on http://tvbox.local/, **Preview a season** → the season (or season / playlist), with a duration.

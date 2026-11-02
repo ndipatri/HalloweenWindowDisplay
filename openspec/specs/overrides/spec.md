@@ -1,7 +1,7 @@
 # overrides Specification
 
 ## Purpose
-Lets the person change what is on screen for a while with `show`, for previews or to switch the screen off, without the change outliving the schedule.
+Lets the person change what is on screen for a while from the box's website, for previews or to switch the screen off, without the change outliving the schedule.
 
 ## Requirements
 

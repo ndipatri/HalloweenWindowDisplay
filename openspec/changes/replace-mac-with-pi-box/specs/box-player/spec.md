@@ -27,6 +27,14 @@ While the clock is set, the box SHALL play what the schedule and any override ch
 - **WHEN** `b.mp4` is added to the folder and the queue next needs topping up
 - **THEN** `halloween/b.mp4` is queued after `halloween/a.mp4`
 
+### Requirement: Keeps the next videos queued
+While a playlist plays, mpv's playlist SHALL hold the playing video and the next two, so each video follows the last without a gap, and SHALL drop videos once they have played.
+
+#### Scenario: the box keeps the next videos queued
+- **GIVEN** the kid playlist playing from a `halloween` folder with `a.mp4`, `b.mp4` and `c.mp4`
+- **WHEN** five videos in a row finish
+- **THEN** after each one, mpv's playlist holds exactly three videos, the first of them playing
+
 ### Requirement: Black when nothing should play
 The box SHALL show black, with mpv stopped, outside the schedule, on a day with no season, and while an override chooses black.
 

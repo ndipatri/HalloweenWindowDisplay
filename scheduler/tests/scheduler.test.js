@@ -1,65 +1,34 @@
-// Tests for video_scheduler.js's logic, run with Node (no Mac needed):
+// Tests for the scheduler's logic (scheduler/logic.js), run with Node:
 //   node scheduler/tests/scheduler.test.js
-// The macOS parts (windows, AVFoundation, files) are replaced with fakes.
+// Files, folders and mpv are replaced with fakes.
 'use strict';
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
 const assert = require('assert');
+const { createScheduler } = require('../logic.js');
+const config = require('../config.js');
+const { FakeMpv } = require('./fake_mpv.js');
 
-const SCRIPT = path.join(__dirname, '..', 'video_scheduler.js');
+const ROOT = '/home/test/video-scheduler';
 
 // Loads the scheduler with fakes. `files` maps paths to file contents;
 // `dirs` maps folder paths to lists of names in them.
 function load({ files = {}, dirs = {} } = {}) {
   const logs = [];
-  const nil = { isNil: () => true };
-  const wrap = (v) => (v === undefined ? nil : { isNil: () => false, value: v });
-  const ctx = {
-    console: { log: (m) => logs.push(m) },
-    ObjC: { import() {}, unwrap: (x) => (x && x.value !== undefined ? x.value : x), deepUnwrap: (x) => x.value },
-    $: {
-      NSHomeDirectory: () => '/Users/test',
-      NSFileManager: { defaultManager: { contentsOfDirectoryAtPathError: (p) => wrap(dirs[p]) } },
-      NSURL: { fileURLWithPath: (p) => ({ path: p }) },
-      NSClassFromString: (name) =>
-        name === 'AVPlayerItem'
-          ? { playerItemWithURL: (url) => ({ isNil: () => false, status: 1, url }) }
-          : { alloc: { get init() { return new FakeQueuePlayer(); } } },
-    },
-  };
-  vm.createContext(ctx);
-  const source = fs.readFileSync(SCRIPT, 'utf8').replace(/\nmain\(\);\s*$/, '\n');
-  vm.runInContext(
-    source +
-      `;readText = (p) => (p in FILES ? FILES[p] : null);
-       writeText = (p, t) => { FILES[p] = t; };
-       removeFile = (p) => { delete FILES[p]; };
-       fileName = (item) => item.url.path.split('/').pop();
-       this.T = { CONFIG, OVERRIDE_PATH, validSchedule, validSeasons, activeSeason, resolve, parseDay,
-                  foldersFor, whatToShow, createPlaylist, keepPlaying, parseOverride };`,
-    Object.assign(ctx, { FILES: files }),
-  );
-  return { T: ctx.T, logs, files, dirs };
-}
-
-class FakeQueuePlayer {
-  constructor() { this.q = []; this.status = 0; this.rate = 0; }
-  get items() { const q = this.q; return { get count() { return q.length; }, get lastObject() { return q[q.length - 1]; } }; }
-  get currentItem() { return this.q[0] || { isNil: () => true }; }
-  replaceCurrentItemWithPlayerItem(item) { this.q = [item, ...this.q.slice(1)]; }
-  insertItemAfterItem(item, after) {
-    if (after == null) throw new Error('-[NSNull _nameForLogging]: unrecognized selector');
-    this.q.splice(this.q.indexOf(after) + 1, 0, item);
-  }
-  get advanceToNextItem() { this.q.shift(); return undefined; }
+  const T = createScheduler({
+    config,
+    videoRoot: ROOT,
+    readText: (p) => (p in files ? files[p] : null),
+    writeText: (p, text) => { files[p] = text; },
+    removeFile: (p) => { delete files[p]; },
+    listFolder: (p) => (p in dirs ? dirs[p].slice() : null),
+    log: (m) => logs.push(m),
+  });
+  return { T, logs, files, dirs };
 }
 
 const at = (month, day, h = 12, m = 0) => new Date(2026, month - 1, day, h, m);
 let passed = 0;
-function test(name, fn) {
-  try { fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }
-}
+const tests = [];
+function test(name, fn) { tests.push([name, fn]); }
 
 const { T } = load();
 const schedule = T.validSchedule(T.CONFIG.schedule);
@@ -273,19 +242,20 @@ test('override file validation', () => {
 
 // ---- Building and playing a playlist ----
 
-const ROOT = '/Users/test/video-scheduler';
+const rel = (paths) => paths.map((p) => p.replace(ROOT + '/', ''));
 
-test('season videos and subfolder videos play together, in name order, round and round', () => {
+test('season videos and subfolder videos play together, in name order, round and round', async () => {
   const { T: t } = load({ dirs: {
     [ROOT + '/halloween']: ['grownup', 'fuzzy.mp4', 'mochi.mp4', 'notes.txt', '.DS_Store'],
     [ROOT + '/halloween/grownup']: ['jump.mp4', 'lady.mp4'],
   } });
   const p = t.createPlaylist('halloween/grownup', seasons);
+  const mpv = new FakeMpv();
   const played = [];
   for (let i = 0; i < 8; i++) {
-    t.keepPlaying(p);
-    played.push(p.player.q[0].url.path.replace(ROOT + '/', ''));
-    p.player.advanceToNextItem;
+    await t.keepPlaying(p, mpv);
+    played.push(mpv.playing().replace(ROOT + '/', ''));
+    mpv.finish();
   }
   assert.deepEqual(played, [
     'halloween/fuzzy.mp4', 'halloween/grownup/jump.mp4', 'halloween/grownup/lady.mp4', 'halloween/mochi.mp4',
@@ -293,43 +263,54 @@ test('season videos and subfolder videos play together, in name order, round and
   ]);
 });
 
-test('a season without the playlist subfolder plays just its own videos', () => {
+test('a season without the playlist subfolder plays just its own videos', async () => {
   const { T: t, logs } = load({ dirs: { [ROOT + '/halloween']: ['fuzzy.mp4', 'mochi.mp4'] } });
   const p = t.createPlaylist('halloween/kid', seasons);
-  assert.equal(t.keepPlaying(p), true);
-  assert.deepEqual(p.player.q.map((i) => i.url.path.split('/').pop()), ['fuzzy.mp4', 'mochi.mp4', 'fuzzy.mp4']);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), true);
+  assert.deepEqual(mpv.files().map((f) => f.split('/').pop()), ['fuzzy.mp4', 'mochi.mp4', 'fuzzy.mp4']);
   assert.ok(!logs.some((l) => /ERROR/.test(l)));
 });
 
-test('the same file name in both folders plays both copies', () => {
+test('the same file name in both folders plays both copies', async () => {
   const { T: t } = load({ dirs: { [ROOT + '/halloween']: ['a.mp4'], [ROOT + '/halloween/kid']: ['a.mp4'] } });
   const p = t.createPlaylist('halloween/kid', seasons);
-  t.keepPlaying(p);
-  assert.deepEqual(p.player.q.map((i) => i.url.path.replace(ROOT + '/', '')), ['halloween/a.mp4', 'halloween/kid/a.mp4', 'halloween/a.mp4']);
+  const mpv = new FakeMpv();
+  await t.keepPlaying(p, mpv);
+  assert.deepEqual(rel(mpv.files()), ['halloween/a.mp4', 'halloween/kid/a.mp4', 'halloween/a.mp4']);
 });
 
-test('a missing season folder is reported once (not as an error) and shows black', () => {
+test('a missing season folder is reported once (not as an error) and shows black', async () => {
   const { T: t, logs } = load({ dirs: {} });
   const p = t.createPlaylist('thanksgiving/kid', seasons);
-  assert.equal(t.keepPlaying(p), false);
-  assert.equal(t.keepPlaying(p), false);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(mpv.playing(), null);
   assert.equal(logs.filter((l) => /No folder .*thanksgiving, so showing black/.test(l)).length, 1);
   assert.ok(!logs.some((l) => /ERROR/.test(l)));
 });
 
-test('an empty season is reported once and shows black', () => {
+test('an empty season is reported once and shows black', async () => {
   const { T: t, logs } = load({ dirs: { [ROOT + '/thanksgiving']: [] } });
   const p = t.createPlaylist('thanksgiving/kid', seasons);
-  assert.equal(t.keepPlaying(p), false);
-  t.keepPlaying(p);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  await t.keepPlaying(p, mpv);
   assert.equal(logs.filter((l) => /No videos for thanksgiving\/kid/.test(l)).length, 1);
 });
 
-test('without seasons, a playlist folder plays as before', () => {
+test('without seasons, a playlist folder plays as before', async () => {
   const { T: t } = load({ dirs: { [ROOT + '/kid']: ['2-b.mp4', '10-c.mp4', '1-a.mp4'] } });
   const p = t.createPlaylist('kid', []);
-  t.keepPlaying(p);
-  assert.deepEqual(p.player.q.map((i) => i.url.path.split('/').pop()), ['1-a.mp4', '2-b.mp4', '10-c.mp4']);
+  const mpv = new FakeMpv();
+  await t.keepPlaying(p, mpv);
+  assert.deepEqual(mpv.files().map((f) => f.split('/').pop()), ['1-a.mp4', '2-b.mp4', '10-c.mp4']);
 });
 
-console.log(passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));
+(async () => {
+  for (const [name, fn] of tests) {
+    try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }
+  }
+  console.log(passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));
+})();
