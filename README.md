@@ -223,7 +223,7 @@ Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-p
 
 ### The prompts
 
-All ten generations, word for word, including the discarded first try. Each was Seedance 2.5 at 1080p with no audio; all but the night extension are text-to-video at 9:16 (the two Mochis add a reference photo).
+The prompts behind every video in `playlists/`, word for word. The woman's loop is two generations joined (the walk and the hand on the glass), and so is the fall dusk (the dusk and its night extension). Each was Seedance 2.5 at 1080p with no audio; all but the night extension are text-to-video at 9:16 (the two Mochis add a reference photo).
 
 **Fall dusk (15 s)**
 
@@ -251,15 +251,9 @@ All ten generations, word for word, including the discarded first try. Each was 
 
 > Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a pitch-dark room. The video begins on an empty, fully black frame. A gang of six shaggy, fuzzy, handmade puppet-like creatures appears in the darkness of the room: long wild shaggy fur in vivid saturated colors, one lime green, one hot pink, one electric blue, one bright orange, one purple, one yellow; big round googly eyes with small black pupils, wide floppy felt mouths, some with little horns, antennae or droopy ears, gangly arms. They are lit only by soft colored rim light against pitch black. They scamper and run around the room behind the glass, tumbling, bouncing, chasing each other and bumping into one another, playful and chaotic. Then all at once they notice the window, freeze, and rush forward together, converging on the glass and crowding against it, extremely close to camera: their fuzzy faces fill the entire frame from edge to edge, squished together, fur pressed against the glass, big googly eyes peering out at the street, blinking, mouths agape, jostling for space, mischievous and curious. They hold there, staring out. Then they slowly back away together, retreating into the darkness of the room, shrinking and fading until they dissolve completely into the black. The final seconds are an empty, fully black frame, identical to the opening. Handcrafted fuzzy puppet aesthetic, playful but eerie Halloween mood, high contrast, saturated colors on pure black, no text, no humans, no camera movement.
 
-**Woman, walk, second try (20 s, used)**
+**Woman, walk (20 s)**
 
 > Static locked-off camera, vertical frame, pure black background, no environment, no floor, no light sources. The camera is right at a window looking into a dark room, and the woman stands directly against the glass, extremely close to camera. Her figure is huge and fills the entire height of the frame: the top of her head touches the top edge of the frame and her body extends down past the bottom edge. She is a solid jet-black silhouette, a featureless dark shape with only a faint soft grey rim of backlight tracing her outline: long hair, shoulders, a long dress. No face, no eyes, no details, no color. The video begins on an empty, fully black frame. She slowly steps in from the left edge, close to the glass and still filling the full frame height, drifts across, stops in the center facing the viewer as if pressed to the window staring out, sways slightly and tilts her head, then slides out of frame on the right. She re-enters from the right, again full height and close to the glass, then turns and slowly walks back into the darkness of the room, shrinking and fading until she dissolves into the black. The final seconds are an empty, fully black frame, identical to the opening. Slow, eerie, ghostly, unhurried, smooth movement. Minimal, haunting, high contrast, no text, no other people, no camera movement.
-
-**Woman, walk, first try (20 s, discarded)**
-
-> Static locked-off camera, vertical frame, completely pure black background, no environment, no floor, no light sources. The video begins on an empty, fully black frame. A woman appears only as a solid jet-black silhouette, a featureless dark shape with a faint, soft grey rim of backlight tracing her outline: long hair, a long flowing dress. No face, no eyes, no details, no color. She slowly walks in from the left edge of the frame, drifts across, pauses in the center facing the viewer as if staring out a window, sways slightly, then walks out of frame on the right. She re-enters from the right, then turns and slowly walks away from the camera into the darkness, growing smaller and fainter until she dissolves completely into the black. The final seconds are an empty, fully black frame, identical to the opening. Slow, eerie, ghostly, unhurried movement, smooth and fluid. Minimal, haunting, high contrast, no text, no other people, no camera movement.
-
-This made her too small: a figure in the middle of the room rather than at the window. The second try fixed it by putting the camera at the window and saying she fills the frame from top to bottom.
 
 **Woman, hand on the glass (12 s)**
 
