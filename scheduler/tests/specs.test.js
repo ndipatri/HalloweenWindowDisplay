@@ -25,8 +25,9 @@ function project(files) {
 
 test('every scenario in the main specs has a test of the same name', () => {
   const { missing, duplicates } = check({ changes: [] });
-  assert.deepEqual(missing.map((s) => s.name), [], 'scenarios without a test');
-  assert.deepEqual(duplicates.map((s) => s.name), [], 'scenario names used twice');
+  const where = (s) => `"${s.name}" (${path.relative(path.join(__dirname, '..', '..'), s.file)}:${s.line})`;
+  assert.equal(missing.length, 0, 'no test named ' + missing.map(where).join(', '));
+  assert.equal(duplicates.length, 0, 'scenario name used twice: ' + duplicates.map(where).join(', '));
 });
 
 // ---- The check itself ----
