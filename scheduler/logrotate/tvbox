@@ -1,0 +1,19 @@
+# Keeps ~/video-scheduler/scheduler.log from filling the SD card. Installed
+# by setup.sh as /etc/logrotate.d/tvbox, which fills in the __NAMES__;
+# Raspberry Pi OS runs logrotate daily.
+#
+# Weekly, or sooner once it passes 5 MB; four old logs are kept, compressed
+# (the newest old one, scheduler.log.1, stays plain for easy reading).
+# copytruncate: the player and sync keep the log open (systemd appends to
+# it), so it is copied and emptied in place rather than renamed.
+__HOME__/video-scheduler/scheduler.log {
+    su __USER__ __USER__
+    weekly
+    maxsize 5M
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

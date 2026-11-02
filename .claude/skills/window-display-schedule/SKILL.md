@@ -61,11 +61,12 @@ If the box shows the wrong season, check first whether setup was rerun after the
 ## How the box works
 
 - `sudo bash scheduler/setup.sh` (run from the person's user, so `SUDO_USER` is them; safe to rerun):
-  - installs `mpv`, `nodejs` and `git` with apt;
+  - installs `mpv`, `nodejs`, `git` and `logrotate` with apt;
   - creates the `video` and `render` groups if missing (tvbox.service asks for both, and systemd won't start it without them), and adds the user to them;
   - sets the time zone (`TVBOX_TIMEZONE`, default America/New_York) and turns on network time;
   - copies `config.js`, `logic.js`, `mpv.js`, `player.js` and `website.js` to `/opt/tvbox`;
   - writes `~/video-scheduler/sync` with the repo path;
+  - installs `/etc/logrotate.d/tvbox` from `scheduler/logrotate/tvbox` (see Files below);
   - installs `tvbox.service`, `tvbox-sync.service` and `tvbox-sync.timer` from `scheduler/systemd/`;
   - syncs once, then restarts the player.
 
@@ -87,6 +88,7 @@ If the box shows the wrong season, check first whether setup was rerun after the
 
   GitHub refuses files over 100 MB. The Pi 5 decodes H.264 in software (fine at 1080p 24 fps); if playback stutters, re-encode to HEVC, which it decodes in hardware.
 - **Files in `~/video-scheduler/`:** `scheduler.log` (what's showing and why on every change, each video as it starts, overrides, sync, problems), `status` (one line, what the website shows), `override.json` (only while an override is on), `.removed/`.
+  `scheduler.log` is rotated by logrotate (Raspberry Pi OS runs it daily): weekly, or sooner past 5 MB, keeping four old logs (`scheduler.log.1`, then compressed `.2.gz` to `.4.gz`). It uses `copytruncate` because the services keep the log open; without it, they would go on writing into the rotated file (the rehearsal checks this).
 - **systemd:**
   - restart: `sudo systemctl restart tvbox`;
   - stop until next boot: `sudo systemctl stop tvbox`;

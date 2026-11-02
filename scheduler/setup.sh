@@ -5,11 +5,12 @@
 #   cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
 #
 # Safe to run again. It:
-#   - installs mpv, Node.js and git
+#   - installs mpv, Node.js, git and logrotate
 #   - lets your user use the screen (video and render groups)
 #   - sets the time zone and turns on network time
 #   - copies the player and website to /opt/tvbox
 #   - installs the video sync as ~/video-scheduler/sync
+#   - keeps the log from growing forever (/etc/logrotate.d/tvbox)
 #   - installs and starts tvbox.service (player and website) and
 #     tvbox-sync.timer (sync a minute after boot, then hourly)
 #
@@ -40,9 +41,9 @@ videos="$home/video-scheduler"
 say() { echo "==> $*"; }
 owned() { [ -n "$root" ] || chown -R "$user:" "$@"; }
 
-say "Installing mpv, Node.js and git"
+say "Installing mpv, Node.js, git and logrotate"
 apt-get update -qq
-apt-get install -y -qq mpv nodejs git >/dev/null
+apt-get install -y -qq mpv nodejs git logrotate >/dev/null
 major="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$major" -lt 18 ]; then
   echo "Node.js $major is too old; the box needs 18 or later." >&2
@@ -74,6 +75,11 @@ sed "s|__REPO__|$repo|" "$here/sync_videos.sh" > "$videos/sync"
 chmod +x "$videos/sync"
 touch "$videos/scheduler.log"
 owned "$videos"
+
+say "Keeping the log from growing forever"
+mkdir -p "$root/etc/logrotate.d"
+sed -e "s|__USER__|$user|g" -e "s|__HOME__|$home|g" "$here/logrotate/tvbox" > "$root/etc/logrotate.d/tvbox"
+chmod 644 "$root/etc/logrotate.d/tvbox"
 
 say "Installing the services"
 mkdir -p "$units"

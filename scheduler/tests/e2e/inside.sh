@@ -67,6 +67,8 @@ check "systemd accepts the units" \
 check "setup's first sync copies the videos over" \
   test -f "$VIDEOS/halloween/a.mp4" -a -f "$VIDEOS/halloween/grownup/c.mp4"
 check "sync logs that GitHub can't be reached and carries on" bash -c "grep -q \"Couldn't pull\" '$LOG'"
+check "setup installs the log rule, and logrotate accepts it" \
+  bash -c "test -f /etc/logrotate.d/tvbox && ! logrotate -d /etc/logrotate.d/tvbox 2>&1 | grep -qi 'error'"
 
 echo "== The player, as tvbox.service runs it (website on 8080 instead of 80)"
 # What systemd would provide: /run/tvbox, and the clock set from the network.
@@ -100,9 +102,16 @@ if [ -n "$frame" ]; then
     process.exit([[255, 165, 0], [128, 0, 128], [0, 255, 0]].some(near) ? 0 : 1);"
 fi
 
+echo "== The log is rotated while the player runs"
+logrotate -f /etc/logrotate.d/tvbox
+check "rotating keeps the old log as scheduler.log.1" grep -q "Seasons: " "$VIDEOS/scheduler.log.1"
+check "the new log starts empty" test "$(stat -c %s "$LOG")" -lt 2000
+
 echo "== Black, then back to the schedule"
 echo "   $(post /api/show '{"target":"black","until":"cleared"}')"
 check "black shows in the status" within 20 bash -c '[ "$(status)" = "black (override until cleared)" ]'
+check "after rotating, the player keeps writing to the log" within 20 logged "Now showing: black (override until cleared)"
+check "the rotated log has no gap of empty bytes" bash -c "tr -d '\\000' < '$LOG' | cmp -s - '$LOG'"
 sleep 3
 before=$(ls "$E/frames" | wc -l); sleep 4; after=$(ls "$E/frames" | wc -l)
 check "no frames are drawn while black" test "$before" -eq "$after"
