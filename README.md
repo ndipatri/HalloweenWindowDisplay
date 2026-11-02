@@ -2,7 +2,7 @@
 
 A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat, between views of an autumn sunset that fades into a moonlit night.
 
-It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, Christmas.
+It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry Pi box that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, Christmas.
 
 <table align="center">
   <tr>
@@ -26,14 +26,14 @@ It's a portrait TV standing behind a sheer curtain, driven by a Mac that plays A
 
 ## How it works
 
-![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Mac](docs/images/physical-setup.svg)
+![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Raspberry Pi box](docs/images/physical-setup.svg)
 
-A Mac plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. Two things decide what's on screen:
+A Raspberry Pi box, plugged into the TV's HDMI, plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. Two things decide what's on screen:
 
 - **The season**, from the date: Halloween videos in October, Thanksgiving in November, Christmas in December.
 - **The time of day**: gentler "kid" videos in the early morning and early evening, scarier "grownup" ones later, and a black screen the rest of the time.
 
-The videos are kept in this repo, and the Mac picks up the latest at every login.
+The videos are kept in this repo, and the box picks up the latest by itself every hour. A page on your phone shows what's playing and lets you change it for a while.
 
 ## What's playing
 
@@ -52,7 +52,7 @@ Each day:
 | 7:30–11 pm | Grownup videos |
 | Any other time | Black |
 
-On a day outside every season, the window stays black. The dates and times can be changed; they're set near the top of `scheduler/video_scheduler.js`.
+On a day outside every season, the window stays black. The dates and times can be changed; they're set in `scheduler/config.js`.
 
 ## The videos
 
@@ -124,31 +124,24 @@ What was asked for, word for word. The woman's video is two clips joined togethe
 ### What you need
 
 - A TV or monitor that can stand upright (this one is 1080 × 1920).
-- A Mac connected to it over HDMI.
+- A Raspberry Pi 5 with its power supply, a microSD card (32 GB or more) and a micro-HDMI to HDMI cable.
 - A sheer white or grey curtain for the window.
 
-### The Mac
+### The box
 
-In Terminal (not as an administrator; no `sudo`):
+1. On a computer, use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to put **Raspberry Pi OS Lite (64-bit)** on the microSD card. In its settings, set the name to `tvbox`, your Wi‑Fi, a username and password, and turn on SSH.
+2. Put the card in the Pi, plug the Pi into the TV, and power it on.
+3. From your computer's Terminal, log in to it and set it up (it asks for your password):
 
-```sh
-git clone https://github.com/ndipatri/HalloweenWindowDisplay.git ~/HalloweenWindowDisplay
-cd ~/HalloweenWindowDisplay
-bash scheduler/install.sh
-```
+   ```sh
+   ssh tvbox.local
+   git clone https://github.com/ndipatri/HalloweenWindowDisplay.git ~/HalloweenWindowDisplay
+   cd ~/HalloweenWindowDisplay && sudo bash scheduler/setup.sh
+   ```
 
-That installs it, copies the videos over, and starts it. From then on it starts by itself whenever the Mac logs in. Keep the folder where it is: not in Desktop, Documents or Downloads, which macOS keeps it from reading.
+That installs everything, copies the videos over, and starts it. From then on it starts by itself whenever the box is plugged in. The screen stays black for a moment after it starts, until the box has the right time from the internet.
 
-Then, in System Settings:
-
-| Setting | Where | Why |
-|---|---|---|
-| Rotate the display to portrait | Displays → Rotation | It only plays on a display that's taller than it is wide |
-| Automatic login | Users & Groups | It only runs while someone's logged in |
-| Do Not Disturb on a schedule | Focus → Do Not Disturb | Keeps notifications from popping up over the videos |
-| Don't install macOS updates automatically | General → Software Update | An overnight restart can leave the Mac stuck at a login screen |
-
-To try it straight away: `~/video-scheduler/show kid 5` plays the kid videos for five minutes.
+If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `scheduler/config.js` and run the last line again.
 
 ### The window
 
@@ -160,50 +153,47 @@ To try it straight away: `~/video-scheduler/show kid 5` plays the kid videos for
 
 ## Using it
 
-### Play something else for a while
+### See what's on, or play something else for a while
 
-The `show` command overrides the schedule:
+Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-```sh
-show                  # what's on screen now, and why
-show grownup 30       # the grownup videos for 30 minutes, then back to normal
-show kid              # the kid videos until the schedule next changes
-show thanksgiving 10  # a season's videos for 10 minutes, even on other days
-show off              # black until the schedule next changes
-show schedule         # back to the schedule now
-```
+- play the **Kid** or **Grownup** videos, or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
+- **preview a season**: another season's videos, even on other days;
+- go **Back to schedule**.
 
-Overrides end by themselves, so a forgotten one can't leave the scary videos on in the morning. To type just `show` instead of `~/video-scheduler/show`, run this once and open a new Terminal window:
-
-```sh
-echo "alias show='$HOME/video-scheduler/show'" >> ~/.zshrc
-```
+Changes show on the TV within a couple of seconds. They end by themselves, so a forgotten one can't leave the scary videos on in the morning (unless you chose "Until switched back").
 
 ### Everyday tasks
 
-| To | Do this on the Mac |
+| To | Do this |
 |---|---|
-| See what's on screen | `show` |
-| Get new videos from the repo now | `~/video-scheduler/sync` (it also happens at every login) |
-| Get the latest version after a change to the dates or times | `cd ~/HalloweenWindowDisplay && git pull && bash scheduler/install.sh` |
-| Stop it for tonight | Click the screen and press Control-C. It starts again at the next login |
-| See what it's been doing | `cat ~/video-scheduler/scheduler.log` |
+| See what's on screen | Open http://tvbox.local/ |
+| Get new videos from the repo | Nothing: the box checks every hour |
+| Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
+| Turn it off | Unplug the box. It starts again when plugged back in |
+| See what it's been doing | `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
 
-Videos removed from the repo aren't deleted from the Mac; they're moved to `~/video-scheduler/.removed/`.
+Videos removed from the repo aren't deleted from the box; they're moved to `~/video-scheduler/.removed/`.
+
+### Running it from a Mac instead
+
+Before the box, a Mac ran the window. That version is kept at the git tag `mac-legacy`: `git checkout mac-legacy`, then follow that version's README.
 
 ## If something's wrong
 
-Run `show` first: it says what should be on screen and why.
+Open http://tvbox.local/ first: it says what should be on screen and why.
 
 | Problem | Try |
 |---|---|
-| The wrong season is playing | The Mac has an old version: `cd ~/HalloweenWindowDisplay && git pull && bash scheduler/install.sh` |
+| The page doesn't open | The box is off or not on the Wi‑Fi. Unplug it and plug it back in, wait two minutes, and try again |
+| It says `waiting for the clock to be set` | The box can't reach the internet to get the time. Check the Wi‑Fi |
+| The wrong season is playing | The box has an old version: see "Get the latest version" above |
 | It says `no season today` | Nothing is scheduled for today, so black is expected |
-| It's not following the schedule | An override is on: `show schedule` |
-| A new video doesn't play | `~/video-scheduler/sync` |
-| `show` says `No status yet` | It isn't running: `bash scheduler/install.sh` |
-| The Mac desktop shows instead of the videos | Rotate the display to portrait, then `bash scheduler/install.sh` |
-| The screen is black but `show` says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
+| It's not following the schedule | Someone changed it on the page: press **Back to schedule** |
+| A new video doesn't play | Wait an hour for the box to pick it up, or unplug it and plug it back in |
+| The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
+| The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
+| The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |
 
-For anything else, the log has the details: `cat ~/video-scheduler/scheduler.log`.
+For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

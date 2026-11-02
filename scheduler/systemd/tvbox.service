@@ -1,0 +1,24 @@
+# Plays the videos on the TV and serves the website. Installed by setup.sh,
+# which fills in the __NAMES__.
+[Unit]
+Description=Window display: videos on the TV, and the website
+After=systemd-timesyncd.service
+
+[Service]
+User=__USER__
+SupplementaryGroups=video render
+Environment=HOME=__HOME__
+WorkingDirectory=__HOME__
+ExecStart=/usr/bin/node __APP__/player.js
+# If it stops (mpv exiting included), start it again.
+Restart=always
+RestartSec=2
+# /run/tvbox, for mpv's control socket.
+RuntimeDirectory=tvbox
+# The website on port 80 without running as root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+StandardOutput=append:__HOME__/video-scheduler/scheduler.log
+StandardError=append:__HOME__/video-scheduler/scheduler.log
+
+[Install]
+WantedBy=multi-user.target

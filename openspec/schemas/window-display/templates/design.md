@@ -20,6 +20,6 @@
 
 <!-- Known risks and trade-offs -->
 
-## Getting it onto the Mac
+## Getting it onto the box
 
-<!-- Installer (`git pull && bash scheduler/install.sh`) or sync only (`~/video-scheduler/sync`)? What the person checks afterwards (`show`, the log). Any Mac-only checks. -->
+<!-- Rerun setup (`git pull && sudo bash scheduler/setup.sh`) or videos only (the hourly sync)? What the person checks afterwards (the website, the log). Any box-only checks. -->

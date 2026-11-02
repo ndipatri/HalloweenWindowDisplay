@@ -51,17 +51,17 @@ artifacts:
       This is the foundation - specs, design, and tasks all build on this.
 
       Window display scope: OpenSpec is for changes to how the display behaves -
-      the scheduler, seasons, the daily schedule, overrides (`show`), syncing,
-      installing, and what the log and `show` report. Adding or replacing a video
+      the player, seasons, the daily schedule, overrides (the website), syncing,
+      setup, and what the log and the website report. Adding or replacing a video
       in `playlists/` is not an OpenSpec change: use the window-display-video
       skill. A README-only or skill-only edit sets `skip_specs: true`.
 
       Window display product checklist: before writing this artifact, settle the
-      decisions that change what someone sees or types, while the user is still
+      decisions that change what someone sees or does, while the user is still
       engaged: which days and times the window is on and what plays (season,
       kid or grownup playlist); what happens on the edge days (a season's first
       and last day, midnight inside a period, a day no season covers); what
-      `show` prints and what the log says; and what the person types to use it.
+      the website says and what the log says; and what the person does to use it.
       Turn every date rule into the exact dates it produces for the next two or
       three years and state them back, as the window-display-schedule skill
       describes. Ask the user about any the brief or conversation leaves open.
@@ -197,30 +197,32 @@ artifacts:
       across the project.
 
       Window display scenarios: write each one so a Node test can check it with
-      the Mac faked. The scheduler tests load `scheduler/video_scheduler.js` with
-      fake folders, files and players and pick the moment with `at(month, day,
-      hour, minute)`. Shell scripts (`sync`, `show`, `start`, `install.sh`) are
-      tested from Node by running them against a temporary home folder with fake
-      `git`, `launchctl` and `osascript` commands first on `PATH`. So:
+      the box faked. The tests load the scheduler with fake folders and files, a
+      fake mpv, and a fake clock, and pick the moment with `at(month, day, hour,
+      minute)`. The website is tested by calling its request handler directly.
+      Shell scripts (`sync`, `setup.sh`) are tested from Node by running them
+      against a temporary home folder with fake `git`, `systemctl` and `apt-get`
+      commands first on `PATH`. So:
       - Use **GIVEN** for the configuration, the folders and videos present, and
         any override in force. Give a concrete moment ("GIVEN it is Friday,
         November 6, 2026 at 7:45 PM"), not "a Friday evening".
       - State the outcome as something a test can read: the folder that plays
-        and in what order, black, the `show` status line, a log line, or files
+        and in what order, black, the status line, a log line, a website reply, or files
         that appear in or move out of `~/video-scheduler/`.
       - One setup and one path per scenario. When behaviour differs by state
         (inside or outside a period, season or no season, override or not),
         write one scenario per state.
 
-      Window display Mac-only behaviour: what only the real Mac can show (the TV
-      picture, the display rotation, launchd starting the agent at login, macOS
-      privacy prompts) is not a scenario, because no test can enforce it. Put it
-      in design.md, and its check in tasks.md's `## Workflow follow-up`.
+      Window display box-only behaviour: what only the real Raspberry Pi can
+      show (the TV picture, the rotation, smooth playback, systemd starting the
+      services at boot, the network) is not a scenario, because no test can
+      enforce it. Put it in design.md, and its check in tasks.md's `## Workflow
+      follow-up`.
 
       Window display product decisions: before finishing this artifact, list the
       decisions the brief leaves open that would change what is shown or
       reported, such as edge days, overlaps between seasons or periods, what a
-      bad configuration entry does, and the exact `show` and log wording. Ask the
+      bad configuration entry does, and the exact website and log wording. Ask the
       user to answer them instead of resolving them by assumption, and ask
       whether any scenarios are missing. Record each answer in the relevant
       requirement or scenario, and update the proposal if an answer changes
@@ -262,27 +264,28 @@ artifacts:
 
       Good design docs explain the "why" behind technical decisions.
 
-      Window display constraints: `scheduler/video_scheduler.js` runs under
-      JavaScriptCore as JXA, so it may use plain ES2015+ but no Node APIs
-      (`require`, `process`, `fs`); only the tests run under Node. The shell
-      scripts run with macOS's `/bin/bash` 3.2, so no bash 4 features
-      (associative arrays, `${var,,}`, `mapfile`). Nothing runs with `sudo`. The
-      Mac must keep playing when it is offline or GitHub is unreachable. Follow
-      the window-display-schedule skill for how the configuration, sync and
-      installer fit together.
+      Window display constraints: the box is a Raspberry Pi running Raspberry Pi
+      OS Lite. The scheduler, player and website run under the Node.js that
+      Raspberry Pi OS installs with apt (18 or later), with no npm packages:
+      only Node's built-in modules. Video plays through mpv. Only
+      `scheduler/setup.sh` runs with `sudo`; everything else runs as the
+      person's user. The box must keep playing when it is offline or GitHub is
+      unreachable. Follow the window-display-schedule skill for how the
+      configuration, sync and setup fit together.
 
       Window display testability: for each scenario in the specs, say how its
       test reaches the behaviour: through the functions the scheduler tests
       already load, a function the change adds to that list, or a shell script
       run against fake commands. When a scenario cannot be reached that way,
       change the design until it can, or move the behaviour out of the specs
-      as Mac-only.
+      as box-only.
 
-      Window display rollout: add a `## Getting it onto the Mac` section. Say
-      whether the change needs the installer (`git pull && bash
-      scheduler/install.sh`: anything under `scheduler/`) or only a sync
-      (`~/video-scheduler/sync`: videos only), and what the person checks
-      afterwards (`show`, and the first lines of `~/video-scheduler/scheduler.log`).
+      Window display rollout: add a `## Getting it onto the box` section. Say
+      whether the change needs setup rerun on the box (`cd ~/HalloweenWindowDisplay
+      && git pull && sudo bash scheduler/setup.sh`: anything under `scheduler/`)
+      or only a sync (videos only, which the box does by itself every hour), and
+      what the person checks afterwards (the website's status line, and the
+      first lines of `~/video-scheduler/scheduler.log`).
     requires:
       - proposal
 
@@ -356,9 +359,9 @@ artifacts:
       - The first group writes the tests: one Node test per spec scenario, named
         exactly as the scenario, written before any implementation so the tests
         define the behaviour before the code exists. Each task names the
-        scenario and the test file. Put scheduler behaviour in
-        `scheduler/tests/scheduler.test.js` and shell-script behaviour in a
-        `scheduler/tests/<script>.test.js`, using the existing tests' `test()`
+        scenario and the test file. Put each part's behaviour in its own
+        `scheduler/tests/<part>.test.js` (scheduler, player, website, or a
+        script's name), using the existing tests' `test()`
         helper and style. If a test needs a function the test loader does not
         expose yet, the same task adds it to the loader's list. The group ends
         with a task that runs the tests and confirms each new test fails on an
@@ -366,11 +369,11 @@ artifacts:
         `node openspec/check-scenarios.js <change>` reports no missing tests.
       - Implementation groups follow, each landing the extra tests its own work
         calls for and the documentation it changes: the window-display-schedule
-        skill for configuration, Mac or troubleshooting detail; the README only
+        skill for configuration, box or troubleshooting detail; the README only
         for what the person sees or types, in plain words, as that skill says.
       - The final group is verification. Its tasks, in order:
         1. Run every test file (`for f in scheduler/tests/*.test.js; do node "$f"
-           || exit 1; done`) and `node --check scheduler/video_scheduler.js`,
+           || exit 1; done`) and `node --check` on every changed `.js` file,
            and confirm they pass.
         2. Run `node openspec/check-scenarios.js <change>` and confirm every
            scenario has its test.
@@ -381,11 +384,11 @@ artifacts:
         4. Add a table to tasks.md mapping each scenario to its test file, listing
            a scenario only after its test passed the disable check.
         5. Run `openspec validate <change> --strict` and fix what it reports.
-      - `## Workflow follow-up` always ends with getting the change onto the Mac,
-        from design.md's `## Getting it onto the Mac`: after the PR is merged, the
-        person runs `cd ~/HalloweenWindowDisplay && git pull && bash
-        scheduler/install.sh` (or only `~/video-scheduler/sync`), then checks
-        `show` and the log. Add a bullet for each Mac-only check from design.md.
+      - `## Workflow follow-up` always ends with getting the change onto the box,
+        from design.md's `## Getting it onto the box`: after the PR is merged, the
+        person runs `cd ~/HalloweenWindowDisplay && git pull && sudo bash
+        scheduler/setup.sh` on the box (or nothing, for videos only), then checks
+        the website and the log. Add a bullet for each box-only check from design.md.
     requires:
       - specs
       - design
@@ -416,4 +419,4 @@ apply:
        user's approval.
     5. Ship as the window-display-schedule skill describes (branch, commit,
        push, PR through `gh api`; merge only when asked), and end by telling
-       the person how to get the change onto the Mac.
+       the person how to get the change onto the box.

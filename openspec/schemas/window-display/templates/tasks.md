@@ -12,4 +12,4 @@
 
 ## Workflow follow-up
 
-- After the PR is merged, on the Mac: `cd ~/HalloweenWindowDisplay && git pull && bash scheduler/install.sh`, then check `show` and the log.
+- After the PR is merged, on the box: `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh`, then check the website and the log.
