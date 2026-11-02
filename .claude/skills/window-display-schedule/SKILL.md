@@ -95,6 +95,45 @@ If the box shows the wrong season, check first whether setup was rerun after the
   - status: `systemctl status tvbox tvbox-sync.timer`;
   - mpv's own errors: in the log, or `journalctl -u tvbox`.
 
+## Making cards (new boxes)
+
+`node cards/make-cards.js`, on the person's Mac, makes SD cards that become working boxes when plugged in.
+
+**What it does:**
+- asks once for the Wi‑Fi (name, password, country), the user and password, the time zone, an SSH key from `~/.ssh` (optional), and the repo;
+- downloads the latest Raspberry Pi OS Lite (64-bit) from `downloads.raspberrypi.com/raspios_lite_arm64_latest` and checks it against its published `.sha256`, keeping it in `~/Library/Caches/tvbox`;
+- for each card:
+  - asks the name (`tvbox`, `tvbox2`, …);
+  - lists only whole, physical, 4–256 GB disks that are external, or a card in a MacBook's built-in SD slot (reported as internal, removable, `Secure Digital`), and never the start-up disk. On APFS, that's the synthesized container plus its physical stores' disks, from `diskutil apfs list` (`bootWholeDisks`). It uses `diskutil list physical` + `plutil`, filtered by `pickCards`;
+  - requires the disk's identifier typed back;
+  - unpacks the image with `xz` (or `python3`'s lzma) into `sudo dd of=/dev/rdiskN bs=4m`;
+  - mounts `bootfs`, writes the three cloud-init files, and ejects.
+
+**The cloud-init files** (`cards/cloud-init.js`, read by Raspberry Pi OS from the boot partition on first boot):
+- `user-data`:
+  - the hostname and time zone;
+  - the user, in Imager's 15 groups, with the password as a SHA-512 crypt hash only;
+  - `enable_ssh`, and `ssh_pwauth: true`;
+  - `write_files`: `/etc/tvbox/firstboot.conf`, `/usr/local/sbin/tvbox-firstboot` (`cards/firstboot.sh`) and `tvbox-firstboot.service`;
+  - `runcmd` enabling and starting that service with `--no-block`.
+- `network-config`: netplan v2 through NetworkManager, with `wlan0` (Wi‑Fi, `regulatory-domain`) and `eth0`, both optional.
+- `meta-data`: `dsmode: local` and a fresh `instance_id`.
+
+**First boot:** `tvbox-firstboot.service` runs the script until it succeeds: it retries every minute, across reboots, until `/var/lib/tvbox/firstboot-done` exists. The script:
+- waits for the repo's host;
+- installs git (Lite doesn't have it);
+- clones the repo as the user;
+- runs `SUDO_USER=<user> bash scheduler/setup.sh`.
+
+It logs to `/var/log/tvbox-firstboot.log`.
+
+**Testing without a Mac or a card:** `node cards/make-cards.js --to-file card.img --answers answers.json [--image raspios.img.xz]` writes a finished card image on Linux (mtools), from a JSON of the answers (it holds a password, so keep it out of the repo). Read the files back with `mtype -i card.img@@<offset> ::/user-data`. The rehearsal checks the files with `cloud-init schema`, applies their `write_files`, and runs the first-boot script for real.
+
+What only a real Mac and Pi show:
+- `diskutil`'s fields on the person's macOS (if `VirtualOrPhysical` or `Internal` were missing, no disk would be offered, which fails safe);
+- the write itself;
+- the Pi joining the Wi‑Fi.
+
 ## Rehearsing on the box's OS
 
 `bash scheduler/tests/e2e/box.e2e.sh` rehearses the box end to end without a Pi:

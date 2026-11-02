@@ -127,21 +127,27 @@ What was asked for, word for word. The woman's video is two clips joined togethe
 - A Raspberry Pi 5 with its power supply, a microSD card (32 GB or more) and a micro-HDMI to HDMI cable.
 - A sheer white or grey curtain for the window.
 
-### The box
+### The boxes
 
-1. On a computer, use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to put **Raspberry Pi OS Lite (64-bit)** on the microSD card. In its settings, set the name to `tvbox`, your Wi‑Fi, a username and password, and turn on SSH.
-2. Put the card in the Pi, plug the Pi into the TV, and power it on.
-3. From your computer's Terminal, log in to it and set it up (it asks for your password):
+Each box is a Raspberry Pi with an SD card made on your Mac. One run makes as many cards as you like.
+
+1. On your Mac, in Terminal (this needs Node.js and xz; if they're missing, `brew install node xz` first):
 
    ```sh
-   ssh tvbox.local
    git clone https://github.com/ndipatri/HalloweenWindowDisplay.git ~/HalloweenWindowDisplay
-   cd ~/HalloweenWindowDisplay && sudo bash scheduler/setup.sh
+   cd ~/HalloweenWindowDisplay && node cards/make-cards.js
    ```
 
-That installs everything, copies the videos over, and starts it. From then on it starts by itself whenever the box is plugged in. The screen stays black for a moment after it starts, until the box has the right time from the internet.
+   It asks once for your Wi‑Fi, a username and password for the boxes, and your time zone. Then, for each card:
+   - it asks the box's name (`tvbox`, then `tvbox2`, …);
+   - it finds the SD card and asks you to type its name (like `disk4`) so nothing else gets erased;
+   - it writes the card, which takes a few minutes. It asks for your Mac password to do this, and if macOS offers to initialise the card, choose **Ignore**.
+2. Put the card in the Pi, plug the Pi into the TV, and power it on.
+3. Wait 10–20 minutes. The first time, the box connects to your Wi‑Fi, downloads what it needs, and sets itself up. Then open **http://tvbox.local/** (or `tvbox2.local`, …) on your phone.
 
-If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `scheduler/config.js` and run the last line again.
+From then on, each box starts by itself whenever it's plugged in. The screen stays black for a moment after it starts, until the box has the right time from the internet.
+
+If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
 ### The window
 
@@ -190,6 +196,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | Problem | Try |
 |---|---|
 | The page doesn't open | The box is off or not on the Wi‑Fi. Unplug it and plug it back in, wait two minutes, and try again |
+| A new box's page never opens | The first setup takes up to 20 minutes, and needs the Wi‑Fi you typed for the card. If it's longer: `ssh tvbox.local` (your box's name), then `cat /var/log/tvbox-firstboot.log` shows how far it got |
 | It says `waiting for the clock to be set` | The box can't reach the internet to get the time. Check the Wi‑Fi |
 | The wrong season is playing | The box has an old version: see "Get the latest version" above |
 | It says `no season today` | Nothing is scheduled for today, so black is expected |

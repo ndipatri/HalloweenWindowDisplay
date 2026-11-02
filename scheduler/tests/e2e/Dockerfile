@@ -18,9 +18,11 @@ RUN apt-get update -qq \
 
 # What setup.sh installs, ahead of time so reruns are quick (setup.sh still
 # runs apt-get itself), plus tools only the test uses: ffmpeg to make test
-# clips and read frames, git for sync, systemd for systemd-analyze, procps.
+# clips and read frames, git for sync, systemd for systemd-analyze, procps,
+# cloud-init and netplan (Raspberry Pi OS has both; cloud-init checks Wi-Fi
+# config with netplan) to check the card files cards/ makes.
 RUN apt-get update -qq \
- && apt-get install -y -qq --no-install-recommends mpv nodejs git logrotate ffmpeg systemd procps >/dev/null \
+ && apt-get install -y -qq --no-install-recommends mpv nodejs git logrotate cloud-init netplan.io python3-yaml ffmpeg systemd procps >/dev/null \
  && rm -rf /var/lib/apt/lists/*
 
 # The person's user, as Raspberry Pi Imager creates it (sudo asks for no
