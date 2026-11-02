@@ -10,7 +10,31 @@ Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) 
 ## 1. Agree the idea and the cost
 
 - Pin down: subject, mood (kid-friendly vs grownup/scary), season, which playlist (season folder = every period; `grownup/` = grownup only), length.
-- Check the balance (`balance`) and quote the cost before generating: Seedance 2.5 at 1080p is **16 credits per second** (20 s = 320, 15 s = 240, 10 s extension = 160). Give it in credits and in USD from how the credits were bought (README "What it cost" has the rates). If credits are short, say so and wait for the person to buy more.
+- Check the balance (`balance`) and quote the cost before generating: Seedance 2.5 at 1080p is **16 credits per second** (20 s = 320, 15 s = 240, 10 s extension = 160). Give it in credits and in USD from how the credits were bought (rates below). If credits are short, say so and wait for the person to buy more; `transactions` shows what was bought.
+
+Credit rates paid so far (USD):
+
+| Credits from | Price | Per credit |
+|---|---|---|
+| Plus plan | $49 a month for 1,200 | ~$0.041 |
+| 1,000-credit top-up | $55.56 | ~$0.056 |
+| 500-credit top-up | $29.41 | ~$0.059 |
+
+Cost ledger (each generation, credits from which pack, USD). Add a row for every new generation, including discarded tries:
+
+| Generation | Credits | Pack | USD |
+|---|---|---|---|
+| Woman walking, first try (too small, discarded) | 320 | Plus | $13.07 |
+| Woman walking, second try | 320 | Plus | $13.07 |
+| Woman, hand on the glass (12 s) | 192 | Plus | $7.84 |
+| Neon monster | 320 | Plus | $13.07 |
+| Fuzzy creatures | 320 | 1,000 top-up | $17.78 |
+| Mochi the ghost-dog | 320 | 1,000 top-up | $17.78 |
+| Jump scare | 320 | 1,000 top-up | $17.78 |
+| Mochi the pilgrim | 320 | 500 top-up | $18.82 |
+| Fall dusk (15 s) | 240 | 500 top-up | $14.12 |
+| Fall dusk night extension (10 s) | 160 | 500 top-up | $9.41 |
+| **Total** | | | **$142.73** |
 
 ## 2. Write the prompt
 
@@ -57,7 +81,17 @@ Output 1080 × 1920. Optional filters, by video type:
 | Scenery that doesn't start/end on black | `fade=t=in:st=0:d=1` and a 1.5 s `fade=t=out` at the end |
 | Two clips (original + extension) | same filters on both, then `xfade=transition=fade:duration=0.25:offset=<len1-0.25>` |
 
-Keep the script in the sandbox so it can be rerun identically. `video/build_loop.sh` in the repo builds the woman's loop the same way.
+Keep the script in the sandbox so it can be rerun identically. `video/build_loop.sh` in the repo builds the woman's loop the same way (her two clips: lowered 20%, flicker, joined, trimmed of dead space from 4:20 to 1:33).
+
+Settings each current video was finished with:
+
+| Video | Drop 20% | Flicker | Other |
+|---|---|---|---|
+| The woman | yes | yes | two clips joined by `video/build_loop.sh` |
+| Neon monster | yes | yes | top edge faded |
+| Fuzzy creatures, Mochi ghost-dog, Mochi pilgrim | no | no | |
+| Jump scare | no | no | |
+| Fall dusk | no | no | 14% crop (drawn frame), joined with its night extension, fade in 1 s / out 1.5 s |
 
 ## 6. Deliver
 
@@ -69,11 +103,11 @@ Keep the script in the sandbox so it can be rerun identically. `video/build_loop
 ## 7. Add it to the repo
 
 - Branch from `origin/main`; copy to `playlists/<season>/` or `playlists/<season>/<playlist>/` with a snake_case name. Under 100 MB (GitHub limit). Files play in name order.
-- Update `README.md`:
-  - the season's row in "The videos" table (description and m:ss length) and the "Seasons set up today" count;
-  - "What it cost": a row per generation, the total, the by-video line, and the credit-pack note;
-  - "The prompts": the full prompt, word for word, only for videos that are in `playlists/` (a joined video lists each generation);
-  - the notes paragraph under the tables if the finishing differs (drop, flicker, crop, fades);
-  - the `playlists/` tree in "Files".
+- Update `README.md`. It is a plain, non-technical guide for the person: no model names, settings, credits, ffmpeg, file paths of videos or anything else in this skill. Only:
+  - "What's playing": the season's Videos column (by name, e.g. "the fall sunset");
+  - "The videos": a row in the season's table: **Name:** one plain sentence of what you see | Kid and grownup hours / Grownup hours / All evening | m:ss;
+  - "What it cost": one row per video in USD (several generations for one video add up into its row), the total, and the "About $N" lead line. Keep the per-generation detail in the ledger above, not the README;
+  - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
+  - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
 - Tell the person the Mac picks it up at next login, or now with `~/video-scheduler/sync`, and how to preview it: `show <season> 10` (or `show <season>/<playlist> 10`).
