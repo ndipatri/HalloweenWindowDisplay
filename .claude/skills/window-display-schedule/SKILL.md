@@ -54,7 +54,7 @@ Then check it took:
 - The website (http://tvbox.local/) shows what's on screen and why, e.g. `thanksgiving/grownup (scheduled until 11:00 PM)` or `black (no season today, Nov 2)`.
 - `tail ~/video-scheduler/scheduler.log` shows `Started.` and a `Seasons:` line listing the new rules.
 
-Video-only changes (adding or removing files in `playlists/`) need nothing: the box syncs a minute after boot and then hourly. To sync now: `sudo systemctl start tvbox-sync.service`.
+Video-only changes (adding or removing files in `playlists/`) need nothing: the box syncs a minute after boot and then hourly. To sync now: **Sync now** on the website (or `sudo systemctl start tvbox-sync.service`).
 
 If the box shows the wrong season, check first whether setup was rerun after the change.
 
@@ -78,7 +78,7 @@ If the box shows the wrong season, check first whether setup was rerun after the
 
   Both services append to `~/video-scheduler/scheduler.log`.
 - **Black until the clock is set:** until `/run/systemd/timesync/synchronized` exists (systemd-timesyncd creates it once the time comes from the network), the status is `black (waiting for the clock to be set)`.
-- **Sync** is `scheduler/sync_videos.sh`: `git pull` under `timeout` (60 s; on failure it uses the repo as it is, and it leaves nothing running), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. Once a season folder exists in the repo, it is the master copy for that season.
+- **Sync** is `scheduler/sync_videos.sh`: `git pull` under `timeout` (60 s; on failure it uses the repo as it is, and it leaves nothing running), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. Once a season folder exists in the repo, it is the master copy for that season. One sync runs at a time: it holds `flock` on `~/video-scheduler/.sync.lock`, and a sync that starts meanwhile (the timer and Sync now overlapping) logs `Skipped: another sync is already running.` and exits 0.
 - **Playback:**
   - `.mp4`, `.m4v`, `.mov`, in name order with numbers sorted as numbers (a `1-`, `2-` prefix sets the order);
   - folders are re-read as the queue moves on, so no restart is needed for video changes;
@@ -131,7 +131,8 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
   - a preview of any season folder or season/playlist folder on the box;
   - Back to schedule.
 - **Durations:** until the schedule changes, 15, 30 or 60 minutes, or until switched back (`untilCleared`).
-- **API:** `GET /api/status`, `GET /api/choices`, `POST /api/show {target, until: 'schedule'|'cleared'|minutes}`, `POST /api/schedule`.
+- **API:** `GET /api/status`, `GET /api/choices`, `POST /api/show {target, until: 'schedule'|'cleared'|minutes}`, `POST /api/schedule`, `POST /api/sync` (runs `~/video-scheduler/sync` with output appended to the log; answers at once, or `A sync is already running.`), `GET /api/log` (`{lines}`: the last 20 non-empty lines, read from the last 16 KB).
+- **Sync now and Recent activity** are on the page. The activity list refreshes with the status every few seconds.
 - An override with no time lasts until the schedule next changes (outside the schedule, until the next period starts). Overrides end by themselves, so the scary videos can't be left on in the morning. On a day with no season, a plain playlist is black, so preview the season instead.
 - There is no password: it's only reachable on the home network.
 

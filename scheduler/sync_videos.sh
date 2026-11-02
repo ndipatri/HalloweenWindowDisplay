@@ -12,7 +12,8 @@
 # Inside a folder the repo has, a subfolder it no longer has is set aside
 # too. Top-level folders that aren't in the repo are left alone.
 #
-# The running scheduler picks the changes up by itself; no restart needed.
+# One sync runs at a time; one that starts while another is running skips.
+# The player picks the changes up by itself; no restart needed.
 # If GitHub can't be reached, it copies from the repo as it already is.
 set -uo pipefail
 
@@ -117,9 +118,21 @@ copy_videos() {
   log "Done: $copied copied, $set_aside moved aside."
 }
 
+# One sync at a time: the hourly timer and the website's Sync now could
+# otherwise both write the same video at once. The lock is released when this
+# script ends, however it ends.
+one_at_a_time() {
+  mkdir -p "$root"
+  exec 9>"$root/.sync.lock"
+  if ! flock -n 9; then
+    log "Skipped: another sync is already running."
+    exit 0
+  fi
+}
+
 case "${1:-}" in
-  "") pull; copy_videos ;;
-  --no-pull) copy_videos ;;
-  -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  "") one_at_a_time; pull; copy_videos ;;
+  --no-pull) one_at_a_time; copy_videos ;;
+  -h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "Usage: sync [--no-pull]" >&2; exit 1 ;;
 esac

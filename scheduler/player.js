@@ -92,6 +92,22 @@ function realIo() {
     listFolder(p) {
       try { return fs.readdirSync(p); } catch (e) { return null; }
     },
+    // The last `bytes` of a file (all of it if smaller), or null.
+    readTail(p, bytes) {
+      let fd;
+      try {
+        fd = fs.openSync(p, 'r');
+        const size = fs.fstatSync(fd).size;
+        const length = Math.min(size, bytes);
+        const buffer = Buffer.alloc(length);
+        fs.readSync(fd, buffer, 0, length, size - length);
+        return buffer.toString('utf8');
+      } catch (e) {
+        return null;
+      } finally {
+        if (fd !== undefined) fs.closeSync(fd);
+      }
+    },
     log(message) {
       // systemd appends this to ~/video-scheduler/scheduler.log.
       console.log(new Date().toLocaleString('en-US') + '  ' + message);

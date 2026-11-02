@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync, execFileSync } = require('child_process');
+const { spawn, spawnSync, execFileSync } = require('child_process');
 
 const SCRIPT = path.join(__dirname, '..', 'sync_videos.sh');
 
@@ -125,6 +125,26 @@ test('sync leaves nothing running when it finishes', () => {
   const r = s.sync([], { VIDEO_SCHEDULER_PULL_TIMEOUT: '60' });
   assert.equal(r.status, 0, r.log);
   assert.ok(r.seconds < 10, 'output ended after ' + r.seconds + ' s');
+});
+
+// ---- One sync at a time ----
+
+test('a sync that starts while another is running skips', async () => {
+  const s = setup({ 'playlists/halloween/a.mp4': 'a' });
+  // Hold the lock the way a running sync does, until killed.
+  const holder = spawn('bash', ['-c', 'exec 9>"$1"; flock 9; echo held; exec sleep 30', '-', s.box('.sync.lock')]);
+  try {
+    await new Promise((resolve, reject) => {
+      holder.stdout.on('data', (d) => d.toString().includes('held') && resolve());
+      holder.on('exit', () => reject(new Error('lock holder exited')));
+    });
+    const r = s.sync();
+    assert.equal(r.status, 0, r.log);
+    assert.ok(r.log.includes('Skipped: another sync is already running.'), r.log);
+    assert.ok(!s.has('halloween/a.mp4'));
+  } finally {
+    holder.kill('SIGKILL');
+  }
 });
 
 // ---- Carries on without GitHub ----
