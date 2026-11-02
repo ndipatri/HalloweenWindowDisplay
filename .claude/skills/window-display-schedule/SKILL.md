@@ -37,7 +37,7 @@ Changes to how the display behaves (seasons, schedule, overrides, the website, s
 1. **Pin down the intent in dates.** Turn the request into the exact days and times it should produce, and state them back. Example: "Thanksgiving: Fri/Sat until Thanksgiving, then the day before and the day" means Nov 6, 7, 13, 14, 20, 21, 25 and 26 in 2026, and other November days are black. Check what nearby seasons and the schedule do on the edge days. Point out side effects, such as the 5–7 am kid period also playing on those days.
 2. **Branch from `origin/main`** and edit `CONFIG`. Keep the explanatory comments above each list accurate, and add a one-line comment on any non-obvious entry.
 3. **Videos:** a new season needs `playlists/<name>/`, plus subfolders if wanted. A season with no folder yet is fine (black, logged once, not an error). Update `playlists/README.md` if the folder rules change.
-4. **Test:** `for f in scheduler/tests/*.test.js; do node "$f" || exit 1; done` (Node; mpv, the clock and files are faked). Add a test that pins the exact days or periods from step 1, in the style of the Thanksgiving test (a list of covered days for two or three years). If you change the season or schedule logic itself, also test bad entries being skipped and logged. Run `node --check` on each changed `.js` file. The box runs the Node from Raspberry Pi OS's apt (18 or later) with no npm packages, so use only built-in modules.
+4. **Test:** `for f in scheduler/tests/*.test.js; do node "$f" || exit 1; done` (Node; mpv, the clock and files are faked). Add a test that pins the exact days or periods from step 1, in the style of the Thanksgiving test (a list of covered days for two or three years). If you change the season or schedule logic itself, also test bad entries being skipped and logged. Run `node --check` on each changed `.js` file. The box runs the Node from Raspberry Pi OS's apt (18 or later) with no npm packages, so use only built-in modules. If the change touches `setup.sh`, sync, the systemd units, `player.js`, `mpv.js` or `website.js`, also run the rehearsal on the box's OS (see "Rehearsing on the box's OS" below).
 5. **README:** it is a plain, non-technical guide for the person, so no config syntax, rules or anything else from this skill goes in it. Update only the "What's playing" tables (each season's When in plain words, e.g. "Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself"; the daily times), and "Using it" / "If something's wrong" if something the person does changes. Details belong in this skill.
 6. **Ship:** commit, push, and open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked in cloud sessions, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`. A cloud session can't push tags or create releases; from the shell on the person's Mac, run git and gh through `.git/tools/gh-run git …` / `.git/tools/gh-run gh …`, which signs in with the repo-only token in `.git/credentials` and waits out that shell's flaky DNS.
 
@@ -62,14 +62,14 @@ If the box shows the wrong season, check first whether setup was rerun after the
 
 - `sudo bash scheduler/setup.sh` (run from the person's user, so `SUDO_USER` is them; safe to rerun):
   - installs `mpv`, `nodejs` and `git` with apt;
-  - adds the user to `video` and `render`;
+  - creates the `video` and `render` groups if missing (tvbox.service asks for both, and systemd won't start it without them), and adds the user to them;
   - sets the time zone (`TVBOX_TIMEZONE`, default America/New_York) and turns on network time;
   - copies `config.js`, `logic.js`, `mpv.js`, `player.js` and `website.js` to `/opt/tvbox`;
   - writes `~/video-scheduler/sync` with the repo path;
   - installs `tvbox.service`, `tvbox-sync.service` and `tvbox-sync.timer` from `scheduler/systemd/`;
   - syncs once, then restarts the player.
 
-  For a dry run, set `TVBOX_ROOT` (a folder standing in for /), `TVBOX_USER` and `TVBOX_HOME`, with fake `apt-get`, `systemctl`, `timedatectl` and `usermod` first on `PATH`.
+  For a dry run, set `TVBOX_ROOT` (a folder standing in for /), `TVBOX_USER` and `TVBOX_HOME`, with fake `apt-get`, `systemctl`, `timedatectl`, `usermod` and `groupadd` first on `PATH`. The rehearsal (below) runs it for real.
 - `tvbox.service` runs `node /opt/tvbox/player.js` as the user. The player:
   - starts mpv (`--vo=gpu --gpu-context=drm`, straight to the TV, black when idle, `--video-rotate` from config), talks to it over `/run/tvbox/mpv.sock`, and serves the website on port 80 (`CAP_NET_BIND_SERVICE`);
   - every second works out what to show (`whatToShow`), writes the status file, and keeps mpv's queue three videos ahead (`keepPlaying`);
@@ -92,6 +92,32 @@ If the box shows the wrong season, check first whether setup was rerun after the
   - stop until next boot: `sudo systemctl stop tvbox`;
   - status: `systemctl status tvbox tvbox-sync.timer`;
   - mpv's own errors: in the log, or `journalctl -u tvbox`.
+
+## Rehearsing on the box's OS
+
+`bash scheduler/tests/e2e/box.e2e.sh` rehearses the box end to end without a Pi:
+- **The environment:** Docker builds the box's OS, Debian 13 (trixie) on arm64 with the Raspberry Pi archive and its keyring package, the way Raspberry Pi OS Lite has them (`scheduler/tests/e2e/Dockerfile`).
+- **What it does:** `scheduler/tests/e2e/inside.sh` plays the person:
+  - clones the repo with small test clips in place of the videos;
+  - runs the real `sudo bash scheduler/setup.sh` (real apt; fake `systemctl` and `timedatectl`, since there's no systemd in a container);
+  - starts the player as the service would;
+  - uses the website;
+  - kills mpv.
+- **What it checks:**
+  - setup's result, and `systemd-analyze verify` on the units;
+  - the first sync;
+  - the status, the log, and mpv's frames (drawn to PNGs by `fakes/mpv`, which wraps the real mpv), including their 90° rotation and colour;
+  - the broken clip skipped once;
+  - black, back to schedule;
+  - the player exiting with code 1 when mpv stops.
+
+It prints `PASS`/`FAIL` per check and ends with `N passed, 0 failed`.
+
+Needs: Docker (in a cloud session, `dockerd > /tmp/dockerd.log 2>&1 &` first). On an Intel machine it turns on arm64 emulation with `tonistiigi/binfmt` (needs `--privileged`). It's slow: the first image build installs packages under emulation (10+ minutes), and later runs take a few minutes. `TVBOX_E2E_PLATFORM=linux/amd64` skips emulation: faster, but not the box's CPU.
+
+Add a check to `inside.sh` for any new box behaviour it can reach: a website action, a log line, a file setup writes. It can't check the TV picture, full-size playback speed, mpv's output straight to the screen, booting, or Wi‑Fi: those stay on-the-box checks.
+
+The box's software today: Raspberry Pi OS Lite (64-bit), Debian 13 (trixie), Node.js 20.19, mpv 0.40, and ffmpeg 7.1 from the Raspberry Pi archive. When Raspberry Pi OS moves to a new Debian release, update the Dockerfile's `FROM` and the keyring package, and rerun the rehearsal.
 
 ## The website (overrides)
 

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Stands in for systemctl: the test container has no systemd running.
+# Records each call; "start tvbox-sync.service" runs the sync for real, as
+# the unit would.
+echo "systemctl $*" >> /tmp/e2e/calls
+if [ "$1" = start ] && [ "$2" = tvbox-sync.service ]; then
+  sudo -u pi -H VIDEO_SCHEDULER_PULL_TIMEOUT=15 /home/pi/video-scheduler/sync >> /home/pi/video-scheduler/scheduler.log 2>&1
+fi
+exit 0

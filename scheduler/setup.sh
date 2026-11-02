@@ -50,6 +50,12 @@ if [ "$major" -lt 18 ]; then
 fi
 
 say "Letting $user use the screen"
+# video: the display; render: the GPU. Raspberry Pi OS normally has both,
+# but tvbox.service asks for them, and systemd won't start it if one is
+# missing, so make sure they exist.
+for group in video render; do
+  getent group "$group" >/dev/null || groupadd --system "$group"
+done
 usermod -aG video,render "$user"
 
 say "Setting the time zone to $timezone and turning on network time"

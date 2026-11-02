@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stands in for timedatectl: no systemd in the test container. Records calls.
+echo "timedatectl $*" >> /tmp/e2e/calls
+exit 0

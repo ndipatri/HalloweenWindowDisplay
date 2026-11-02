@@ -4,8 +4,11 @@ schema: window-display
 context: |
   Every spec scenario must be enforced by a Node test with exactly the same
   name in scheduler/tests/*.test.js; `node openspec/check-scenarios.js`
-  checks this. The display runs on a Raspberry Pi box (Node.js, mpv,
-  systemd); the Mac version is kept only at the git tag `mac-legacy`. The
+  checks this. The display runs on a Raspberry Pi 5 box (Node.js, mpv,
+  systemd) with the latest Raspberry Pi OS Lite (64-bit), today Debian 13
+  (trixie) on arm64; `scheduler/tests/e2e/box.e2e.sh` rehearses it end to
+  end on that OS in Docker. The Mac version is kept only at the git tag
+  `mac-legacy`. The
   person who uses the display is not technical: README.md
   stays plain, and technical detail goes in the window-display-schedule and
   window-display-video skills. The GitHub CLI can't use GraphQL here, so PRs
