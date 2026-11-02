@@ -223,6 +223,8 @@ Sources: [Higgsfield pricing (Oct 2026)](https://higgsfield.ai/blog/higgsfield-p
 
 ### The prompts
 
+The prompts behind every video in `playlists/`, word for word. The woman's loop is two generations joined (the walk and the hand on the glass), and so is the fall dusk (the dusk and its night extension). Each was Seedance 2.5 at 1080p with no audio; all but the night extension are text-to-video at 9:16 (the two Mochis add a reference photo).
+
 **Fall dusk (15 s)**
 
 > Static locked-off camera, vertical frame, a classic New England autumn landscape at dusk, seen as if looking out of a window. In the foreground and middle ground, tall old maple and oak trees in full fall color, deep red, burnt orange and gold, already half bare, with dark branches showing through. Beyond them a gently rolling field of long golden grass and a distant line of hills. The sun is low and failing, a large soft orange disc sinking toward the hills, casting long shadows and a warm red-orange glow across the horizon, the sky fading from amber near the horizon to deep violet and dusky blue above, a few streaky clouds lit pink and orange. A steady autumn wind blows: branches sway, leaves loosen and break away from the trees, and many red, orange and yellow leaves drift, flutter and tumble through the air across the frame, some passing close to the camera, the long grass ripples in waves. Slowly, over the clip, the light dims a little as the sun sinks lower. Peaceful, nostalgic, cinematic, rich warm colors, photorealistic, no people, no animals, no buildings, no text, no camera movement.
