@@ -36,25 +36,24 @@ pull() {
     log "ERROR: $repo isn't a git checkout, so can't pull. Using the videos as they are."
     return
   fi
-  local errors pid watchdog status
+  local errors status
   errors="$(mktemp)"
-  # Never wait on a password prompt; give up on a stalled transfer.
+  # Never wait on a password prompt; give up on a stalled transfer, and on a
+  # pull that takes longer than $pull_timeout seconds in all (timeout ends
+  # it with TERM, then KILL 5 seconds later; it leaves nothing running).
   GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=20 \
-    git -C "$repo" pull --ff-only --quiet 2>"$errors" &
-  pid=$!
-  (sleep "$pull_timeout" && kill "$pid" 2>/dev/null) &
-  watchdog=$!
-  wait "$pid"
+    timeout --kill-after=5 "$pull_timeout" git -C "$repo" pull --ff-only --quiet 2>"$errors"
   status=$?
-  kill "$watchdog" 2>/dev/null
-  wait "$watchdog" 2>/dev/null
 
   local reason
   reason="$(tail -n 1 "$errors" | sed 's/^fatal: //')"
   if [ "$status" -eq 0 ]; then
     log "Pulled the latest from GitHub ($(git -C "$repo" log -1 --format=%h))."
   else
-    [ -n "$reason" ] || reason="no answer within $pull_timeout seconds"
+    # 124: timeout ended it; 137: it had to be killed.
+    if [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || [ -z "$reason" ]; then
+      reason="no answer within $pull_timeout seconds"
+    fi
     log "Couldn't pull from GitHub ($reason). Using the videos already in the repo."
   fi
   rm -f "$errors"
