@@ -103,10 +103,9 @@ Settings each current video was finished with:
 ## 7. Add it to the repo
 
 - Branch from `origin/main`; copy to `playlists/<season>/` or `playlists/<season>/<playlist>/` with a snake_case name. Under 100 MB (GitHub limit). Files play in name order.
-- Update `README.md`. It is a plain, non-technical guide for the person: no model names, settings, credits, ffmpeg, file paths of videos or anything else in this skill. Only:
+- Update `README.md`. It is a plain, non-technical guide for the person: no costs, model names, settings, credits, ffmpeg, file paths of videos or anything else in this skill. Only:
   - "What's playing": the season's Videos column (by name, e.g. "the fall sunset");
   - "The videos": a row in the season's table: **Name:** one plain sentence of what you see | Kid and grownup hours / Grownup hours / All evening | m:ss;
-  - "What it cost": one row per video in USD (several generations for one video add up into its row), the total, and the "About $N" lead line. Keep the per-generation detail in the ledger above, not the README;
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.

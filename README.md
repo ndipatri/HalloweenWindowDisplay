@@ -79,25 +79,6 @@ The videos play one after another and start over, each fading in from black and 
 
 The videos were made in a conversation with [Claude](https://claude.ai), Anthropic's AI assistant, connected to [Higgsfield](https://higgsfield.ai), an AI video service. The ideas were described in plain words ("a woman who's just a dark silhouette, walking in and out of the window"); Claude wrote the detailed prompts, made the videos on Higgsfield, and edited them (making her bigger, lowering her to window height, adding a flicker to make it scarier) until they looked right. For the Mochi videos, a photo of the real dog was used so the video shows him rather than any white dog.
 
-### What it cost
-
-**About $143 for the videos**, plus a **Claude subscription** (from $20 a month). Prices in US dollars, as of November 2026.
-
-| Video | Cost |
-|---|---|
-| The woman (two clips, plus a first try that came out too small) | $33.97 |
-| Neon monster | $13.07 |
-| Fuzzy creatures | $17.78 |
-| Mochi the ghost-dog | $17.78 |
-| Jump scare | $17.78 |
-| Mochi the pilgrim | $18.82 |
-| Fall sunset (two clips) | $23.53 |
-| **Total** | **$142.73** |
-
-Higgsfield charges for each clip it makes, by its length; editing afterwards is free. Claude is a flat monthly subscription (Pro is $20 a month; Max at $100 and Ultra at $200 give more room for long sessions like this one), so writing the prompts, editing the videos and building the scheduler cost nothing extra.
-
-Sources: [Higgsfield pricing](https://higgsfield.ai/blog/higgsfield-pricing-explained) · [Claude plans & pricing](https://claude.com/pricing)
-
 ### The prompts
 
 What was asked for, word for word. The woman's video is two clips joined together, and so is the fall dusk.
