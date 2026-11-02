@@ -495,3 +495,4 @@ Start with the log: `cat ~/video-scheduler/scheduler.log`. It records what's sho
 | `playlists/` | The videos, one folder per season, with optional playlist subfolders |
 | `video/build_loop.sh` | Builds the 1:33 loop from the two generated clips |
 | `docs/images/` | Frames and diagrams used in this guide |
+| `.claude/skills/` | Agent skills for working on this repo with Claude: `window-display-video` (making a new video with Higgsfield and adding it) and `window-display-schedule` (changing seasons or the schedule and getting it onto the Mac) |
