@@ -119,6 +119,23 @@ echo "   $(post /api/schedule '{}')"
 check "back to schedule removes the override" within 10 test ! -e "$VIDEOS/override.json"
 check "the status leaves the override" within 20 bash -c '! status | grep -q override'
 
+echo "== Sync now, and the recent activity"
+syncs_before=$(grep -c "sync: Done:" "$LOG")
+echo "   $(post /api/sync '{}')"
+check "Sync now starts a sync that finishes in the log" \
+  within 60 bash -c "[ \$(grep -c 'sync: Done:' '$LOG') -gt $syncs_before ]"
+check "the website shows the log's last lines" bash -c "
+  curl -fsS $SITE/api/log | node -e '
+    const l = JSON.parse(require(\"fs\").readFileSync(0)).lines;
+    process.exit(l.length > 0 && l.length <= 20 && l.some((x) => x.includes(\"sync: Done:\")) ? 0 : 1);'"
+# Hold the sync lock as a running sync would, then start another.
+sudo -u pi bash -c 'exec 9>/home/pi/video-scheduler/.sync.lock; flock 9; sleep 20' &
+holder=$!
+sleep 1
+sudo -u pi -H /home/pi/video-scheduler/sync >> "$LOG" 2>&1
+check "a second sync while one runs is skipped" logged "Skipped: another sync is already running."
+kill $holder 2>/dev/null; pkill -u pi -x sleep 2>/dev/null
+
 echo "== mpv stops"
 pkill -x mpv
 check "the player exits with code 1, so systemd would restart it" bash -c "

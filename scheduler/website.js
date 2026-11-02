@@ -10,10 +10,15 @@ const { createScheduler } = require('./logic.js');
 // paths out of the video folder, no quotes or backslashes.
 const PLAYLIST_NAME = /^[^/.\\"][^/\\"]*(\/[^/.\\"][^/\\"]*)?$/;
 
+// How much of the log to show, and how much of its end to read for that.
+const LOG_LINES = 20;
+const LOG_TAIL_BYTES = 16 * 1024;
+
 // `options`: { config, videoRoot, now() -> Date, readText, writeText,
-//              removeFile, listFolder }
+//              removeFile, listFolder, readTail(path, bytes) -> text or null,
+//              startSync() -> false if a sync it started is still running }
 function createWebsite(options) {
-  const { config, videoRoot, now, readText, writeText, removeFile, listFolder } = options;
+  const { config, videoRoot, now, readText, writeText, removeFile, listFolder, readTail, startSync } = options;
   const logic = createScheduler(Object.assign({ log() {} }, options));
   const isFolder = (p) => listFolder(p) !== null;
   const visible = (name) => !name.startsWith('.');
@@ -81,6 +86,19 @@ function createWebsite(options) {
       return json(200, { status: text === null ? null : text.trim() });
     }
     if (route === 'GET /api/choices') return json(200, choices());
+    if (route === 'GET /api/log') {
+      const text = readTail(videoRoot + '/scheduler.log', LOG_TAIL_BYTES);
+      const lines = text === null ? [] : text.split('\n').filter((l) => l.trim() !== '');
+      // The first line may be cut off where the read started, unless the
+      // whole log fit.
+      if (text !== null && text.length >= LOG_TAIL_BYTES) lines.shift();
+      return json(200, { lines: lines.slice(-LOG_LINES) });
+    }
+    if (route === 'POST /api/sync') {
+      return startSync()
+        ? ok('Syncing now. New videos play within a minute or two.')
+        : ok('A sync is already running.');
+    }
     if (route === 'POST /api/schedule') {
       removeFile(logic.OVERRIDE_PATH);
       return ok('Override cancelled. Following the schedule.');
@@ -106,7 +124,7 @@ function fail(error) { return json(400, { error }); }
 // Serves the website. A failure to listen is logged, not fatal: the TV
 // keeps playing without it.
 function startWebsite(options, port) {
-  const site = createWebsite(options);
+  const site = createWebsite(Object.assign({ startSync: syncStarter(options) }, options));
   const server = http.createServer((req, res) => {
     let body = '';
     req.setEncoding('utf8');
@@ -132,6 +150,32 @@ function startWebsite(options, port) {
   return server;
 }
 
+// Starts ~/video-scheduler/sync with its output appended to the log, as the
+// hourly timer does. Returns false while a sync it started is still running.
+// (The sync's own lock also keeps it from overlapping the timer's.)
+function syncStarter(options) {
+  const fs = require('fs');
+  const { spawn } = require('child_process');
+  let running = false;
+  return () => {
+    if (running) return false;
+    const out = fs.openSync(options.videoRoot + '/scheduler.log', 'a');
+    let child;
+    try {
+      child = spawn(options.videoRoot + '/sync', [], { stdio: ['ignore', out, out] });
+    } finally {
+      fs.closeSync(out);
+    }
+    running = true;
+    child.on('error', (e) => {
+      running = false;
+      options.log("ERROR: Couldn't start sync: " + e.message);
+    });
+    child.on('exit', () => { running = false; });
+    return true;
+  };
+}
+
 const PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -153,14 +197,16 @@ const PAGE = `<!DOCTYPE html>
   button.primary { background: var(--accent); border-color: var(--accent); color: #1a1a1a; font-weight: 600; }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
-  #message { min-height: 1.4em; margin-top: 14px; color: var(--accent); }
+  #message { min-height: 1.4em; margin-top: 10px; color: var(--accent); }
   #message.error { color: #ff6b6b; }
+  #log { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
 <body>
 <main>
   <h1>Window</h1>
   <div class="card"><div id="status">Checking…</div></div>
+  <div id="message"></div>
 
   <h2>Play</h2>
   <div class="grid" id="playlists"><button id="black">Black</button></div>
@@ -183,7 +229,11 @@ const PAGE = `<!DOCTYPE html>
   <h2>Schedule</h2>
   <button class="primary" id="schedule">Back to schedule</button>
 
-  <div id="message"></div>
+  <h2>Videos</h2>
+  <button id="sync">Sync now</button>
+
+  <h2>Recent activity</h2>
+  <div class="card"><div id="log">Loading…</div></div>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -213,6 +263,10 @@ const PAGE = `<!DOCTYPE html>
       const r = await (await fetch('/api/status')).json();
       $('status').textContent = r.status || 'The box has not started yet.';
     } catch (e) { $('status').textContent = "Couldn't reach the box."; }
+    try {
+      const l = await (await fetch('/api/log')).json();
+      $('log').textContent = l.lines.length ? l.lines.join('\\n') : 'Nothing yet.';
+    } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
   async function load() {
@@ -229,6 +283,7 @@ const PAGE = `<!DOCTYPE html>
   $('black').onclick = () => show('black');
   $('preview-go').onclick = () => $('preview').value && show($('preview').value);
   $('schedule').onclick = () => post('/api/schedule');
+  $('sync').onclick = () => post('/api/sync');
   load().catch(() => say("Couldn't reach the box.", true));
   refresh();
   setInterval(refresh, 3000);

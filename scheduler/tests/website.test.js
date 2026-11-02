@@ -23,11 +23,19 @@ function site(dirs = {}) {
     folders[ROOT + '/' + k] = v;
     if (!k.includes('/')) folders[ROOT].push(k);
   }
+  const sync = { running: false, started: 0 };
   const w = createWebsite({
     config,
     videoRoot: ROOT,
     now: () => SIX_PM,
     readText: (p) => (p in files ? files[p] : null),
+    readTail: (p, bytes) => (p in files ? files[p].slice(-bytes) : null),
+    startSync: () => {
+      if (sync.running) return false;
+      sync.running = true;
+      sync.started++;
+      return true;
+    },
     writeText: (p, text) => { files[p] = text; },
     removeFile: (p) => { delete files[p]; },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
@@ -37,10 +45,16 @@ function site(dirs = {}) {
     return Object.assign({}, r, { json: r.type === 'application/json' ? JSON.parse(r.body) : null });
   };
   const override = () => (OVERRIDE in files ? JSON.parse(files[OVERRIDE]) : null);
-  return { files, call, override };
+  return { files, call, override, sync };
 }
 
 const show = (s, body) => s.call('POST', '/api/show', body);
+
+// The page's own script must compile, or none of its buttons work.
+function assertScriptCompiles(page) {
+  const code = page.split('<script>')[1].split('</script>')[0];
+  new (require('vm').Script)(code);
+}
 
 // ---- Shows the status ----
 
@@ -162,6 +176,53 @@ test('the website page offers each choice', () => {
     'value="schedule"', 'value="15"', 'value="30"', 'value="60"', 'value="cleared"']) {
     assert.ok(r.body.includes(text), 'page has ' + text);
   }
+  assertScriptCompiles(r.body);
+});
+
+// ---- Syncs on request ----
+
+test('the website starts a sync when asked', () => {
+  const s = site();
+  const r = s.call('POST', '/api/sync');
+  assert.equal(r.status, 200);
+  assert.equal(s.sync.started, 1);
+  assert.equal(r.json.message, 'Syncing now. New videos play within a minute or two.');
+});
+
+test("the website doesn't start a second sync while one is running", () => {
+  const s = site();
+  s.sync.running = true;
+  const r = s.call('POST', '/api/sync');
+  assert.equal(r.status, 200);
+  assert.equal(s.sync.started, 0);
+  assert.equal(r.json.message, 'A sync is already running.');
+});
+
+// ---- Shows recent activity ----
+
+test('the website shows the last lines of the log', () => {
+  const s = site();
+  const lines = Array.from({ length: 30 }, (_, i) => 'line ' + (i + 1));
+  s.files[ROOT + '/scheduler.log'] = lines.join('\n') + '\n';
+  const r = s.call('GET', '/api/log');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.lines, lines.slice(10));
+});
+
+test('the website shows no log lines when there is no log yet', () => {
+  const s = site();
+  const r = s.call('GET', '/api/log');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.lines, []);
+});
+
+test('the website page offers Sync now and shows recent activity', () => {
+  const s = site();
+  const page = s.call('GET', '/').body;
+  for (const text of ['>Sync now<', 'Recent activity', 'id="log"', "fetch('/api/log')", "post('/api/sync')"]) {
+    assert.ok(page.includes(text), 'page has ' + text);
+  }
+  assertScriptCompiles(page);
 });
 
 (async () => {
