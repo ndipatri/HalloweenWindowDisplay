@@ -77,7 +77,7 @@ If the box shows the wrong season, check first whether setup was rerun after the
 
   Both services append to `~/video-scheduler/scheduler.log`.
 - **Black until the clock is set:** until `/run/systemd/timesync/synchronized` exists (systemd-timesyncd creates it once the time comes from the network), the status is `black (waiting for the clock to be set)`.
-- **Sync** is `scheduler/sync_videos.sh`: `git pull` (60 s watchdog; on failure it uses the repo as it is), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. Once a season folder exists in the repo, it is the master copy for that season.
+- **Sync** is `scheduler/sync_videos.sh`: `git pull` under `timeout` (60 s; on failure it uses the repo as it is, and it leaves nothing running), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. Once a season folder exists in the repo, it is the master copy for that season.
 - **Playback:**
   - `.mp4`, `.m4v`, `.mov`, in name order with numbers sorted as numbers (a `1-`, `2-` prefix sets the order);
   - folders are re-read as the queue moves on, so no restart is needed for video changes;
