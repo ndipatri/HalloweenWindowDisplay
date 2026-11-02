@@ -1,0 +1,10 @@
+schema: window-display
+
+# Project context: constraints an agent can't infer from the code.
+context: |
+  Every spec scenario must be enforced by a Node test with exactly the same
+  name in scheduler/tests/*.test.js; `node openspec/check-scenarios.js`
+  checks this. The person who uses the display is not technical: README.md
+  stays plain, and technical detail goes in the window-display-schedule and
+  window-display-video skills. The GitHub CLI can't use GraphQL here, so PRs
+  are opened with `gh api`, as those skills describe.
