@@ -33,26 +33,56 @@ echo "== The box's software"
 echo "   $(. /etc/os-release; echo "$PRETTY_NAME"), $(uname -m)"
 echo "   node $(node -v), $(mpv --version | head -1 | cut -d' ' -f1-2), ffmpeg $(dpkg-query -W -f='${Version}' ffmpeg)"
 
-echo "== The repo, as the person clones it, with small test clips for videos"
-cp -a /src "$REPO"
-rm -rf "$REPO/.git" "$REPO/playlists"/*/
-mkdir -p "$REPO/playlists/halloween/grownup"
+echo "== The repo the box will clone, with small test clips for videos"
+TESTREPO="$E/testrepo"
+cp -a /src "$TESTREPO"
+rm -rf "$TESTREPO/.git" "$TESTREPO/playlists"/*/
+mkdir -p "$TESTREPO/playlists/halloween/grownup"
 clip() { # file colour: 2 s, portrait, H.264 like the real videos
   ffmpeg -loglevel error -f lavfi -i "color=c=$2:s=108x192:d=2" -r 24 -pix_fmt yuv420p "$1"
 }
-clip "$REPO/playlists/halloween/a.mp4" orange
-clip "$REPO/playlists/halloween/b.mp4" purple
-clip "$REPO/playlists/halloween/grownup/c.mp4" lime
-echo "not a video" > "$REPO/playlists/halloween/broken.mp4"
-# Its own git repo with no remote, so sync's pull fails fast, as offline.
-git -C "$REPO" init -q && git -C "$REPO" add -A && \
-  git -C "$REPO" -c user.name=e2e -c user.email=e2e@example.com commit -qm e2e
-chown -R pi: "$REPO"
+clip "$TESTREPO/playlists/halloween/a.mp4" orange
+clip "$TESTREPO/playlists/halloween/b.mp4" purple
+clip "$TESTREPO/playlists/halloween/grownup/c.mp4" lime
+echo "not a video" > "$TESTREPO/playlists/halloween/broken.mp4"
+git -C "$TESTREPO" init -q -b main && git -C "$TESTREPO" add -A && \
+  git -C "$TESTREPO" -c user.name=e2e -c user.email=e2e@example.com commit -qm e2e
+chown -R pi: "$TESTREPO"
 
-echo "== sudo bash scheduler/setup.sh"
-(cd "$REPO" && env PATH="/opt/e2e-fakes:$PATH" SUDO_USER=pi bash scheduler/setup.sh) > "$E/setup.out" 2>&1
+echo "== A card's first-boot files, made by cards/ (as make-cards.js does)"
+mkdir -p "$E/card"
+node -e '
+  const cards = require("/src/cards/cloud-init.js");
+  const fs = require("fs");
+  const files = cards.buildCard(cards.prepareAnswers({
+    user: "pi", password: "rehearsal password", timezone: "America/New_York", sshKey: null,
+    wifi: { ssid: "Pumpkin Patch", password: "hunter22", country: "US" },
+    repoUrl: process.argv[1] }), "tvbox");
+  for (const [f, text] of Object.entries(files)) fs.writeFileSync("/tmp/e2e/card/" + f, text);
+' "$TESTREPO"
+check "cloud-init accepts the card's user-data" \
+  bash -c "cloud-init schema --config-file '$E/card/user-data' > '$E/schema.out' 2>&1 || { cat '$E/schema.out'; false; }"
+check "cloud-init accepts the card's network-config" \
+  bash -c "cloud-init schema --schema-type network-config --config-file '$E/card/network-config' > '$E/schema.out' 2>&1 || { cat '$E/schema.out'; false; }"
+# What cloud-init's write_files does with the card's user-data on first boot.
+python3 - "$E/card/user-data" <<'PY'
+import os, sys, yaml
+for f in yaml.safe_load(open(sys.argv[1]))["write_files"]:
+    os.makedirs(os.path.dirname(f["path"]), exist_ok=True)
+    open(f["path"], "w").write(f["content"])
+    os.chmod(f["path"], int(f.get("permissions", "0644"), 8))
+PY
+check "the card installs the first-boot script, its settings and its service" \
+  test -x /usr/local/sbin/tvbox-firstboot -a -f /etc/tvbox/firstboot.conf -a -f /etc/systemd/system/tvbox-firstboot.service
+check "systemd accepts the first-boot service" \
+  bash -c "! systemd-analyze verify --man=no /etc/systemd/system/tvbox-firstboot.service 2>&1 | grep -v 'Failed to determine\|Running in a container' | grep -q ."
+
+echo "== First boot: tvbox-firstboot (clones the repo, runs sudo bash scheduler/setup.sh)"
+env PATH="/opt/e2e-fakes:$PATH" TVBOX_FIRSTBOOT_DONE="$E/firstboot-done" /usr/local/sbin/tvbox-firstboot > "$E/setup.out" 2>&1
 setup_status=$?
 sed 's/^/   /' "$E/setup.out"
+check "a card's first-boot script installs, clones and sets up the box" \
+  test $setup_status -eq 0 -a -f "$E/firstboot-done" -a -d "$REPO/.git"
 check "setup finishes without an error" test $setup_status -eq 0
 if [ $setup_status -ne 0 ]; then
   echo; echo "$passed passed, $failed failed (stopped: nothing after setup can work)"
@@ -66,7 +96,7 @@ check "systemd accepts the units" \
   bash -c "! systemd-analyze verify --man=no /etc/systemd/system/tvbox.service /etc/systemd/system/tvbox-sync.service /etc/systemd/system/tvbox-sync.timer 2>&1 | grep -v 'Failed to determine\|Running in a container\|Assignment outside' | grep -q ."
 check "setup's first sync copies the videos over" \
   test -f "$VIDEOS/halloween/a.mp4" -a -f "$VIDEOS/halloween/grownup/c.mp4"
-check "sync logs that GitHub can't be reached and carries on" bash -c "grep -q \"Couldn't pull\" '$LOG'"
+check "setup's first sync pulls the latest from the repo" logged "Pulled the latest from GitHub"
 check "setup installs the log rule, and logrotate accepts it" \
   bash -c "test -f /etc/logrotate.d/tvbox && ! logrotate -d /etc/logrotate.d/tvbox 2>&1 | grep -qi 'error'"
 
