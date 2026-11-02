@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "agentic-coding": {
+      "source": { "source": "github", "repo": "ndipatri/agentic-coding" }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-coding@agentic-coding": true
+  }
+}
