@@ -191,6 +191,7 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
 | `Website on port 80: … EADDRINUSE` | Something else has port 80: change `webPort` in config.js |
 | `No videos for …` | The season (and its subfolder) has no playable files yet |
 | `ERROR: Skipping …` | Damaged or unplayable file; re-export as H.264 MP4 |
+| `Cannot load libcuda.so.1` / `Failed setup for format vulkan` on every video | mpv probing hardware decoders the Pi 5 doesn't have for H.264: the box runs code from before `--hwdec=no`; rerun setup. Harmless, as playback falls back to software |
 | A video vanished from the box | Not in the repo, so sync moved it to `.removed/`; add it to the repo |
 | `Ignoring …/override.json` | Malformed override; Back to schedule deletes it |
 | Picture upside down or sideways | `rotate` in config.js (90 ↔ 270), then rerun setup |
