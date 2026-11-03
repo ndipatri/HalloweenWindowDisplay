@@ -14,7 +14,10 @@ function mpvArgs(box) {
     '--fullscreen',
     '--vo=gpu',
     '--gpu-context=drm',
-    '--hwdec=auto-safe',
+    // Software decoding: the Pi 5 has no H.264 hardware decoder, and trying the
+    // ones that don't apply (Vulkan, CUDA) logs errors on every video. For HEVC
+    // videos, which the Pi 5 can decode in hardware, this would be --hwdec=drm.
+    '--hwdec=no',
     '--video-rotate=' + box.rotate,
     '--no-audio',
     '--prefetch-playlist=yes',
