@@ -45,6 +45,9 @@ clip "$TESTREPO/playlists/halloween/a.mp4" orange
 clip "$TESTREPO/playlists/halloween/b.mp4" purple
 clip "$TESTREPO/playlists/halloween/grownup/c.mp4" lime
 echo "not a video" > "$TESTREPO/playlists/halloween/broken.mp4"
+# A repo folder with the uploads' name, which sync must leave alone.
+mkdir -p "$TESTREPO/playlists/photos"
+clip "$TESTREPO/playlists/photos/x.mp4" white
 git -C "$TESTREPO" init -q -b main && git -C "$TESTREPO" add -A && \
   git -C "$TESTREPO" -c user.name=e2e -c user.email=e2e@example.com commit -qm e2e
 chown -R pi: "$TESTREPO"
@@ -100,6 +103,16 @@ check "setup's first sync pulls the latest from the repo" logged "Pulled the lat
 check "setup installs the log rule, and logrotate accepts it" \
   bash -c "test -f /etc/logrotate.d/tvbox && ! logrotate -d /etc/logrotate.d/tvbox 2>&1 | grep -qi 'error'"
 
+echo "== Adding photos: first boot sets no PIN; setup run again with one"
+check "first boot, with no one to ask, leaves adding photos off and says so" \
+  bash -c "grep -q 'No upload PIN set, so adding photos is off' '$E/setup.out' && test ! -e '$VIDEOS/upload-pin'"
+check "setup makes the photos folder" test -d "$VIDEOS/photos"
+check "sync skips the repo's playlists/photos" \
+  bash -c "logged 'Skipping playlists/photos: that name is kept for uploads from the website.' && test ! -e '$VIDEOS/photos/x.mp4'"
+env PATH="/opt/e2e-fakes:$PATH" SUDO_USER=pi TVBOX_UPLOAD_PIN=4321 bash "$REPO/scheduler/setup.sh" < /dev/null > "$E/setup2.out" 2>&1
+check "setup run again with TVBOX_UPLOAD_PIN saves it, readable only by pi" \
+  bash -c "[ \"\$(cat '$VIDEOS/upload-pin')\" = 4321 ] && [ \"\$(stat -c '%a %U' '$VIDEOS/upload-pin')\" = '600 pi' ]"
+
 echo "== The player, as tvbox.service runs it (website on 8080 instead of 80)"
 # What systemd would provide: /run/tvbox, and the clock set from the network.
 mkdir -p /run/tvbox && chown pi: /run/tvbox
@@ -149,11 +162,108 @@ echo "   $(post /api/schedule '{}')"
 check "back to schedule removes the override" within 10 test ! -e "$VIDEOS/override.json"
 check "the status leaves the override" within 20 bash -c '! status | grep -q override'
 
+echo "== Photos and videos added from a phone"
+upload() { # file name pin -> the website's answer
+  curl -sS -X POST -H "X-Upload-Pin: $3" --data-binary "@$1" "$SITE/api/uploads?name=$2"
+}
+code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+# A plain portrait photo, a photo stored sideways with EXIF orientation 6
+# (turn 90° clockwise to show it), a PNG whose top half is see-through, and
+# an HEVC clip as a phone records.
+ffmpeg -loglevel error -f lavfi -i "color=c=red:s=96x160" -frames:v 1 "$E/red.jpg"
+ffmpeg -loglevel error -f lavfi -i "color=c=green:s=160x96" -frames:v 1 "$E/sideways-plain.jpg"
+node -e '
+  // Insert an APP1 Exif segment (orientation 6) right after the JPEG start.
+  const fs = require("fs");
+  const jpg = fs.readFileSync(process.argv[1]);
+  const tiff = Buffer.from([0x4d,0x4d,0,0x2a, 0,0,0,8, 0,1, 0x01,0x12, 0,3, 0,0,0,1, 0,6,0,0, 0,0,0,0]);
+  const body = Buffer.concat([Buffer.from("Exif\0\0", "binary"), tiff]);
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 255]), body]);
+  fs.writeFileSync(process.argv[2], Buffer.concat([jpg.subarray(0, 2), app1, jpg.subarray(2)]));
+' "$E/sideways-plain.jpg" "$E/sideways.jpg"
+ffmpeg -loglevel error -f lavfi -i "color=c=blue:s=96x160,format=rgba,geq=r=0:g=0:b=255:a='if(lt(Y,80),0,255)'" -frames:v 1 "$E/half.png"
+hevc_ok=0
+if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx265; then
+  ffmpeg -loglevel error -f lavfi -i "color=c=yellow:s=108x192:d=2" -r 24 -c:v libx265 -tag:v hvc1 -pix_fmt yuv420p "$E/hevc.mp4" && hevc_ok=1
+fi
+
+check "a batch check with the wrong PIN is refused (403)" \
+  test "$(code -X POST -H 'X-Upload-Pin: 1111' -d '{"files":[{"name":"a.jpg","bytes":10}]}' "$SITE/api/uploads/check")" = 403
+check "a batch check with the right PIN is ready" \
+  bash -c "curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'Ready to add 1 file.'"
+echo "   $(upload "$E/red.jpg" Red.JPG 4321)"
+check "an upload with the right PIN is added and logged" \
+  bash -c "test -f '$VIDEOS/photos/00001-red.jpg' && logged 'Uploaded photos/00001-red.jpg'"
+echo "   $(upload "$E/sideways.jpg" Sideways.jpg 4321)"
+echo "   $(upload "$E/half.png" Half.png 4321)"
+[ $hevc_ok -eq 1 ] && echo "   $(upload "$E/hevc.mp4" Phone.mp4 4321)"
+check "the website lists the uploads in order" bash -c "
+  curl -fsS $SITE/api/uploads | node -e '
+    const d = JSON.parse(require(\"fs\").readFileSync(0));
+    const names = d.uploads.map((u) => u.name);
+    process.exit(d.pinSet && names[0] === \"00001-red.jpg\" && names[1] === \"00002-sideways.jpg\" && names[2] === \"00003-half.png\" ? 0 : 1);'"
+check "the website sends an upload with a range" \
+  test "$(code -H 'Range: bytes=0-9' "$SITE/photos/00001-red.jpg")" = 206
+
+echo "   $(post /api/show '{"target":"photos","until":"cleared"}')"
+check "Photos shows in the status" within 20 bash -c '[ "$(status)" = "photos (override until cleared)" ]'
+check "the uploads play in order" within 60 logged "photos: playing 00002-sideways.jpg"
+check "each photo stays on screen about 10 seconds" node -e '
+  const log = require("fs").readFileSync(process.argv[1], "utf8").split("\n");
+  const when = (name) => { const l = log.find((x) => x.includes("photos: playing " + name)); return l && Date.parse(l.split("  ")[0]); };
+  const gap = (when("00002-sideways.jpg") - when("00001-red.jpg")) / 1000;
+  console.log("   red.jpg to sideways.jpg: " + gap + " s");
+  process.exit(gap >= 8 && gap <= 15 ? 0 : 1);' "$LOG"
+check "the see-through PNG plays" within 30 logged "photos: playing 00003-half.png"
+if [ $hevc_ok -eq 1 ]; then
+  check "the HEVC clip plays" within 60 logged "photos: playing 00004-phone.mp4"
+  sleep 3
+  check "the HEVC clip isn't skipped" bash -c "! grep -q 'ERROR: Skipping 00004-phone.mp4' '$LOG'"
+else
+  echo "   (this ffmpeg has no libx265: no HEVC clip to try)"
+fi
+check "no hardware-decoder probing errors are logged" bash -c "! grep -qi 'libcuda\|vulkan' '$LOG'"
+# Frames by colour: what each upload looked like on the turned screen.
+frames_like() { # r g b -> sizes of frames near that colour
+  for f in "$E/frames"/*.png; do
+    c="$(ffmpeg -loglevel error -i "$f" -vf scale=1:1 -f rawvideo -pix_fmt rgb24 - | od -An -tu1 | xargs)"
+    node -e "const [r,g,b]='$c'.split(' ').map(Number);const [R,G,B]=[$1,$2,$3];process.exit(Math.abs(r-R)+Math.abs(g-G)+Math.abs(b-B)<70?0:1)" &&
+      ffprobe -v error -select_streams v -show_entries stream=width,height -of csv=p=0 "$f"
+  done | sort -u
+}
+sideways="$(frames_like 0 128 0)"
+echo "   the sideways photo's frames: ${sideways:-none}"
+check "a photo stored sideways (EXIF orientation 6) comes out upright (160 x 96, like the plain one)" \
+  bash -c "[ -n '$sideways' ] && ! echo '$sideways' | grep -qv '^160,96$'"
+# Black behind the see-through PNG is box-only: without the TV's GPU output
+# mpv ignores --background, so the rehearsal only checks that it plays.
+if [ $hevc_ok -eq 1 ]; then
+  check "the HEVC clip draws frames" test -n "$(frames_like 255 255 0)"
+fi
+
+# Remove a photo just after it comes on, so it has most of its 10 seconds
+# left: if the next one starts within 5 seconds, the removal moved mpv on.
+lines=$(grep -c 'photos: playing' "$LOG")
+within 15 bash -c "[ \$(grep -c 'photos: playing' '$LOG') -gt $lines ]"
+playing="$(grep -o 'photos: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
+errors_before=$(grep -c 'ERROR' "$LOG")
+echo "   removing $playing: $(curl -sS -X POST -H 'X-Upload-Pin: 4321' -d "{\"name\":\"$playing\"}" "$SITE/api/uploads/remove")"
+check "removing the upload on screen deletes it and logs it" \
+  bash -c "test ! -e '$VIDEOS/photos/$playing' && logged 'Removed photos/$playing (from the website)'"
+check "the next upload comes on at once after the removed one" within 5 bash -c "
+  tail -n +\$(grep -n 'Removed photos/$playing' '$LOG' | tail -1 | cut -d: -f1) '$LOG' | grep 'photos: playing' | grep -qv '$playing'"
+# A full round of the uploads left, so a stale queue entry would be reached.
+sleep 35
+check "removing it logs no error, even a round later" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
+echo "   $(post /api/schedule '{}')"
+uploads_before="$(ls -A "$VIDEOS/photos")"
+
 echo "== Sync now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")
 echo "   $(post /api/sync '{}')"
 check "Sync now starts a sync that finishes in the log" \
   within 60 bash -c "[ \$(grep -c 'sync: Done:' '$LOG') -gt $syncs_before ]"
+check "Sync now leaves the uploads alone" test "$(ls -A "$VIDEOS/photos")" = "$uploads_before"
 check "the website shows the log's last lines" bash -c "
   curl -fsS $SITE/api/log | node -e '
     const l = JSON.parse(require(\"fs\").readFileSync(0)).lines;

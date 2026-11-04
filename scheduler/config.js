@@ -48,6 +48,19 @@ module.exports = {
   videoExtensions: ['mp4', 'm4v', 'mov'],
   checkSeconds: 1,
 
+  // Photos and videos added from a phone on the website. They live in
+  // ~/video-scheduler/photos on the box (never in the repo) and play only
+  // when Photos is chosen on the website, so no season or schedule entry
+  // may be called 'photos'.
+  photoSeconds: 10, // how long each photo stays on screen
+  photoExtensions: ['jpg', 'jpeg', 'png'], // photo files, which play only in Photos
+  uploads: {
+    maxBytes: 1024 ** 3, // at most 1 GB a file
+    keepFreeBytes: 2 * 1024 ** 3, // refuse an upload that would leave under 2 GB free
+    pinTries: 5, // wrong upload PINs in a row before uploads lock...
+    lockMinutes: 5, // ...for this long
+  },
+
   box: {
     // Videos, the status file, the override and the log live here. Default:
     // ~/video-scheduler for the user setup.sh was run for.

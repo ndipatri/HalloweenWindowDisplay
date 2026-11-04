@@ -32,7 +32,7 @@ To choose which *days* the window is on, use season `days`/`alsoOn`. To choose *
 
 ## Making a change
 
-Changes to how the display behaves (seasons, schedule, overrides, the website, sync, setup, what the status and the log report) go through OpenSpec with this repo's `window-display` schema (`openspec/schemas/window-display/`, CLI 1.14.1: `npm install -g @fission-ai/openspec@1.14.1`). Start with the agentic-coding plugin's `openspec-propose` or `openspec-new-change` skill. Every scenario in a spec is enforced by a test with exactly its name in `scheduler/tests/*.test.js`: `node openspec/check-scenarios.js` lists any scenario without one, and `scheduler/tests/specs.test.js` runs that check over `openspec/specs/` with the other tests. A one-line config tweak the person has asked for can skip OpenSpec, but it still needs a pinned test (step 4). The steps below apply either way.
+Changes to how the display behaves (seasons, schedule, overrides, the website, sync, setup, what the status and the log report) go through OpenSpec with this repo's `window-display` schema (`openspec/schemas/window-display/`, CLI 1.14.1: `npm install -g @fission-ai/openspec@1.14.1`). Start with the agentic-coding plugin's `openspec-propose` or `openspec-new-change` skill. Every scenario in a spec is enforced by a test with exactly its name in `scheduler/tests/*.test.js`: `node openspec/check-scenarios.js` lists any scenario without one, and `scheduler/tests/specs.test.js` runs that check over `openspec/specs/` with the other tests. Two reviews are part of every change with a design.md: the agentic-coding plugin's `review-opsx-design`, as a read-only subagent once design.md is written, with every BLOCKING finding settled with the person before tasks; and `review-orchestrator` on the whole change as the last verification task, repeated until no BLOCKING findings remain. Both are told the project is Node, bash, mpv and systemd, not Dart or Python (the schema has the wording). A one-line config tweak the person has asked for can skip OpenSpec, but it still needs a pinned test (step 4). The steps below apply either way.
 
 1. **Pin down the intent in dates.** Turn the request into the exact days and times it should produce, and state them back. Example: "Thanksgiving: Fri/Sat until Thanksgiving, then the day before and the day" means Nov 6, 7, 13, 14, 20, 21, 25 and 26 in 2026, and other November days are black. Check what nearby seasons and the schedule do on the edge days. Point out side effects, such as the 5–7 am kid period also playing on those days.
 2. **Branch from `origin/main`** and edit `CONFIG`. Keep the explanatory comments above each list accurate, and add a one-line comment on any non-obvious entry.
@@ -66,28 +66,31 @@ If the box shows the wrong season, check first whether setup was rerun after the
   - sets the time zone (`TVBOX_TIMEZONE`, default America/New_York) and turns on network time;
   - copies `config.js`, `logic.js`, `mpv.js`, `player.js` and `website.js` to `/opt/tvbox`;
   - writes `~/video-scheduler/sync` with the repo path;
+  - makes `~/video-scheduler/photos/` and settles the upload PIN, before installing anything: `TVBOX_UPLOAD_PIN` (4–8 digits, else it exits 1 with `The upload PIN must be 4 to 8 digits.`) sets or changes it; otherwise a saved `upload-pin` is kept; otherwise, with a terminal (`[ -t 0 ]`), it asks with `read -rs`; otherwise (a card's first boot) it prints `No upload PIN set, so adding photos is off. …` and uploads stay off. The file is written mode 600. To set or change it later: `sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` (`sudo` drops other environment variables, so give it inside the sudo command);
   - installs `/etc/logrotate.d/tvbox` from `scheduler/logrotate/tvbox` (see Files below);
   - installs `tvbox.service`, `tvbox-sync.service` and `tvbox-sync.timer` from `scheduler/systemd/`;
   - syncs once, then restarts the player.
 
-  For a dry run, set `TVBOX_ROOT` (a folder standing in for /), `TVBOX_USER` and `TVBOX_HOME`, with fake `apt-get`, `systemctl`, `timedatectl`, `usermod` and `groupadd` first on `PATH`. The rehearsal (below) runs it for real.
+  For a dry run, set `TVBOX_ROOT` (a folder standing in for /), `TVBOX_USER` and `TVBOX_HOME`, with fake `apt-get`, `systemctl`, `timedatectl`, `usermod`, `groupadd` and `getent` first on `PATH` and stdin from `/dev/null`; `scheduler/tests/setup.test.js` does this. The rehearsal (below) runs it for real.
 - `tvbox.service` runs `node /opt/tvbox/player.js` as the user. The player:
-  - starts mpv (`--vo=gpu --gpu-context=drm`, straight to the TV, black when idle, `--video-rotate` from config), talks to it over `/run/tvbox/mpv.sock`, and serves the website on port 80 (`CAP_NET_BIND_SERVICE`);
+  - starts mpv (`--vo=gpu --gpu-context=drm`, straight to the TV, black when idle, `--video-rotate` from config; `--hwdec=drm --hwdec-codecs=hevc`, so HEVC decodes in hardware and every other codec in software without probing; photos for `photoSeconds` each with `--image-display-duration`, fitted on black with `--keepaspect=yes --panscan=0 --background=color --background-color=#000000`), talks to it over `/run/tvbox/mpv.sock`, and serves the website on port 80 (`CAP_NET_BIND_SERVICE`);
   - every second works out what to show (`whatToShow`), writes the status file, and keeps mpv's queue three videos ahead (`keepPlaying`);
   - if mpv exits, exits with code 1, and systemd (`Restart=always`) starts both again.
 
   Both services append to `~/video-scheduler/scheduler.log`.
 - **Black until the clock is set:** until `/run/systemd/timesync/synchronized` exists (systemd-timesyncd creates it once the time comes from the network), the status is `black (waiting for the clock to be set)`.
-- **Sync** is `scheduler/sync_videos.sh`: `git pull` under `timeout` (60 s; on failure it uses the repo as it is, and it leaves nothing running), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. Once a season folder exists in the repo, it is the master copy for that season. One sync runs at a time: it holds `flock` on `~/video-scheduler/.sync.lock`, and a sync that starts meanwhile (the timer and Sync now overlapping) logs `Skipped: another sync is already running.` and exits 0.
+- **Sync** is `scheduler/sync_videos.sh`: `git pull` under `timeout` (60 s; on failure it uses the repo as it is, and it leaves nothing running), then mirrors each folder under `playlists/`. It copies new or changed videos in under a hidden name and renames them into place, and moves videos (or whole subfolders) no longer in the repo to `~/video-scheduler/.removed/`. It never deletes. Top-level folders not in the repo are left alone. `photos` is skipped in both of its loops, even if the repo has `playlists/photos` (then it logs `Skipping playlists/photos: that name is kept for uploads from the website.` once per sync). Once a season folder exists in the repo, it is the master copy for that season. One sync runs at a time: it holds `flock` on `~/video-scheduler/.sync.lock`, and a sync that starts meanwhile (the timer and Sync now overlapping) logs `Skipped: another sync is already running.` and exits 0.
 - **Playback:**
   - `.mp4`, `.m4v`, `.mov`, in name order with numbers sorted as numbers (a `1-`, `2-` prefix sets the order);
+  - photos (`.jpg`, `.jpeg`, `.png`, `config.photoExtensions`) play only in `photos`, never in a season folder;
   - folders are re-read as the queue moves on, so no restart is needed for video changes;
   - a playlist that comes back starts again at the video it was on;
   - a single video loops;
   - a file mpv can't play is skipped and logged once.
 
-  GitHub refuses files over 100 MB. The Pi 5 decodes H.264 in software (fine at 1080p 24 fps); if playback stutters, re-encode to HEVC, which it decodes in hardware.
-- **Files in `~/video-scheduler/`:** `scheduler.log` (what's showing and why on every change, each video as it starts, overrides, sync, problems), `status` (one line, what the website shows), `override.json` (only while an override is on), `.removed/`.
+  GitHub refuses files over 100 MB. The Pi 5 decodes H.264 in software (fine at 1080p 24 fps) and HEVC in hardware (`--hwdec=drm`); if a repo video stutters, re-encode it to HEVC.
+- **Photos (uploads):** `photos` is a kept name. `resolve('photos')` is `photos` whatever the season (with or without seasons), playing only `~/video-scheduler/photos/`, so it plays only as an override from the website's Photos button. A season named `photos` or a schedule period playing `photos` is ignored with an `ERROR: Ignoring …` line saying why. Uploads are named `NNNNN-<cleaned name>` (one above the highest number ever given, kept in the hidden `photos/.last-number`), so name order is upload order and numbers are never reused, even after the newest is removed. Leftover `.upload-*` part files from a restart mid-upload are removed when the website starts. With no uploads (or no folder) the screen is black and `No photos or videos uploaded yet. Showing black until one is added.` is logged once. Removing an upload on the website first takes it out of mpv's playlist (`player.dropFile`, serialised with the tick), so mpv moves on without an error.
+- **Files in `~/video-scheduler/`:** `scheduler.log` (what's showing and why on every change, each video as it starts, overrides, sync, uploads and removals, problems), `status` (one line, what the website shows), `override.json` (only while an override is on), `.removed/`, `photos/` (the uploads; `.upload-*` while one arrives), `upload-pin` (mode 600).
   `scheduler.log` is rotated by logrotate (Raspberry Pi OS runs it daily): weekly, or sooner past 5 MB, keeping four old logs (`scheduler.log.1`, then compressed `.2.gz` to `.4.gz`). It uses `copytruncate` because the services keep the log open; without it, they would go on writing into the rotated file (the rehearsal checks this).
 - **systemd:**
   - restart: `sudo systemctl restart tvbox`;
@@ -166,14 +169,24 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
 
 - **Choices:**
   - each playlist named in the schedule (kid, grownup);
+  - Photos (the uploads; `photos: true` in the choices);
   - Black;
-  - a preview of any season folder or season/playlist folder on the box;
+  - a preview of any season folder or season/playlist folder on the box other than `photos`;
   - Back to schedule.
 - **Durations:** until the schedule changes, 15, 30 or 60 minutes, or until switched back (`untilCleared`).
 - **API:** `GET /api/status`, `GET /api/choices`, `POST /api/show {target, until: 'schedule'|'cleared'|minutes}`, `POST /api/schedule`, `POST /api/sync` (runs `~/video-scheduler/sync` with output appended to the log; answers at once, or `A sync is already running.`), `GET /api/log` (`{lines}`: the last 20 non-empty lines, read from the last 16 KB).
 - **Sync now and Recent activity** are on the page. The activity list refreshes with the status every few seconds.
 - An override with no time lasts until the schedule next changes (outside the schedule, until the next period starts). Overrides end by themselves, so the scary videos can't be left on in the morning. On a day with no season, a plain playlist is black, so preview the season instead.
-- There is no password: it's only reachable on the home network.
+- **Uploads** (Add photos or videos): the page checks the whole batch first, then sends each file as one raw POST (`XMLHttpRequest`, for progress), stopping at the first refusal; a wrong PIN or a lock forgets the PIN kept in `localStorage`. The batch flow is `sendBatch` in its own `<script>` block, so the tests run it in `vm`. Each file streams into `photos/.upload-<random>` and is linked to its numbered name only when every byte has arrived; one that stops partway is deleted and logged. Limits come from `config.uploads`: at most 1 GB a file, 2 GB must stay free (`fs.statfsSync`), 5 wrong PINs in a row (uploads, checks and removals together) lock for 5 minutes (in memory; a restart clears it). The server has no overall request timeout (`requestTimeout: 0`) and closes a connection idle for 2 minutes.
+
+  | Route | Request | Success | Refusals |
+  |---|---|---|---|
+  | `GET /api/uploads` | – | `{ pinSet, uploads: [{ name, kind: 'photo'\|'video', bytes }] }` in play order | – |
+  | `POST /api/uploads/check` | header `X-Upload-Pin`; `{ files: [{ name, bytes }] }` | `Ready to add N files.` | 403 `Wrong PIN.` / `Adding photos is off…`; 429 `Too many wrong PINs…`; 400 type; 413 too big; 507 no room |
+  | `POST /api/uploads?name=…` | header `X-Upload-Pin`, `Content-Length`; the file as the body | `Added <name>.` | as check; 400 `Bad request.` |
+  | `POST /api/uploads/remove` | header `X-Upload-Pin`; `{ name }` | `Removed <name>.` | 403, 429; 404 `No upload named <name>.` |
+  | `GET /photos/<name>` | optional `Range` | 200 or 206, cacheable for a year | 404 `Not found.`; 416 |
+- Only adding and removing photos need a PIN; everything else has no password, as the website is only reachable on the home network.
 
 ## Troubleshooting the box
 
@@ -190,8 +203,12 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
 | `ERROR: mpv stopped` repeating | mpv can't open the screen: TV not connected at boot, or the user not in `video`/`render` (rerun setup, then reboot) |
 | `Website on port 80: … EADDRINUSE` | Something else has port 80: change `webPort` in config.js |
 | `No videos for …` | The season (and its subfolder) has no playable files yet |
-| `ERROR: Skipping …` | Damaged or unplayable file; re-export as H.264 MP4 |
-| `Cannot load libcuda.so.1` / `Failed setup for format vulkan` on every video | mpv probing hardware decoders the Pi 5 doesn't have for H.264: the box runs code from before `--hwdec=no`; rerun setup. Harmless, as playback falls back to software |
+| `ERROR: Skipping …` | Damaged or unplayable file; re-export as H.264 MP4. For an uploaded photo, it may be too large for the GPU (48 MP and up): shrink it and add it again |
+| `Cannot load libcuda.so.1` / `Failed setup for format vulkan` on every video | mpv probing hardware decoders the Pi 5 doesn't have for H.264: the box runs code from before `--hwdec-codecs=hevc`; rerun setup. Harmless, as playback falls back to software |
+| An uploaded HEVC video stutters, or its colours look washed out | iPhone 4K HDR (10-bit) video. Try `--hwdec=drm-copy` in `mpv.js`; or on the phone turn off HDR video, or share at 1080p |
+| Website: `Adding photos is off: no upload PIN is set on the box.` | No valid `~/video-scheduler/upload-pin` (a card's unattended first boot sets none): `sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` |
+| `Five wrong upload PINs in a row: uploads locked until …` | Someone typed the PIN wrong five times; it unlocks by itself after five minutes (or on a restart) |
+| `No photos or videos uploaded yet` | Photos chosen with nothing uploaded: add some on the website |
 | A video vanished from the box | Not in the repo, so sync moved it to `.removed/`; add it to the repo |
 | `Ignoring …/override.json` | Malformed override; Back to schedule deletes it |
 | Picture upside down or sideways | `rotate` in config.js (90 ↔ 270), then rerun setup |

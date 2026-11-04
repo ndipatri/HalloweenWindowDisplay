@@ -66,8 +66,13 @@ copy_videos() {
     return
   fi
   local copied=0 set_aside=0 dir name dest file base
+  # The box's photos/ holds the uploads from the website: never the repo's.
+  if [ -d "$src/photos" ]; then
+    log "Skipping playlists/photos: that name is kept for uploads from the website."
+  fi
   # Every folder under playlists/, at any depth: halloween, halloween/grownup...
   while IFS= read -r name; do
+    [ "${name%%/*}" = photos ] && continue
     dir="$src/$name/"
     dest="$root/$name"
     mkdir -p "$dest"
@@ -104,7 +109,7 @@ copy_videos() {
   local top
   while IFS= read -r name; do
     top="${name%%/*}"
-    [ -d "$src/$top" ] && [ ! -d "$src/$name" ] || continue
+    [ "$top" != photos ] && [ -d "$src/$top" ] && [ ! -d "$src/$name" ] || continue
     for file in "$root/$name"/*; do
       base="$(basename "$file")"
       [ -f "$file" ] && is_video "$base" || continue

@@ -20,10 +20,21 @@ function createScheduler(io) {
   // Videos queued ahead of time, so one follows the next without a gap.
   const QUEUE_AHEAD = 3;
 
+  // The uploads from the website: their own folder and their own choice.
+  const PHOTOS = 'photos';
+  const NO_UPLOADS = 'No photos or videos uploaded yet. Showing black until one is added.';
+
   // ---------- Schedule ----------
 
   function validSchedule(periods) {
     return periods.filter((period, i) => {
+      if (period && period.playlist === PHOTOS) {
+        log(
+          'ERROR: Ignoring schedule entry ' + (i + 1) + ': ' + JSON.stringify(period) +
+          ': photos plays only when chosen on the website, never on the schedule.',
+        );
+        return false;
+      }
       const ok =
         isTime(period.start) &&
         isTime(period.stop) &&
@@ -98,6 +109,7 @@ function createScheduler(io) {
   function seasonError(season) {
     if (!season || typeof season !== 'object') return 'not an object';
     if (!isFolderName(season.name)) return 'bad name';
+    if (season.name === PHOTOS) return 'the name photos is kept for uploads from the website';
     if (!parseDay(season.from, false)) return 'bad from';
     if (!parseDay(season.to, false)) return 'bad to';
     if (season.days !== undefined && parseWeekdays(season.days) === null) return 'bad days';
@@ -229,7 +241,7 @@ function createScheduler(io) {
   // or no season today. Without seasons, names are used as they are.
   function resolve(name, seasons, date) {
     if (name === null) return null;
-    if (!seasons.length || name.includes('/')) return name;
+    if (name === PHOTOS || !seasons.length || name.includes('/')) return name;
     if (seasons.some((s) => s.name === name)) return name;
     const season = activeSeason(seasons, date);
     return season ? season + '/' + name : null;
@@ -238,7 +250,7 @@ function createScheduler(io) {
   // The folders (relative to videoRoot) whose videos make up `key`:
   // 'halloween/grownup' plays halloween/ plus halloween/grownup/.
   function foldersFor(key, seasons) {
-    if (!seasons.length) return [key];
+    if (key === PHOTOS || !seasons.length) return [key];
     const slash = key.indexOf('/');
     return slash < 0 ? [key] : [key.slice(0, slash), key];
   }
@@ -397,6 +409,7 @@ function createScheduler(io) {
     return {
       name,
       folders: foldersFor(name, seasons).map((f) => videoRoot + '/' + f),
+      photos: name === PHOTOS, // photo files play too
       lastQueued: null, // the last video put in mpv's queue
       resumeAt: null, // when the playlist comes back: the video to start at
       nowPlaying: null, // the playing video, as { name, path }
@@ -449,7 +462,12 @@ function createScheduler(io) {
     let queued = entries.length;
     if (queued >= QUEUE_AHEAD) return true;
 
-    const videos = listVideos(playlist.folders);
+    const videos = listVideos(playlist.folders, playlist.photos);
+    if (playlist.photos && (videos === null || videos.length === 0)) {
+      warnOnce(playlist, 'none', NO_UPLOADS);
+      return queued > 0;
+    }
+    clearWarning(playlist, 'none');
     if (videos === null) {
       warnOnce(
         playlist,
@@ -500,9 +518,10 @@ function createScheduler(io) {
     return path.split('/').pop();
   }
 
-  // The videos in `folders`, as { name, path }, sorted by name. null if the
-  // first folder can't be read; later folders are optional.
-  function listVideos(folders) {
+  // The videos in `folders` (and photos too, with `withPhotos`), as
+  // { name, path }, sorted by name. null if the first folder can't be read;
+  // later folders are optional.
+  function listVideos(folders, withPhotos) {
     const videos = [];
     for (let i = 0; i < folders.length; i++) {
       const names = listFolder(folders[i]);
@@ -511,16 +530,17 @@ function createScheduler(io) {
         continue;
       }
       names
-        .filter(isVideoFile)
+        .filter((name) => isVideoFile(name, withPhotos))
         .forEach((name) => videos.push({ name, path: folders[i] + '/' + name }));
     }
     return videos.sort(compareVideos);
   }
 
-  function isVideoFile(name) {
+  function isVideoFile(name, withPhotos) {
     if (name.startsWith('.') || !name.includes('.')) return false;
     const extension = name.split('.').pop().toLowerCase();
-    return CONFIG.videoExtensions.includes(extension);
+    return CONFIG.videoExtensions.includes(extension) ||
+      (!!withPhotos && CONFIG.photoExtensions.includes(extension));
   }
 
   // Name order, with numbers compared as numbers: 2-ghost.mp4 before 10-hand.mp4.
@@ -552,10 +572,10 @@ function createScheduler(io) {
   }
 
   return {
-    CONFIG, OVERRIDE_PATH, STATUS_PATH, QUEUE_AHEAD,
+    CONFIG, OVERRIDE_PATH, STATUS_PATH, QUEUE_AHEAD, PHOTOS,
     validSchedule, validSeasons, describeSeason, activeSeason, resolve, parseDay,
     foldersFor, whatToShow, parseOverride, formatTime, createPlaylist, keepPlaying,
-    setAside, listVideos, compareNames,
+    setAside, listVideos, compareNames, isVideoFile,
   };
 }
 

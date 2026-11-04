@@ -1,5 +1,45 @@
 #!/bin/bash
-# Wraps the real mpv: there is no TV in the test container, so after the
-# box's own options, draw each frame to a PNG in /tmp/e2e/frames instead.
-# mpv takes the last value given for an option, so these win.
-exec /usr/bin/mpv "$@" --vo=image --vo-image-format=png --vo-image-outdir=/tmp/e2e/frames
+# Wraps the real mpv: there is no TV in the test container. mpv plays with no
+# picture output (--vo=null) so that videos and photos keep real time, as on
+# the TV (mpv's image output, --vo=image, runs untimed: a 2-second clip or a
+# 10-second photo would be over in a fraction of a second). Twice a second,
+# a screenshot of the playing picture, turned as on the TV, is saved as a
+# PNG in /tmp/e2e/frames; nothing is saved while mpv is idle (black).
+# mpv takes the last value given for an option, so --vo=null wins.
+frames=/tmp/e2e/frames
+socket=
+for a in "$@"; do
+  case "$a" in --input-ipc-server=*) socket="${a#--input-ipc-server=}" ;; esac
+done
+
+/usr/bin/mpv "$@" --vo=null &
+mpv=$!
+trap 'kill -TERM $mpv 2>/dev/null' TERM INT
+
+if [ -n "$socket" ]; then
+  node -e '
+    const net = require("net");
+    const [socket, frames] = process.argv.slice(1);
+    let n = 0;
+    (function connect() {
+      const c = net.connect(socket);
+      c.on("error", () => setTimeout(connect, 200)); // not there yet
+      c.on("connect", () => {
+        c.on("close", () => process.exit(0));
+        c.resume();
+        setInterval(() => {
+          const file = frames + "/" + String(++n).padStart(6, "0") + ".png";
+          c.write(JSON.stringify({ command: ["screenshot-to-file", file, "video"] }) + "\n");
+        }, 500);
+      });
+    })();
+  ' "$socket" "$frames" &
+  shots=$!
+fi
+
+wait $mpv
+code=$?
+# After a TERM, wait returns early; wait again for mpv itself.
+kill -0 $mpv 2>/dev/null && { wait $mpv; code=$?; }
+[ -n "${shots:-}" ] && kill $shots 2>/dev/null
+exit $code

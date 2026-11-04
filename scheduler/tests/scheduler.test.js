@@ -308,6 +308,98 @@ test('without seasons, a playlist folder plays as before', async () => {
   assert.deepEqual(mpv.files().map((f) => f.split('/').pop()), ['1-a.mp4', '2-b.mp4', '10-c.mp4']);
 });
 
+// ---- Photos ----
+
+test('Photos plays the uploads on a season day', () => {
+  const r = withOverride({ playlist: 'photos', untilCleared: true }, at(10, 20, 18));
+  assert.equal(r.playlist, 'photos');
+  assert.equal(r.status, 'photos (override until cleared)');
+  assert.deepEqual(T.foldersFor('photos', seasons), ['photos']);
+});
+
+test('Photos plays the uploads on a day with no season', () => {
+  const r = withOverride({ playlist: 'photos', untilCleared: true, setAt: +at(1, 15, 17) }, at(1, 15, 18));
+  assert.equal(r.playlist, 'photos');
+  assert.equal(r.status, 'photos (override until cleared)');
+});
+
+test('Photos plays the uploads when there are no seasons', () => {
+  const { T: t, files } = load();
+  files[t.OVERRIDE_PATH] = JSON.stringify({ playlist: 'photos', setAt: +at(2, 1, 17), expires: null, untilCleared: true });
+  const r = t.whatToShow(schedule, [], at(2, 1, 18), fresh());
+  assert.equal(r.playlist, 'photos');
+  assert.deepEqual(t.createPlaylist('photos', []).folders, [ROOT + '/photos']);
+});
+
+test('Photos plays photos and videos in upload order, round and round', async () => {
+  const { T: t } = load({ dirs: { [ROOT + '/photos']: ['00002-b.mp4', '00001-a.jpg', '00010-c.png', 'notes.txt', '.upload-123'] } });
+  const p = t.createPlaylist('photos', seasons);
+  const mpv = new FakeMpv();
+  const played = [];
+  for (let i = 0; i < 6; i++) {
+    await t.keepPlaying(p, mpv);
+    played.push(mpv.playing().split('/').pop());
+    mpv.finish();
+  }
+  assert.deepEqual(played, ['00001-a.jpg', '00002-b.mp4', '00010-c.png', '00001-a.jpg', '00002-b.mp4', '00010-c.png']);
+});
+
+test("a photo in a season folder doesn't play", async () => {
+  const { T: t } = load({ dirs: { [ROOT + '/halloween']: ['fuzzy.mp4', 'poster.jpg'] } });
+  const p = t.createPlaylist('halloween/kid', seasons);
+  const mpv = new FakeMpv();
+  await t.keepPlaying(p, mpv);
+  assert.deepEqual(rel(mpv.files()), ['halloween/fuzzy.mp4', 'halloween/fuzzy.mp4', 'halloween/fuzzy.mp4']);
+});
+
+const NO_UPLOADS = 'No photos or videos uploaded yet. Showing black until one is added.';
+
+test('Photos with no uploads shows black and says so once', async () => {
+  const { T: t, logs } = load({ dirs: { [ROOT + '/photos']: [] } });
+  const p = t.createPlaylist('photos', seasons);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(mpv.playing(), null);
+  assert.equal(logs.filter((l) => l === NO_UPLOADS).length, 1, logs.join('\n'));
+  assert.ok(!logs.some((l) => /ERROR/.test(l)));
+});
+
+test('Photos with no photos folder shows black and says so once', async () => {
+  const { T: t, logs } = load({ dirs: {} });
+  const p = t.createPlaylist('photos', seasons);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(mpv.playing(), null);
+  assert.equal(logs.filter((l) => l === NO_UPLOADS).length, 1, logs.join('\n'));
+  assert.ok(!logs.some((l) => /ERROR/.test(l)));
+});
+
+test('a season named photos is skipped and logged', () => {
+  const { T: t, logs } = load();
+  const s = t.validSeasons([
+    { name: 'photos', from: '06-01', to: '06-30' },
+    { name: 'halloween', from: '10-01', to: '10-31' },
+  ]);
+  assert.deepEqual(s.map((x) => x.name), ['halloween']);
+  assert.equal(logs.length, 1);
+  assert.ok(logs[0].startsWith('ERROR: Ignoring season entry 1'), logs[0]);
+  assert.ok(/photos.*kept for uploads/.test(logs[0]), logs[0]);
+});
+
+test('a schedule entry for photos is skipped and logged', () => {
+  const { T: t, logs } = load();
+  const s = t.validSchedule([
+    { start: '17:00', stop: '19:30', playlist: 'kid' },
+    { start: '19:30', stop: '23:00', playlist: 'photos' },
+  ]);
+  assert.deepEqual(s.map((x) => x.playlist), ['kid']);
+  assert.equal(logs.length, 1);
+  assert.ok(logs[0].startsWith('ERROR: Ignoring schedule entry 2'), logs[0]);
+  assert.ok(/photos.*only when chosen on the website/.test(logs[0]), logs[0]);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }
