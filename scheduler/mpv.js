@@ -6,18 +6,27 @@ const fs = require('fs');
 const net = require('net');
 
 // mpv straight to the TV (no desktop), black when idle, turned for a TV on
-// its side, controlled only through the socket.
-function mpvArgs(box) {
+// its side, controlled only through the socket. `config` gives the photo time.
+function mpvArgs(box, config) {
   return [
     '--idle=yes',
     '--force-window=yes',
     '--fullscreen',
     '--vo=gpu',
     '--gpu-context=drm',
-    // Software decoding: the Pi 5 has no H.264 hardware decoder, and trying the
-    // ones that don't apply (Vulkan, CUDA) logs errors on every video. For HEVC
-    // videos, which the Pi 5 can decode in hardware, this would be --hwdec=drm.
-    '--hwdec=no',
+    // HEVC (what phones record) in hardware, through the Pi 5's decoder.
+    // Every other codec, H.264 included, in software without trying hardware
+    // first: the Pi 5 has no H.264 decoder, and trying the ones that don't
+    // apply (Vulkan, CUDA) logs errors on every video.
+    '--hwdec=drm',
+    '--hwdec-codecs=hevc',
+    // Photos: on screen for a while each, fitted with black around them
+    // (and behind any transparent parts), never cropped.
+    '--image-display-duration=' + config.photoSeconds,
+    '--keepaspect=yes',
+    '--panscan=0',
+    '--background=color',
+    '--background-color=#000000',
     '--video-rotate=' + box.rotate,
     '--no-audio',
     '--prefetch-playlist=yes',
@@ -31,9 +40,9 @@ function mpvArgs(box) {
   ];
 }
 
-function startMpv(box) {
+function startMpv(box, config) {
   try { fs.rmSync(box.mpvSocket, { force: true }); } catch (e) { /* not there */ }
-  return spawn('mpv', mpvArgs(box), { stdio: ['ignore', 'inherit', 'inherit'] });
+  return spawn('mpv', mpvArgs(box, config), { stdio: ['ignore', 'inherit', 'inherit'] });
 }
 
 // Connects to mpv's socket, waiting for mpv to create it.

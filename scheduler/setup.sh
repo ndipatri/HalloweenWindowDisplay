@@ -10,11 +10,15 @@
 #   - sets the time zone and turns on network time
 #   - copies the player and website to /opt/tvbox
 #   - installs the video sync as ~/video-scheduler/sync
+#   - sets up adding photos on the website: the photos folder and the
+#     upload PIN (asked for the first time, then kept)
 #   - keeps the log from growing forever (/etc/logrotate.d/tvbox)
 #   - installs and starts tvbox.service (player and website) and
 #     tvbox-sync.timer (sync a minute after boot, then hourly)
 #
-# Settings (environment): TVBOX_TIMEZONE (default America/New_York).
+# Settings (environment): TVBOX_TIMEZONE (default America/New_York);
+# TVBOX_UPLOAD_PIN, 4 to 8 digits, to set or change the PIN for adding photos
+# (pass it through sudo: sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh).
 # For testing only: TVBOX_ROOT (a folder that stands in for /), TVBOX_USER
 # and TVBOX_HOME.
 set -euo pipefail
@@ -40,6 +44,26 @@ videos="$home/video-scheduler"
 
 say() { echo "==> $*"; }
 owned() { [ -n "$root" ] || chown -R "$user:" "$@"; }
+
+# The PIN for adding photos on the website: the one given, else the saved
+# one, else asked for (only with someone at the keyboard), else none, which
+# leaves adding photos off. Settled before anything is installed.
+pin_file="$videos/upload-pin"
+pin="${TVBOX_UPLOAD_PIN:-}"
+valid_pin() { [[ "$1" =~ ^[0-9]{4,8}$ ]]; }
+if [ -n "$pin" ] && ! valid_pin "$pin"; then
+  echo "The upload PIN must be 4 to 8 digits." >&2
+  exit 1
+fi
+if [ -z "$pin" ] && [ ! -f "$pin_file" ] && [ -t 0 ]; then
+  while :; do
+    printf 'Choose a PIN for adding photos on the website (4 to 8 digits): '
+    read -rs pin || { pin=""; echo; break; }
+    echo
+    valid_pin "$pin" && break
+    echo "The upload PIN must be 4 to 8 digits."
+  done
+fi
 
 say "Installing mpv, Node.js, git and logrotate"
 apt-get update -qq
@@ -74,6 +98,20 @@ mkdir -p "$videos"
 sed "s|__REPO__|$repo|" "$here/sync_videos.sh" > "$videos/sync"
 chmod +x "$videos/sync"
 touch "$videos/scheduler.log"
+
+say "Setting up adding photos on the website"
+mkdir -p "$videos/photos"
+if [ -n "$pin" ]; then
+  # Readable only by you, from the moment it exists.
+  (umask 077 && printf '%s\n' "$pin" > "$pin_file.new")
+  mv -f "$pin_file.new" "$pin_file"
+  echo "    Upload PIN saved."
+elif [ -f "$pin_file" ]; then
+  chmod 600 "$pin_file"
+  echo "    Keeping the upload PIN you chose before."
+else
+  echo "    No upload PIN set, so adding photos is off. To turn it on: sudo TVBOX_UPLOAD_PIN=<4 to 8 digits> bash scheduler/setup.sh"
+fi
 owned "$videos"
 
 say "Keeping the log from growing forever"

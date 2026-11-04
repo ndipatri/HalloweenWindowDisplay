@@ -3,8 +3,8 @@
 # display". To rebase, copy the new upstream schema (`openspec schema fork
 # spec-driven`) and re-apply those paragraphs.
 name: window-display
-version: 1
-description: HalloweenWindowDisplay workflow on OpenSpec spec-driven 1.14.1, every scenario enforced by a test - proposal → specs → design → tasks
+version: 2
+description: HalloweenWindowDisplay workflow on OpenSpec spec-driven 1.14.1, every scenario enforced by a test, design and implementation reviewed - proposal → specs → design → tasks
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -305,6 +305,27 @@ artifacts:
       or only a sync (videos only, which the box does by itself every hour), and
       what the person checks afterwards (the website's status line, and the
       first lines of `~/video-scheduler/scheduler.log`).
+
+      Window display design review: once design.md is written, always get an
+      independent review of it before writing tasks. A fresh reviewer catches
+      mismatches between the design and the existing code, and wrong claims
+      about Node, mpv, systemd or the phones, that the author misses. Launch
+      the `review-opsx-design` skill (agentic-coding plugin) as a read-only
+      subagent. Give it the paths to proposal.md, every specs/**/spec.md file
+      and design.md, plus this schema and the window-display-schedule skill,
+      and tell it that this project is Node (built-in modules only), bash, mpv
+      and systemd on a Raspberry Pi. Its Dart, Flutter and Python checklists
+      don't apply: it judges architecture against the code under `scheduler/`
+      and `cards/` and the tests in `scheduler/tests/`, and this schema's
+      design rules stand in for its section table (`## Getting it onto the
+      box` replaces a migration plan). Ask for findings as BLOCKING / WARNING
+      / SUGGESTION / PASS, each citing the file and line. Present the findings
+      to the user, resolve every BLOCKING finding with them, and update the
+      proposal, specs and design to match before writing tasks. Record in
+      design.md, under `## Design review`, that the review ran and how each
+      BLOCKING and WARNING finding was settled. Only a change with no
+      design.md (a README-only or skill-only edit) skips the review, and says
+      that it did.
     requires:
       - proposal
 
@@ -408,6 +429,23 @@ artifacts:
            emulation), and confirm every check passes. Record the result line
            (`N passed, 0 failed`) in the task.
         6. Run `openspec validate <change> --strict` and fix what it reports.
+        7. Implementation review, always the last task: run the
+           `review-orchestrator` skill (agentic-coding plugin) on the whole
+           change (every file it changed against `origin/main`: code, tests,
+           scripts, the page, the README, the skill and the OpenSpec
+           artifacts), asking for the full report so every BLOCKING finding
+           is listed. Tell its reviewers that this project is Node (built-in
+           modules only), bash, mpv and systemd on a Raspberry Pi, with the
+           conventions of the code under `scheduler/` and this schema's
+           test-per-scenario rule, so they judge it against those and not
+           against Dart, Flutter or Python rules. Fix every BLOCKING
+           finding, rerun every test file (and the rehearsal, if a fix
+           touched what it runs), and run the review again until no BLOCKING
+           findings remain. Record each round's result in the task. Do not
+           ask the user whether to run it.
+      - Before writing tasks, check that design.md's `## Design review`
+        records the design review and that no BLOCKING finding is left open.
+        If it doesn't, run the review first (see the design artifact).
       - `## Workflow follow-up` always ends with getting the change onto the box,
         from design.md's `## Getting it onto the box`: after the PR is merged, the
         person runs `cd ~/HalloweenWindowDisplay && git pull && sudo bash
@@ -442,6 +480,12 @@ apply:
        scenario-to-test table and, when design.md says the change touches
        what it runs, the rehearsal on the box's OS. None of it is optional,
        and none of it needs the user's approval.
-    5. Ship as the window-display-schedule skill describes (branch, commit,
+    5. Finish with the implementation review task, so the review covers the
+       finished code and tests: run `review-orchestrator` for the full
+       report, fix every BLOCKING finding, rerun the tests, and review again
+       until no BLOCKING findings remain. It is not optional and does not
+       need the user's approval. Report the WARNING findings you left to
+       the user when you ship.
+    6. Ship as the window-display-schedule skill describes (branch, commit,
        push, PR through `gh api`; merge only when asked), and end by telling
        the person how to get the change onto the box.

@@ -255,6 +255,29 @@ test("sync leaves a season folder the repo doesn't have alone", () => {
   assert.ok(!s.has('.removed/easter'));
 });
 
+// ---- Leaves the uploads alone ----
+
+test('sync skips a photos folder in the repo', () => {
+  const s = setup({
+    'playlists/halloween/a.mp4': 'a',
+    'playlists/photos/y.mp4': 'y',
+  });
+  // The repo has photos/ but no photos/old/: both of sync's loops would
+  // set the box's videos aside if they didn't skip photos.
+  s.put('photos/00001-a.jpg', 'A');
+  s.put('photos/00002-b.mp4', 'B');
+  s.put('photos/old/x.mp4', 'X');
+  const r = s.sync(['--no-pull']);
+  assert.equal(r.status, 0, r.log);
+  assert.deepEqual(list(s.box('photos')), ['00001-a.jpg', '00002-b.mp4', 'old']);
+  assert.deepEqual(list(s.box('photos/old')), ['x.mp4']);
+  assert.equal(s.read('photos/00001-a.jpg'), 'A');
+  assert.equal(s.read('photos/old/x.mp4'), 'X');
+  assert.ok(!s.has('.removed/photos'));
+  const skip = 'Skipping playlists/photos: that name is kept for uploads from the website.';
+  assert.equal(r.log.split('\n').filter((l) => l.includes(skip)).length, 1, r.log);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }

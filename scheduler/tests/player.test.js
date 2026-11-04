@@ -35,7 +35,11 @@ function box(dirs = {}) {
     clockIsSet: () => b.clockSet,
     readText: (p) => (p in files ? files[p] : null),
     writeText: (p, text) => { files[p] = text; },
-    removeFile: (p) => { delete files[p]; },
+    removeFile: (p) => {
+      delete files[p];
+      const dir = p.slice(0, p.lastIndexOf('/'));
+      if (folders[dir]) folders[dir] = folders[dir].filter((n) => dir + '/' + n !== p);
+    },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
     log: (m) => logs.push(m),
   });
@@ -190,6 +194,76 @@ test('the box exits when mpv stops, so it is restarted', () => {
   child.exit(1);
   assert.deepEqual(logs, ['ERROR: mpv stopped (exit code 1). Exiting so the box restarts.']);
   assert.equal(exitCode, 1);
+});
+
+// ---- Photos ----
+
+const { mpvArgs } = require('../mpv.js');
+
+test('the box shows each photo for 10 seconds', () => {
+  const args = mpvArgs(config.box, config);
+  assert.ok(args.includes('--image-display-duration=10'), args.join(' '));
+  for (const a of ['--keepaspect=yes', '--panscan=0', '--background=color', '--background-color=#000000']) {
+    assert.ok(args.includes(a), 'mpv gets ' + a);
+  }
+});
+
+test('the box decodes HEVC in hardware and H.264 in software', () => {
+  const args = mpvArgs(config.box, config);
+  assert.ok(args.includes('--hwdec=drm'), args.join(' '));
+  assert.ok(args.includes('--hwdec-codecs=hevc'), args.join(' '));
+  assert.ok(!args.includes('--hwdec=no'));
+});
+
+// The box playing Photos, with its website wired to it as on the box.
+async function photosPlaying() {
+  const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'photos', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.files[ROOT + '/upload-pin'] = '4321\n';
+  await b.tick();
+  const { createWebsite } = require('../website.js');
+  const site = createWebsite({
+    config, videoRoot: ROOT, now: () => b.now, log: (m) => b.logs.push(m),
+    readText: (p) => (p in b.files ? b.files[p] : null),
+    writeText: (p, t) => { b.files[p] = t; },
+    removeFile: (p) => {
+      delete b.files[p];
+      b.folders[ROOT + '/photos'] = b.folders[ROOT + '/photos'].filter((n) => ROOT + '/photos/' + n !== p);
+    },
+    listFolder: (p) => (p in b.folders ? b.folders[p].slice() : null),
+    fileSize: () => 1,
+    readTail: () => null,
+    startSync: () => true,
+    freeBytes: () => 0,
+    beforeRemove: (p) => b.player.dropFile(p),
+  });
+  b.remove = (name) => site.handle({
+    method: 'POST', path: '/api/uploads/remove', headers: { 'x-upload-pin': '4321' }, body: JSON.stringify({ name }),
+  });
+  return b;
+}
+
+test('removing the upload on screen moves on to the next', async () => {
+  const b = await photosPlaying();
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+  const r = await b.remove('00001-a.jpg');
+  assert.equal(r.status, 200, r.body);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00002-b.mp4');
+  assert.equal(b.rel()[0], 'photos/00002-b.mp4');
+  assert.ok(!b.rel().includes('photos/00001-a.jpg'), b.rel().join(' '));
+  await b.tick();
+  assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
+});
+
+test('removing a queued upload takes it out of the queue', async () => {
+  const b = await photosPlaying();
+  const r = await b.remove('00002-b.mp4');
+  assert.equal(r.status, 200, r.body);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+  assert.ok(!b.rel().includes('photos/00002-b.mp4'), b.rel().join(' '));
+  await b.tick();
+  assert.ok(!b.rel().includes('photos/00002-b.mp4'), b.rel().join(' '));
+  assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
 });
 
 (async () => {

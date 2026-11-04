@@ -163,7 +163,7 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-- play the **Kid** or **Grownup** videos, or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
+- play the **Kid** or **Grownup** videos, your own **Photos**, or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
 - **preview a season**: another season's videos, even on other days;
 - go **Back to schedule**;
 - **Sync now**, to pick up new videos from the repo straight away instead of within the hour.
@@ -172,6 +172,25 @@ At the bottom, **Recent activity** shows the last things the box did: each video
 
 Changes show on the TV within a couple of seconds. They end by themselves, so a forgotten one can't leave the scary videos on in the morning (unless you chose "Until switched back").
 
+### Put your own photos and videos on the window
+
+1. On your phone, open **http://tvbox.local/**.
+2. Under **Add photos or videos**, type the box's upload PIN. The phone remembers it after the first time.
+3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
+4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
+5. Tap **Photos** under Play to show them, for as long as you choose.
+
+They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. Photos are shown whole, with black around them, so nothing gets cut off.
+
+To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
+
+Good to know:
+- The schedule never shows your photos by itself: they only show when you choose Photos.
+- They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
+- Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
+- Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
+- The PIN is chosen when the box is set up. To change it, or to set one on a box that says adding photos is off: `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` (with your own 4 to 8 digits).
+
 ### Everyday tasks
 
 | To | Do this |
@@ -179,6 +198,7 @@ Changes show on the TV within a couple of seconds. They end by themselves, so a 
 | See what's on screen | Open http://tvbox.local/ |
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Sync now** on the page |
 | Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
+| Show your own photos and videos | On the page: **Add photos or videos**, then **Photos** (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
 | See what it did last week | `ssh tvbox.local`, then `less ~/video-scheduler/scheduler.log.1` (the box keeps about a month of logs) |
@@ -206,5 +226,10 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |
+| The page says `Adding photos is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |
+| It says `Wrong PIN` or `Too many wrong PINs` | Type the PIN again. After five wrong tries, wait five minutes |
+| A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
+| A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
+| Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
 
 For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

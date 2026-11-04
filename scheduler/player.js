@@ -29,7 +29,16 @@ function createPlayer(options) {
     idle = true;
   }
 
-  async function tick() {
+  // mpv's playlist is changed by the tick and by dropFile; one at a time, so
+  // neither reads it while the other is changing it.
+  let busy = Promise.resolve();
+  function serially(fn) {
+    const done = busy.then(fn);
+    busy = done.catch(() => {});
+    return done;
+  }
+
+  async function tickNow() {
     const choice = clockIsSet()
       ? logic.whatToShow(schedule, seasons, now(), overrideState)
       : { playlist: null, status: CLOCK_NOT_SET };
@@ -62,7 +71,22 @@ function createPlayer(options) {
     }
   }
 
-  return { tick, logic, schedule, seasons };
+  // An upload is about to be deleted: take it out of mpv's playlist first,
+  // so mpv moves on cleanly instead of failing on a missing file.
+  async function dropFileNow(file) {
+    const entries = (await mpv.getProperty('playlist')) || [];
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i].filename === file) await mpv.command('playlist-remove', i);
+    }
+  }
+
+  return {
+    tick: () => serially(tickNow),
+    dropFile: (file) => serially(() => dropFileNow(file)),
+    logic,
+    schedule,
+    seasons,
+  };
 }
 
 // When mpv exits, the box exits too, so systemd starts both again fresh.
@@ -91,6 +115,10 @@ function realIo() {
     },
     listFolder(p) {
       try { return fs.readdirSync(p); } catch (e) { return null; }
+    },
+    // A file's size in bytes, or null.
+    fileSize(p) {
+      try { return fs.statSync(p).size; } catch (e) { return null; }
     },
     // The last `bytes` of a file (all of it if smaller), or null.
     readTail(p, bytes) {
@@ -124,7 +152,7 @@ async function main() {
   const videoRoot = box.videoRoot || path.join(os.homedir(), 'video-scheduler');
   fs.mkdirSync(videoRoot, { recursive: true });
 
-  const child = startMpv(box);
+  const child = startMpv(box, config);
   watchMpv(child, { log: io.log, exit: (code) => process.exit(code) });
   const mpv = await connect(box.mpvSocket);
 
@@ -142,7 +170,12 @@ async function main() {
       : 'No seasons: playlists play all year.',
   );
 
-  startWebsite(Object.assign({}, io, { config, videoRoot, now: () => new Date() }), box.webPort);
+  startWebsite(Object.assign({}, io, {
+    config,
+    videoRoot,
+    now: () => new Date(),
+    beforeRemove: player.dropFile,
+  }), box.webPort);
 
   for (;;) {
     try {

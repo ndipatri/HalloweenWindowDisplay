@@ -25,7 +25,8 @@ class FakeMpv {
       if (i < 0 || i >= this.entries.length) throw new Error('error running command');
       this.entries.splice(i, 1);
       if (this.pos > i) this.pos--;
-      else if (this.pos === i) this.pos = -1;
+      // Like mpv: removing the playing entry plays the next one, if any.
+      else if (this.pos === i && i >= this.entries.length) this.pos = -1;
     } else if (name === 'stop') {
       this.entries = [];
       this.pos = -1;
