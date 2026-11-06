@@ -80,9 +80,49 @@ function createPlayer(options) {
     }
   }
 
+  // The picks were saved on the website. While My picks plays, the queue
+  // behind the item on screen is rebuilt from them at once; an item on
+  // screen that is no longer picked gives way to the pick that followed it,
+  // queued first so mpv moves straight on to it rather than going black.
+  async function repickNow() {
+    if (!active || !active.ordered) return; // read afresh when picks next plays
+    const entries = (await mpv.getProperty('playlist')) || [];
+    const current = entries.findIndex((e) => e.current);
+    if (current === -1) {
+      idle = !(await logic.keepPlaying(active, mpv));
+      return;
+    }
+    // mpv may move on meanwhile, so each removal reads the playlist afresh
+    // and never takes out the entry that is on screen by then.
+    for (;;) {
+      const now = (await mpv.getProperty('playlist')) || [];
+      const at = now.findIndex((e) => e.current);
+      if (at === -1 || at >= now.length - 1) break;
+      await mpv.command('playlist-remove', now.length - 1);
+    }
+    const onScreen = entries[current].filename;
+    const picked = logic.readPicks().filter(logic.pickable).map((rel) => logic.videoRoot + '/' + rel);
+    if (picked.includes(onScreen)) {
+      active.lastQueued = { name: onScreen.split('/').pop(), path: onScreen };
+      idle = !(await logic.keepPlaying(active, mpv));
+      return;
+    }
+    const old = active.order.map((v) => v.path);
+    const after = old.slice(old.indexOf(onScreen) + 1);
+    const next = after.find((p) => picked.includes(p));
+    active.resumeAt = next ? { name: next.split('/').pop(), path: next } : null;
+    active.lastQueued = null;
+    await logic.keepPlaying(active, mpv); // queues behind the item on screen
+    const now = (await mpv.getProperty('playlist')) || [];
+    const at = now.findIndex((e) => e.current && e.filename === onScreen);
+    if (at !== -1) await mpv.command('playlist-remove', at);
+    idle = !(await logic.keepPlaying(active, mpv));
+  }
+
   return {
     tick: () => serially(tickNow),
     dropFile: (file) => serially(() => dropFileNow(file)),
+    repick: () => serially(repickNow),
     logic,
     schedule,
     seasons,
@@ -175,6 +215,7 @@ async function main() {
     videoRoot,
     now: () => new Date(),
     beforeRemove: player.dropFile,
+    picksChanged: player.repick,
   }), box.webPort);
 
   for (;;) {

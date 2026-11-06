@@ -47,3 +47,21 @@ A period with `days` SHALL apply only on those weekdays, judged by the day it st
 - **THEN** kid plays on Sat Oct 24 at 10 AM but nothing on Mon Oct 26 at 10 AM
 - **AND** grownup plays on Fri Oct 23 at 11 PM and at 12:30 AM after it, but not on Saturday night or after its midnight
 - **AND** a period with the weekday "someday" is skipped, with one line logged
+
+### Requirement: The schedule never plays uploads
+A schedule period whose playlist is `photos` SHALL be skipped and logged as an error naming the reason, because uploads play only when chosen on the website.
+
+#### Scenario: a schedule entry for photos is skipped and logged
+- **GIVEN** a schedule of kid from 17:00 to 19:30, then photos from 19:30 to 23:00
+- **WHEN** the scheduler reads it
+- **THEN** only the kid period is kept
+- **AND** `ERROR: Ignoring schedule entry 2` is logged, saying `photos` plays only when chosen on the website
+
+### Requirement: The schedule never plays the picks
+A schedule period whose playlist is `picks` SHALL be skipped and logged as an error naming the reason, because My picks plays only when chosen on the website.
+
+#### Scenario: a schedule entry for picks is skipped and logged
+- **GIVEN** a schedule of kid from 17:00 to 19:30, then picks from 19:30 to 23:00
+- **WHEN** the scheduler reads it
+- **THEN** only the kid period is kept
+- **AND** `ERROR: Ignoring schedule entry 2` is logged, saying `picks` plays only when chosen on the website

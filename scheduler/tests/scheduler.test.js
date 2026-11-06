@@ -400,6 +400,96 @@ test('a schedule entry for photos is skipped and logged', () => {
   assert.ok(/photos.*only when chosen on the website/.test(logs[0]), logs[0]);
 });
 
+// ---- My picks ----
+
+const PICKS = ROOT + '/picks.json';
+const NO_PICKS = 'Nothing picked yet. Showing black until something is ticked in My picks.';
+const picksFile = (...picks) => JSON.stringify({ picks }) + '\n';
+
+// Plays `n` items of `picks` and returns their paths relative to the video folder.
+async function playPicks(t, n) {
+  const p = t.createPlaylist('picks', seasons);
+  const mpv = new FakeMpv();
+  const played = [];
+  for (let i = 0; i < n; i++) {
+    await t.keepPlaying(p, mpv);
+    played.push(mpv.playing() && mpv.playing().replace(ROOT + '/', ''));
+    if (mpv.playing()) mpv.finish();
+  }
+  return played;
+}
+
+test('My picks plays the picks in the order they were picked, round and round', async () => {
+  const { T: t } = load({
+    files: { [PICKS]: picksFile('thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4') },
+    dirs: { [ROOT + '/halloween']: ['fuzzy.mp4'], [ROOT + '/thanksgiving']: ['dusk.mp4'], [ROOT + '/photos']: ['00001-a.jpg'] },
+  });
+  assert.deepEqual(await playPicks(t, 6), [
+    'thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4',
+    'thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4',
+  ]);
+});
+
+test('a single pick plays round and round', async () => {
+  const { T: t } = load({
+    files: { [PICKS]: picksFile('thanksgiving/dusk.mp4') },
+    dirs: { [ROOT + '/thanksgiving']: ['dusk.mp4', 'fall.mp4'] },
+  });
+  assert.deepEqual(await playPicks(t, 3), ['thanksgiving/dusk.mp4', 'thanksgiving/dusk.mp4', 'thanksgiving/dusk.mp4']);
+});
+
+test('My picks plays on a day with no season', () => {
+  const r = withOverride({ playlist: 'picks', untilCleared: true, setAt: +at(1, 15, 17) }, at(1, 15, 18));
+  assert.equal(r.playlist, 'picks');
+  assert.equal(r.status, 'picks (override until cleared)');
+});
+
+test('My picks with nothing picked shows black and says so once', async () => {
+  const { T: t, logs } = load({ dirs: { [ROOT + '/thanksgiving']: ['dusk.mp4'] } });
+  const p = t.createPlaylist('picks', seasons);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(mpv.playing(), null);
+  assert.equal(logs.filter((l) => l === NO_PICKS).length, 1, logs.join('\n'));
+  assert.ok(!logs.some((l) => /ERROR/.test(l)), logs.join('\n'));
+});
+
+test('My picks skips a pick that is no longer on the box and says so once', async () => {
+  const { T: t, logs } = load({
+    files: { [PICKS]: picksFile('halloween/gone.mp4', 'thanksgiving/dusk.mp4') },
+    dirs: { [ROOT + '/thanksgiving']: ['dusk.mp4'] },
+  });
+  assert.deepEqual(await playPicks(t, 4), Array(4).fill('thanksgiving/dusk.mp4'));
+  const skip = 'Skipping halloween/gone.mp4 in picks: it is no longer on the box.';
+  assert.equal(logs.filter((l) => l === skip).length, 1, logs.join('\n'));
+  assert.ok(!logs.some((l) => /ERROR/.test(l)), logs.join('\n'));
+});
+
+test('a season named picks is skipped and logged', () => {
+  const { T: t, logs } = load();
+  const s = t.validSeasons([
+    { name: 'picks', from: '06-01', to: '06-30' },
+    { name: 'halloween', from: '10-01', to: '10-31' },
+  ]);
+  assert.deepEqual(s.map((x) => x.name), ['halloween']);
+  assert.equal(logs.length, 1);
+  assert.ok(logs[0].startsWith('ERROR: Ignoring season entry 1'), logs[0]);
+  assert.ok(/picks.*kept for My picks/.test(logs[0]), logs[0]);
+});
+
+test('a schedule entry for picks is skipped and logged', () => {
+  const { T: t, logs } = load();
+  const s = t.validSchedule([
+    { start: '17:00', stop: '19:30', playlist: 'kid' },
+    { start: '19:30', stop: '23:00', playlist: 'picks' },
+  ]);
+  assert.deepEqual(s.map((x) => x.playlist), ['kid']);
+  assert.equal(logs.length, 1);
+  assert.ok(logs[0].startsWith('ERROR: Ignoring schedule entry 2'), logs[0]);
+  assert.ok(/picks.*only when chosen on the website/.test(logs[0]), logs[0]);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }

@@ -258,6 +258,26 @@ check "removing it logs no error, even a round later" test "$(grep -c 'ERROR' "$
 echo "   $(post /api/schedule '{}')"
 uploads_before="$(ls -A "$VIDEOS/photos")"
 
+echo "== My picks"
+upload_left="$(ls "$VIDEOS/photos" | head -1)"
+echo "   $(post /api/picks "{\"picks\":[\"halloween/grownup/c.mp4\",\"photos/$upload_left\"]}")"
+check "saving the picks writes them and logs it" \
+  bash -c "grep -q 'halloween/grownup/c.mp4' '$VIDEOS/picks.json' && logged 'My picks: 2 picked (from the website).'"
+check "the website lists the picks in order" bash -c "
+  curl -fsS $SITE/api/picks | node -e '
+    const d = JSON.parse(require(\"fs\").readFileSync(0));
+    process.exit(d.picks.join() === \"halloween/grownup/c.mp4,photos/$upload_left\" ? 0 : 1);'"
+errors_before=$(grep -c 'ERROR' "$LOG")
+echo "   $(post /api/show '{"target":"picks","until":"cleared"}')"
+check "My picks shows in the status" within 20 bash -c '[ "$(status)" = "picks (override until cleared)" ]'
+check "My picks plays the first pick" within 30 logged "picks: playing c.mp4"
+check "My picks plays the next pick" within 30 logged "picks: playing $upload_left"
+# Unpick everything but a.mp4: whatever is on screen gives way to it at once.
+echo "   $(post /api/picks '{"picks":["halloween/a.mp4"]}')"
+check "changing the picks while they play moves on to the new pick" within 8 logged "picks: playing a.mp4"
+check "My picks logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
+echo "   $(post /api/schedule '{}')"
+
 echo "== Sync now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")
 echo "   $(post /api/sync '{}')"

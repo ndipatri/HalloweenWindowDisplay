@@ -266,6 +266,83 @@ test('removing a queued upload takes it out of the queue', async () => {
   assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
 });
 
+// ---- Changing the picks while they play ----
+
+// The box playing My picks: dusk on screen, then a.jpg and fuzzy queued.
+async function picksPlaying() {
+  const b = box({
+    halloween: ['fuzzy.mp4', 'grownup'], 'halloween/grownup': ['jump.mp4'],
+    thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'],
+  });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'picks', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.files[ROOT + '/picks.json'] = JSON.stringify({ picks: ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4'] });
+  await b.tick();
+  assert.deepEqual(b.rel(), ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4']);
+  b.repick = async (...picks) => {
+    b.files[ROOT + '/picks.json'] = JSON.stringify({ picks });
+    assert.equal(typeof b.player.repick, 'function', 'the player has repick');
+    await b.player.repick();
+  };
+  return b;
+}
+
+test('changing the picks while they play replaces what is queued', async () => {
+  const b = await picksPlaying();
+  await b.repick('thanksgiving/dusk.mp4', 'halloween/grownup/jump.mp4');
+  assert.equal(b.mpv.playing(), ROOT + '/thanksgiving/dusk.mp4');
+  assert.deepEqual(b.rel(), ['thanksgiving/dusk.mp4', 'halloween/grownup/jump.mp4', 'thanksgiving/dusk.mp4']);
+});
+
+test('unpicking the item on screen moves on to the next pick', async () => {
+  const b = await picksPlaying();
+  const stops = () => b.mpv.commands.filter((c) => c[0] === 'stop').length;
+  const before = stops();
+  await b.repick('halloween/fuzzy.mp4', 'photos/00001-a.jpg');
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+  assert.deepEqual(b.rel(), ['photos/00001-a.jpg', 'halloween/fuzzy.mp4', 'photos/00001-a.jpg']);
+  assert.equal(stops(), before, 'mpv was never stopped (no black gap)');
+  await b.tick();
+  assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
+});
+
+test('unpicking the last pick on screen goes round to the first', async () => {
+  const b = await picksPlaying();
+  b.mpv.finish(); b.mpv.finish(); // fuzzy, the last pick, on screen
+  await b.tick();
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/fuzzy.mp4');
+  await b.repick('thanksgiving/dusk.mp4', 'photos/00001-a.jpg');
+  assert.equal(b.mpv.playing(), ROOT + '/thanksgiving/dusk.mp4');
+  assert.ok(!b.rel().includes('halloween/fuzzy.mp4'), b.rel().join(' '));
+});
+
+test('unpicking everything while the picks play shows black and says so once', async () => {
+  const b = await picksPlaying();
+  await b.repick();
+  await b.tick();
+  await b.tick();
+  assert.equal(b.mpv.playing(), null);
+  const none = 'Nothing picked yet. Showing black until something is ticked in My picks.';
+  assert.equal(b.logs.filter((l) => l === none).length, 1, b.logs.join('\n'));
+});
+
+test('picking while My picks shows black starts the picks at once', async () => {
+  const b = await picksPlaying();
+  await b.repick();
+  assert.equal(b.mpv.playing(), null);
+  await b.repick('halloween/grownup/jump.mp4');
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/grownup/jump.mp4');
+});
+
+test('changing the picks while something else plays leaves mpv alone', async () => {
+  const b = box({ halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'halloween', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const before = b.rel();
+  b.files[ROOT + '/picks.json'] = JSON.stringify({ picks: ['thanksgiving/dusk.mp4'] });
+  await b.player.repick();
+  assert.deepEqual(b.rel(), before);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }

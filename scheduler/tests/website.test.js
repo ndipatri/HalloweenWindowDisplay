@@ -16,7 +16,7 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // A website with fake files. `dirs` maps folder paths (relative to the
 // video folder) to the names in them.
-function site(dirs = {}) {
+function site(dirs = {}, extra = {}) {
   const files = {};
   const folders = { [ROOT]: [] };
   for (const [k, v] of Object.entries(dirs)) {
@@ -39,6 +39,8 @@ function site(dirs = {}) {
     writeText: (p, text) => { files[p] = text; },
     removeFile: (p) => { delete files[p]; },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
+    log: extra.log,
+    picksChanged: extra.picksChanged,
   });
   const call = async (method, path, body, headers = {}) => {
     const r = await w.handle({ method, path, headers, body: body === undefined ? '' : JSON.stringify(body) });
@@ -226,19 +228,149 @@ test('the website page offers Sync now and shows recent activity', async () => {
 
 // ---- Photos (choices and page) ----
 
-test('the website offers Photos apart from the season previews', async () => {
-  const s = site({ halloween: [], photos: ['old'], 'photos/old': [] });
+test('the website offers All uploads and My picks apart from the season previews', async () => {
+  const s = site({ halloween: [], photos: ['old'], 'photos/old': [], picks: [] });
   const r = await s.call('GET', '/api/choices');
   assert.equal(r.json.photos, true);
+  assert.equal(r.json.picks, true);
   assert.deepEqual(r.json.previews, ['halloween']);
 });
 
-test('the website page offers a Photos button', async () => {
+test('the website page offers All uploads and My picks buttons', async () => {
   const s = site();
   const page = (await s.call('GET', '/')).body;
-  assert.ok(page.includes('id="photos">Photos<'), 'page has a Photos button');
+  assert.ok(page.includes('id="photos">All uploads<'), 'page has an All uploads button');
   assert.ok(page.includes("$('photos').onclick = () => show('photos')"), 'it shows photos for the chosen duration');
+  assert.ok(page.includes('id="picks">My picks<'), 'page has a My picks button');
+  assert.ok(page.includes("$('picks').onclick = () => show('picks')"), 'it shows picks for the chosen duration');
+  assert.ok(!page.includes('>Photos<'), 'no button is still called Photos');
   assertScriptCompiles(page);
+});
+
+// ---- My picks ----
+
+const PICKS = ROOT + '/picks.json';
+const picksFile = (...picks) => JSON.stringify({ picks }) + '\n';
+const savedPicks = (files) => JSON.parse(files[PICKS]).picks;
+
+test('the website lists what can be picked', async () => {
+  const s = site({
+    halloween: ['fuzzy.mp4', 'poster.jpg', 'grownup'], 'halloween/grownup': ['jump.mp4'],
+    thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg', '00002-b.mov'],
+  });
+  s.files[PICKS] = picksFile('thanksgiving/dusk.mp4', 'photos/00001-a.jpg');
+  const r = await s.call('GET', '/api/picks');
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(r.json.items, [
+    { path: 'halloween/fuzzy.mp4', group: 'Halloween' },
+    { path: 'halloween/grownup/jump.mp4', group: 'Halloween / Grownup' },
+    { path: 'thanksgiving/dusk.mp4', group: 'Thanksgiving' },
+    { path: 'photos/00001-a.jpg', group: 'Uploads' },
+    { path: 'photos/00002-b.mov', group: 'Uploads' },
+  ]);
+  assert.deepEqual(r.json.picks, ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg']);
+});
+
+test('the website leaves out a pick that is no longer on the box', async () => {
+  const s = site({ thanksgiving: ['dusk.mp4'] });
+  s.files[PICKS] = picksFile('halloween/gone.mp4', 'thanksgiving/dusk.mp4');
+  const r = await s.call('GET', '/api/picks');
+  assert.deepEqual(r.json && r.json.picks, ['thanksgiving/dusk.mp4']);
+});
+
+test('the website saves the picks in the order given', async () => {
+  const logs = [];
+  let changed = 0;
+  const s = site({ halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'] },
+    { log: (m) => logs.push(m), picksChanged: async () => { changed++; } });
+  const r = await s.call('POST', '/api/picks', { picks: ['photos/00001-a.jpg', 'thanksgiving/dusk.mp4'] });
+  assert.equal(r.status, 200, r.body);
+  assert.equal(changed, 1, 'the player is told the picks changed');
+  assert.deepEqual(r.json.picks, ['photos/00001-a.jpg', 'thanksgiving/dusk.mp4']);
+  assert.deepEqual(savedPicks(s.files), ['photos/00001-a.jpg', 'thanksgiving/dusk.mp4']);
+  assert.equal(r.json.message, 'Saved. 2 picked.');
+  assert.ok(logs.includes('My picks: 2 picked (from the website).'), logs.join('\n'));
+});
+
+test('the website saves each pick only once', async () => {
+  const s = site({ halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'] });
+  const r = await s.call('POST', '/api/picks', { picks: ['thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4', 'thanksgiving/dusk.mp4'] });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(savedPicks(s.files), ['thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4']);
+  assert.equal(r.json.message, 'Saved. 2 picked.');
+});
+
+test('the website saves an empty list of picks', async () => {
+  const s = site({ thanksgiving: ['dusk.mp4'] });
+  s.files[PICKS] = picksFile('thanksgiving/dusk.mp4');
+  const r = await s.call('POST', '/api/picks', { picks: [] });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(savedPicks(s.files), []);
+  assert.equal(r.json.message, 'Saved. Nothing picked.');
+});
+
+test("the website refuses a pick that can't be picked", async () => {
+  const s = site({ halloween: ['fuzzy.mp4', 'poster.jpg'], photos: ['.upload-1'] });
+  s.files[ROOT + '/status'] = 'halloween/kid\n';
+  s.files[PICKS] = picksFile('halloween/fuzzy.mp4');
+  for (const bad of ['../status', 'halloween/poster.jpg', 'halloween/missing.mp4', 'photos/.upload-1', 'photos/sub/x.jpg', 'picks/x.mp4', 'halloween\\fuzzy.mp4']) {
+    const r = await s.call('POST', '/api/picks', { picks: [bad] });
+    assert.equal(r.status, 400, bad + ': ' + r.body);
+    assert.ok(r.json.error.startsWith("Can't pick") && r.json.error.includes(bad), r.json.error);
+  }
+  // A good pick with a bad one saves neither.
+  const mixed = await s.call('POST', '/api/picks', { picks: ['halloween/fuzzy.mp4', 'halloween/poster.jpg'] });
+  assert.equal(mixed.status, 400, mixed.body);
+  assert.equal((await s.call('POST', '/api/picks', { picks: 'halloween/fuzzy.mp4' })).status, 400);
+  assert.deepEqual(savedPicks(s.files), ['halloween/fuzzy.mp4']);
+});
+
+test('a picks file that is broken reads as nothing picked', async () => {
+  const s = site({ thanksgiving: ['dusk.mp4'] });
+  for (const text of ['{not json', '{"picks":"thanksgiving/dusk.mp4"}', '[1,2]', '{"picks":[7,null,"thanksgiving/dusk.mp4"]}']) {
+    s.files[PICKS] = text;
+    const r = await s.call('GET', '/api/picks');
+    assert.deepEqual(r.json.picks, text.includes('[7') ? ['thanksgiving/dusk.mp4'] : [], text);
+  }
+});
+
+test("a problem rebuilding the queue doesn't undo a save", async () => {
+  const logs = [];
+  const s = site({ thanksgiving: ['dusk.mp4'] },
+    { log: (m) => logs.push(m), picksChanged: async () => { throw new Error('mpv went away'); } });
+  const r = await s.call('POST', '/api/picks', { picks: ['thanksgiving/dusk.mp4'] });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(savedPicks(s.files), ['thanksgiving/dusk.mp4']);
+  assert.ok(logs.some((l) => l.startsWith('ERROR:') && l.includes('mpv went away')), logs.join('\n'));
+});
+
+test("the website won't show a folder inside picks", async () => {
+  const s = site({ picks: ['old'], 'picks/old': [] });
+  const r = await show(s, { target: 'picks/old' });
+  assert.equal(r.status, 400, r.body);
+  assert.ok(r.json.error.startsWith('Not a playlist name'), r.json.error);
+  assert.equal(s.override(), null);
+});
+
+test('the website page offers My picks', async () => {
+  const s = site();
+  const page = (await s.call('GET', '/')).body;
+  for (const text of ['<h2>My picks</h2>', 'id="picklist"', "fetch('/api/picks')", 'type="checkbox"', "fetch('/api/picks', { method: 'POST'", 'togglePick(']) {
+    assert.ok(page.includes(text), 'page has ' + text);
+  }
+  assertScriptCompiles(page);
+});
+
+test('the page puts a ticked item at the end of the picks and closes up an unticked one', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function togglePick'));
+  assert.ok(code, 'the page has togglePick');
+  const context = {};
+  require('vm').runInNewContext(code + '\nthis.togglePick = togglePick;', context);
+  const first = context.togglePick(['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4'], 'halloween/grownup/jump.mp4');
+  assert.deepEqual(Array.from(first), ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4', 'halloween/grownup/jump.mp4']);
+  const second = context.togglePick(first, 'photos/00001-a.jpg');
+  assert.deepEqual(Array.from(second), ['thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4', 'halloween/grownup/jump.mp4']);
 });
 
 // ---- Uploads ----
@@ -266,6 +398,7 @@ function uploads({ pin = '4321', free = 20 * GB } = {}) {
     log: (m) => u.logs.push(m),
     // Taken off mpv while the file is still there.
     beforeRemove: async (p) => { assert.ok(fs.existsSync(p), 'removed before mpv let go'); u.removed.push(p); },
+    picksChanged: async () => { u.picksChanged = (u.picksChanged || 0) + 1; },
     startSync: () => true,
   }));
   const answer = (r) => Object.assign({}, r, { json: r.type === 'application/json' ? JSON.parse(r.body) : null });
@@ -523,6 +656,29 @@ test('the website removes an upload with the right PIN', async () => {
   assert.equal(r.json.message, 'Removed 00001-a.jpg.');
   assert.ok(u.logs.includes('Removed photos/00001-a.jpg (from the website)'), u.logs.join('\n'));
   assert.deepEqual(u.removed, [u.root + '/photos/00001-a.jpg']);
+});
+
+test('a new upload joins the end of the picks', async () => {
+  const u = uploads();
+  fs.mkdirSync(u.root + '/thanksgiving');
+  fs.writeFileSync(u.root + '/thanksgiving/dusk.mp4', 'v');
+  fs.writeFileSync(u.root + '/picks.json', JSON.stringify({ picks: ['thanksgiving/dusk.mp4'] }));
+  const r = await u.upload('a.jpg');
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(JSON.parse(fs.readFileSync(u.root + '/picks.json', 'utf8')).picks, ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg']);
+  assert.equal(u.picksChanged, 1, 'the player is told the picks changed');
+});
+
+test('removing an upload takes it out of the picks', async () => {
+  const u = uploads();
+  u.put('00001-a.jpg');
+  fs.mkdirSync(u.root + '/thanksgiving');
+  fs.writeFileSync(u.root + '/thanksgiving/dusk.mp4', 'v');
+  fs.writeFileSync(u.root + '/picks.json', JSON.stringify({ picks: ['photos/00001-a.jpg', 'thanksgiving/dusk.mp4'] }));
+  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' }, '4321');
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(JSON.parse(fs.readFileSync(u.root + '/picks.json', 'utf8')).picks, ['thanksgiving/dusk.mp4']);
+  assert.equal(u.picksChanged, 1, 'the player is told the picks changed');
 });
 
 test('the website refuses to remove an upload with the wrong PIN', async () => {

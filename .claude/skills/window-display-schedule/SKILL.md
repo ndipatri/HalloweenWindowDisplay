@@ -89,8 +89,9 @@ If the box shows the wrong season, check first whether setup was rerun after the
   - a file mpv can't play is skipped and logged once.
 
   GitHub refuses files over 100 MB. The Pi 5 decodes H.264 in software (fine at 1080p 24 fps) and HEVC in hardware (`--hwdec=drm`); if a repo video stutters, re-encode it to HEVC.
-- **Photos (uploads):** `photos` is a kept name. `resolve('photos')` is `photos` whatever the season (with or without seasons), playing only `~/video-scheduler/photos/`, so it plays only as an override from the website's Photos button. A season named `photos` or a schedule period playing `photos` is ignored with an `ERROR: Ignoring …` line saying why. Uploads are named `NNNNN-<cleaned name>` (one above the highest number ever given, kept in the hidden `photos/.last-number`), so name order is upload order and numbers are never reused, even after the newest is removed. Leftover `.upload-*` part files from a restart mid-upload are removed when the website starts. With no uploads (or no folder) the screen is black and `No photos or videos uploaded yet. Showing black until one is added.` is logged once. Removing an upload on the website first takes it out of mpv's playlist (`player.dropFile`, serialised with the tick), so mpv moves on without an error.
-- **Files in `~/video-scheduler/`:** `scheduler.log` (what's showing and why on every change, each video as it starts, overrides, sync, uploads and removals, problems), `status` (one line, what the website shows), `override.json` (only while an override is on), `.removed/`, `photos/` (the uploads; `.upload-*` while one arrives), `upload-pin` (mode 600).
+- **Photos (uploads):** `photos` is a kept name. `resolve('photos')` is `photos` whatever the season (with or without seasons), playing only `~/video-scheduler/photos/`, so it plays only as an override from the website's All uploads button. A season named `photos` or a schedule period playing `photos` is ignored with an `ERROR: Ignoring …` line saying why. Uploads are named `NNNNN-<cleaned name>` (one above the highest number ever given, kept in the hidden `photos/.last-number`), so name order is upload order and numbers are never reused, even after the newest is removed. Leftover `.upload-*` part files from a restart mid-upload are removed when the website starts. With no uploads (or no folder) the screen is black and `No photos or videos uploaded yet. Showing black until one is added.` is logged once. Removing an upload on the website first takes it out of mpv's playlist (`player.dropFile`, serialised with the tick), so mpv moves on without an error.
+- **My picks:** `picks` is a kept name too (a season or schedule entry `picks` is ignored with an `ERROR: Ignoring …` line, a `picks` folder is never a preview, and `POST /api/show` refuses `picks/…`). The picks are `~/video-scheduler/picks.json` (`{"picks": ["thanksgiving/dusk.mp4", "photos/00001-a.jpg"]}`, paths relative to the video folder). `logic.pickable(path)` decides what can be picked: a video (not a photo) in a top folder or one of its subfolders, or a photo or video directly in `photos/`, that is on the box now. `resolve('picks')` is `picks` whatever the season; its playlist is `ordered`: items play in the file's order (by position, not name), round and round, and `resumeAt` goes by path. A pick no longer on the box (sync moved it to `.removed/`) is skipped with `Skipping <path> in picks: it is no longer on the box.` once; none at all is black with `Nothing picked yet. Showing black until something is ticked in My picks.` once. A new upload is appended to the picks and a removed one taken out. When the picks are saved while they play, `player.repick` (serialised with the tick, passed to the website as `picksChanged`) clears mpv's queue behind the item on screen and refills it from the new picks; if the item on screen was unpicked, the next pick is queued first and then the item removed, so mpv moves straight on without going black.
+- **Files in `~/video-scheduler/`:** `scheduler.log` (what's showing and why on every change, each video as it starts, overrides, sync, uploads and removals, problems), `status` (one line, what the website shows), `override.json` (only while an override is on), `.removed/`, `photos/` (the uploads; `.upload-*` while one arrives), `upload-pin` (mode 600), `picks.json` (My picks, written by the website).
   `scheduler.log` is rotated by logrotate (Raspberry Pi OS runs it daily): weekly, or sooner past 5 MB, keeping four old logs (`scheduler.log.1`, then compressed `.2.gz` to `.4.gz`). It uses `copytruncate` because the services keep the log open; without it, they would go on writing into the rotated file (the rehearsal checks this).
 - **systemd:**
   - restart: `sudo systemctl restart tvbox`;
@@ -169,9 +170,10 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
 
 - **Choices:**
   - each playlist named in the schedule (kid, grownup);
-  - Photos (the uploads; `photos: true` in the choices);
+  - My picks (`picks: true` in the choices; plays `picks`);
+  - All uploads (the uploads; `photos: true` in the choices; plays `photos`);
   - Black;
-  - a preview of any season folder or season/playlist folder on the box other than `photos`;
+  - a preview of any season folder or season/playlist folder on the box other than `photos` and `picks`;
   - Back to schedule.
 - **Durations:** until the schedule changes, 15, 30 or 60 minutes, or until switched back (`untilCleared`).
 - **API:** `GET /api/status`, `GET /api/choices`, `POST /api/show {target, until: 'schedule'|'cleared'|minutes}`, `POST /api/schedule`, `POST /api/sync` (runs `~/video-scheduler/sync` with output appended to the log; answers at once, or `A sync is already running.`), `GET /api/log` (`{lines}`: the last 20 non-empty lines, read from the last 16 KB).
@@ -186,6 +188,7 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
   | `POST /api/uploads?name=…` | header `X-Upload-Pin`, `Content-Length`; the file as the body | `Added <name>.` | as check; 400 `Bad request.` |
   | `POST /api/uploads/remove` | header `X-Upload-Pin`; `{ name }` | `Removed <name>.` | 403, 429; 404 `No upload named <name>.` |
   | `GET /photos/<name>` | optional `Range` | 200 or 206, cacheable for a year | 404 `Not found.`; 416 |
+- **My picks** on the page lists `GET /api/picks` (`{ items: [{ path, group }], picks: [path] }`: season folders and subfolders in name order, then `Uploads`; picks no longer on the box left out) with a tick box per item, numbered in pick order. Each tick or untick runs `togglePick` (in the same DOM-free `<script>` block as `sendBatch`, so tests run it in `vm`) and posts the whole list to `POST /api/picks {picks}`: every entry must be `pickable` (else 400 `Can't pick <path>.` and nothing saved), duplicates are dropped, and it answers `Saved. N picked.` / `Saved. Nothing picked.` and logs `My picks: N picked (from the website).`.
 - Only adding and removing photos need a PIN; everything else has no password, as the website is only reachable on the home network.
 
 ## Troubleshooting the box
@@ -208,7 +211,9 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
 | An uploaded HEVC video stutters, or its colours look washed out | iPhone 4K HDR (10-bit) video. Try `--hwdec=drm-copy` in `mpv.js`; or on the phone turn off HDR video, or share at 1080p |
 | Website: `Adding photos is off: no upload PIN is set on the box.` | No valid `~/video-scheduler/upload-pin` (a card's unattended first boot sets none): `sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` |
 | `Five wrong upload PINs in a row: uploads locked until …` | Someone typed the PIN wrong five times; it unlocks by itself after five minutes (or on a restart) |
-| `No photos or videos uploaded yet` | Photos chosen with nothing uploaded: add some on the website |
+| `No photos or videos uploaded yet` | All uploads chosen with nothing uploaded: add some on the website |
+| `Nothing picked yet` | My picks chosen with nothing ticked: tick something under My picks |
+| `Skipping … in picks: it is no longer on the box.` | A picked video left the repo (sync moved it to `.removed/`); it drops out of the list, and out of `picks.json` on the next save |
 | A video vanished from the box | Not in the repo, so sync moved it to `.removed/`; add it to the repo |
 | `Ignoring …/override.json` | Malformed override; Back to schedule deletes it |
 | Picture upside down or sideways | `rotate` in config.js (90 ↔ 270), then rerun setup |
