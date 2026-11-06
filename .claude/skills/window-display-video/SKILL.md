@@ -92,6 +92,7 @@ Settings each current video was finished with:
 | Fuzzy creatures, Mochi ghost-dog, Mochi pilgrim | no | no | |
 | Jump scare | no | no | |
 | Fall dusk | no | no | 14% crop (drawn frame), joined with its night extension, fade in 1 s / out 1.5 s |
+| Steady fall sun | no | no | no generation: `video/build_steady_sun.py` takes fall_dusk.mp4's steady 1.0–7.0 s, holds the light and the sun, crossfades it into a 4.5 s loop, repeats it to 22.5 s, fade in 1 s / out 1.5 s |
 
 ## 6. Deliver
 

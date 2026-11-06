@@ -1,6 +1,6 @@
 # Halloween Window Display
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat, between views of an autumn sunset that fades into a moonlit night.
+A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat, between views of an autumn sunset that fades into a moonlit night and a calmer one where the sun hangs still over the hills while the leaves keep falling.
 
 It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry Pi box that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, Christmas.
 
@@ -40,7 +40,7 @@ The videos are kept in this repo, and the box picks up the latest by itself ever
 | Season | When | Videos |
 |---|---|---|
 | Halloween | Every day in October | Kid hours: the fuzzy creatures and Mochi the ghost-dog. Grownup hours: those two plus the monster, the jump scare and the woman |
-| Thanksgiving | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself | The fall sunset and Mochi the pilgrim, all evening |
+| Thanksgiving | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself | The fall sunset, Mochi the pilgrim and the steady fall sun, all evening |
 | Christmas | December | None yet, so the window stays black |
 
 Each day:
@@ -72,6 +72,7 @@ On a day outside every season, the window stays black. The dates and times can b
 |---|---|---|
 | **Fall sunset:** the sun sinks into the hills behind red maples losing their leaves, wind blows leaves across the window, then the sky fades through purple to deep blue and a pale moon rises over the field | All evening | 0:25 |
 | **Mochi the pilgrim:** Mochi trots up in a little pilgrim hat, gazes out at the street, then spots a floating roast drumstick and chases it out of frame | All evening | 0:20 |
+| **Steady fall sun:** the same sunset, but calm: the sun stays just above the hills, the light never changes, and red and orange leaves keep drifting past the window the whole time | All evening | 0:23 |
 
 The videos play one after another and start over, each fading in from black and back out, so there's no visible jump between them.
 
@@ -81,7 +82,7 @@ The videos were made in a conversation with [Claude](https://claude.ai), Anthrop
 
 ### The prompts
 
-What was asked for, word for word. The woman's video is two clips joined together, and so is the fall dusk.
+What was asked for, word for word. The woman's video is two clips joined together, and so is the fall dusk. The steady fall sun has no prompt of its own: it's made from the first few seconds of the fall dusk clip, with the sun and the light held still and those seconds looped.
 
 **Fall dusk (15 s)**
 
