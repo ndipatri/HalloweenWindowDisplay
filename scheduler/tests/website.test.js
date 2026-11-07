@@ -239,9 +239,9 @@ test('the website offers All uploads and My picks apart from the season previews
 test('the website page offers All uploads and My picks buttons', async () => {
   const s = site();
   const page = (await s.call('GET', '/')).body;
-  assert.ok(page.includes('id="photos">All uploads<'), 'page has an All uploads button');
+  assert.ok(/id="photos"[^>]*>All uploads</.test(page), 'page has an All uploads button');
   assert.ok(page.includes("$('photos').onclick = () => show('photos')"), 'it shows photos for the chosen duration');
-  assert.ok(page.includes('id="picks">My picks<'), 'page has a My picks button');
+  assert.ok(/id="picks"[^>]*>My picks</.test(page), 'page has a My picks button');
   assert.ok(page.includes("$('picks').onclick = () => show('picks')"), 'it shows picks for the chosen duration');
   assert.ok(!page.includes('>Photos<'), 'no button is still called Photos');
   assertScriptCompiles(page);
@@ -377,6 +377,51 @@ test('the page confirms the picks next to the list and offers Play my picks', as
   assert.ok(/button:active/.test(page), 'buttons look pressed when tapped');
   assert.ok(/\.pickbar \{[^}]*position: sticky/.test(page), 'the note and button stay in view');
   assertScriptCompiles(page);
+});
+
+// ---- The page shows what is playing under Play ----
+
+test('the page shows the status under Play and outlines what is playing', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const body = page.slice(page.indexOf('<main>'));
+  const play = body.indexOf('<h2>Play</h2>');
+  assert.ok(play !== -1 && body.indexOf('id="status"') > play && body.indexOf('id="status"') < body.indexOf('id="playlists"'),
+    'the status line is in the Play section, before its buttons');
+  assert.ok(!body.slice(0, play).includes('class="card"'), 'no separate status card above Play');
+  for (const choice of ['picks', 'photos', 'black']) {
+    assert.ok(page.includes('data-choice="' + choice + '"'), 'the ' + choice + ' button can be outlined');
+  }
+  assert.ok(/button\.current \{[^}]*outline/.test(page), 'the playing button is outlined');
+  assert.ok(page.includes("setAttribute('aria-current', 'true')"), 'and marked as current');
+  const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let playlistNames'));
+  assert.ok(refresh.includes('playingChoice('), 'the outline follows the status');
+  assertScriptCompiles(page);
+});
+
+test('the page works out which Play button is playing from the status', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function playingChoice'));
+  assert.ok(code, 'the page has playingChoice');
+  const context = {};
+  require('vm').runInNewContext(code + '\nthis.playingChoice = playingChoice;', context);
+  const playlists = ['kid', 'grownup'];
+  const cases = [
+    ['thanksgiving/kid (scheduled until 7:30 PM)', 'kid'],
+    ['halloween/grownup (override until cleared)', 'grownup'],
+    ['kid (scheduled until 7:00 AM)', 'kid'],
+    ['picks (override until cleared)', 'picks'],
+    ['photos (override until 8:15 PM, then back to the schedule)', 'photos'],
+    ['black (outside schedule until 5:00 PM)', 'black'],
+    ['black (no season today, Nov 2)', 'black'],
+    ['black (waiting for the clock to be set)', 'black'],
+    ['kid (override until cleared)', 'kid'],
+    ['black (override until cleared; asked for kid but no season today)', 'black'],
+    ['halloween/scary (override until cleared)', null],
+    ['thanksgiving (override until cleared)', null],
+    ['', null],
+    [null, null],
+  ];
+  for (const [status, choice] of cases) assert.equal(context.playingChoice(status, playlists), choice, status);
 });
 
 test('the page puts a ticked item at the end of the picks and closes up an unticked one', async () => {
