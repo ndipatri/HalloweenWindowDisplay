@@ -561,7 +561,9 @@ const PAGE = `<!DOCTYPE html>
   h1 { font-size: 22px; margin: 0 0 14px; }
   h2 { font-size: 15px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; margin: 22px 0 8px; }
   .card { background: var(--card); border-radius: 12px; padding: 14px 16px; }
-  #status { font-size: 19px; }
+  .now { margin-bottom: 12px; }
+  #status { font-weight: 600; }
+  button.current { border-color: var(--accent); outline: 3px solid var(--accent); outline-offset: 2px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   button, select { font: inherit; color: var(--text); background: #2c2c2c; border: 1px solid #3a3a3a; border-radius: 10px; padding: 12px; width: 100%; }
   button { cursor: pointer; }
@@ -602,11 +604,13 @@ const PAGE = `<!DOCTYPE html>
 <body>
 <main>
   <h1>Window</h1>
-  <div class="card"><div id="status">Checking…</div></div>
-  <div id="message"></div>
 
   <h2>Play</h2>
-  <div class="grid" id="playlists"><button id="picks">My picks</button><button id="photos">All uploads</button><button id="black">Black</button></div>
+  <div class="card">
+    <div class="now" role="status">Now: <span id="status">Checking…</span></div>
+    <div class="grid" id="playlists"><button id="picks" data-choice="picks">My picks</button><button id="photos" data-choice="photos">All uploads</button><button id="black" data-choice="black">Black</button></div>
+  </div>
+  <div id="message"></div>
 
   <h2>For how long</h2>
   <select id="until">
@@ -676,10 +680,24 @@ const PAGE = `<!DOCTYPE html>
     return b;
   }
 
+  // Changes an element's text only when it differs, so a screen reader
+  // doesn't read a status line out again on every poll.
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+
+  // Outlines the Play button for what is on the window (none for null).
+  function outline(on) {
+    for (const b of $('playlists').querySelectorAll('button')) {
+      const yes = b.dataset.choice === on;
+      b.classList.toggle('current', yes);
+      if (yes) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    }
+  }
+
   async function refresh() {
     try {
       const r = await (await fetch('/api/status')).json();
-      $('status').textContent = r.status || 'The box has not started yet.';
+      setText($('status'), r.status || 'The box has not started yet.');
+      outline(playingChoice(r.status, playlistNames));
       // Keeps "Showing on the window now" under My picks true.
       const was = $('picknote').className;
       const showing = /^picks /.test($('status').textContent);
@@ -687,17 +705,24 @@ const PAGE = `<!DOCTYPE html>
       if (pending === 0 && was !== 'error' && !(was === 'playing' && (showing || justTapped))) {
         notePicks(was === 'saved' ? 'saved' : undefined);
       }
-    } catch (e) { $('status').textContent = "Couldn't reach the box."; }
+    } catch (e) { setText($('status'), "Couldn't reach the box."); outline(null); }
     try {
       const l = await (await fetch('/api/log')).json();
       $('log').textContent = l.lines.length ? l.lines.join('\\n') : 'Nothing yet.';
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
+  let playlistNames = []; // the schedule's playlists, for outlining the playing one
   async function load() {
     const c = await (await fetch('/api/choices')).json();
     const grid = $('playlists');
-    for (const p of c.playlists) grid.insertBefore(button(label(p), () => show(p)), $('picks'));
+    playlistNames = c.playlists;
+    for (const p of c.playlists) {
+      const b = button(label(p), () => show(p));
+      b.dataset.choice = p;
+      grid.insertBefore(b, $('picks'));
+    }
+    refresh();
     for (const p of c.previews) {
       const o = document.createElement('option');
       o.value = p; o.textContent = label(p);
@@ -827,12 +852,12 @@ const PAGE = `<!DOCTYPE html>
     const showing = /^picks /.test($('status').textContent);
     $('play-picks').disabled = n === 0;
     note.className = state === 'saved' ? 'saved' : state === 'error' ? 'error' : '';
-    if (state === 'saving') note.textContent = 'Saving…';
-    else if (state === 'error') note.textContent = error;
-    else if (n === 0) note.textContent = 'Nothing picked yet.';
+    if (state === 'saving') setText(note, 'Saving…');
+    else if (state === 'error') setText(note, error);
+    else if (n === 0) setText(note, 'Nothing picked yet.');
     else {
-      note.textContent = (state === 'saved' ? '✓ Saved. ' : '') + (n === 1 ? '1 picked. ' : n + ' picked. ') +
-        (showing ? 'Showing on the window now.' : 'Tap Play my picks to show them.');
+      setText(note, (state === 'saved' ? '✓ Saved. ' : '') + (n === 1 ? '1 picked. ' : n + ' picked. ') +
+        (showing ? 'Showing on the window now.' : 'Tap Play my picks to show them.'));
     }
   }
   function savePicks() {
@@ -948,6 +973,17 @@ const PAGE = `<!DOCTYPE html>
     }
     ui.say(files.length === 1 ? 'Added 1 file.' : 'Added ' + files.length + ' files.');
     return true;
+  }
+
+  // Which Play button is on the window, from the status line: 'black',
+  // 'picks', 'photos', or a schedule playlist ('kid' for halloween/kid or,
+  // without seasons, kid). null for anything no button plays, such as a
+  // whole season previewed.
+  function playingChoice(status, playlists) {
+    const key = String(status || '').split(' (')[0];
+    if (key === 'black' || key === 'picks' || key === 'photos') return key;
+    const playlist = key.split('/').pop();
+    return playlists.includes(playlist) ? playlist : null;
   }
 
   // Ticking an item puts it at the end of the picks; unticking takes it out,
