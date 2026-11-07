@@ -429,8 +429,8 @@ function createWebsite(options) {
     }
     if (route === 'POST /api/sync') {
       return startSync()
-        ? ok('Syncing now. New videos play within a minute or two.')
-        : ok('A sync is already running.');
+        ? ok('Checking GitHub for new videos. New ones play within a minute or two; watch Recent activity below.')
+        : ok('Already checking for new videos.');
     }
     if (route === 'POST /api/schedule') {
       removeFile(logic.OVERRIDE_PATH);
@@ -593,6 +593,9 @@ const PAGE = `<!DOCTYPE html>
   .pickrow .num { flex: none; min-width: 26px; text-align: center; font-weight: 600; color: #1a1a1a; background: var(--accent); border-radius: 13px; padding: 1px 6px; font-size: 14px; }
   .pickrow .num:empty { display: none; }
   .hint { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
+  .note { font-size: 14px; color: var(--accent); margin-top: 8px; }
+  .note:empty { display: none; }
+  .note.error { color: #ff6b6b; }
   .pickbar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid #3a3a3a; margin-top: 8px; padding: 10px 0 12px; display: flex; gap: 10px; align-items: center; }
   .pickbar #picknote { flex: 1; font-size: 14px; }
   .pickbar #picknote.saved { color: #7bd88f; }
@@ -651,8 +654,12 @@ const PAGE = `<!DOCTYPE html>
   <h2>Schedule</h2>
   <button class="primary" id="schedule">Back to schedule</button>
 
-  <h2>Videos</h2>
-  <button id="sync">Sync now</button>
+  <h2>New videos from GitHub</h2>
+  <div class="card">
+    <div class="hint">The box checks GitHub for new videos every hour by itself. New ones play within a minute or two; ones taken out are set aside on the box, not deleted. Your uploads and picks aren't touched, and the box's own settings and schedule don't change.</div>
+    <button id="sync">Check for new videos now</button>
+    <div id="sync-note" class="note" role="status" aria-live="polite"></div>
+  </div>
 
   <h2>Recent activity</h2>
   <div class="card"><div id="log">Loading…</div></div>
@@ -662,14 +669,19 @@ const PAGE = `<!DOCTYPE html>
   const say = (text, error) => { $('message').textContent = text; $('message').className = error ? 'error' : ''; };
   const label = (name) => name.split('/').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' / ');
 
-  async function post(path, body) {
+  // Sends a request and shows the answer in the message line, unless
+  // quiet (the caller shows it next to its own button).
+  async function post(path, body, quiet) {
     try {
       const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
       const data = await r.json();
-      say(data.message || data.error, !r.ok);
+      if (!quiet) say(data.message || data.error, !r.ok);
       setTimeout(refresh, 1500);
       return Object.assign({ ok: r.ok }, data);
-    } catch (e) { say("Couldn't reach the box.", true); return { ok: false, error: "Couldn't reach the box." }; }
+    } catch (e) {
+      if (!quiet) say("Couldn't reach the box.", true);
+      return { ok: false, error: "Couldn't reach the box." };
+    }
   }
   const show = (target) => post('/api/show', { target, until: $('until').value });
 
@@ -920,7 +932,12 @@ const PAGE = `<!DOCTYPE html>
   $('black').onclick = () => show('black');
   $('preview-go').onclick = () => $('preview').value && show($('preview').value);
   $('schedule').onclick = () => post('/api/schedule');
-  $('sync').onclick = () => post('/api/sync');
+  // The answer shows under the button, where it was tapped.
+  $('sync').onclick = async () => {
+    const r = await post('/api/sync', {}, true);
+    setText($('sync-note'), r.ok ? r.message : r.error);
+    $('sync-note').className = 'note' + (r.ok ? '' : ' error');
+  };
   load().catch(() => say("Couldn't reach the box.", true));
   loadUploads();
   loadPicks();

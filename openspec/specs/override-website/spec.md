@@ -88,31 +88,13 @@ The website SHALL start a sync when asked, the same sync the hourly timer runs, 
 - **GIVEN** no sync running
 - **WHEN** the website is asked to sync
 - **THEN** it starts one sync
-- **AND** it answers `Syncing now. New videos play within a minute or two.`
+- **AND** it answers `Checking GitHub for new videos. New ones play within a minute or two; watch Recent activity below.`
 
 #### Scenario: the website doesn't start a second sync while one is running
 - **GIVEN** a sync the website started is still running
 - **WHEN** the website is asked to sync again
 - **THEN** it starts no other sync
-- **AND** it answers `A sync is already running.`
-
-### Requirement: Shows recent activity
-The website SHALL show the last 20 lines of the box's log, oldest first, and no lines when there is no log yet. Its page SHALL offer Sync now and show the recent activity, refreshed every few seconds.
-
-#### Scenario: the website shows the last lines of the log
-- **GIVEN** the log has 30 lines, `line 1` to `line 30`
-- **WHEN** the website is asked for the recent activity
-- **THEN** it answers with `line 11` to `line 30`, in that order
-
-#### Scenario: the website shows no log lines when there is no log yet
-- **GIVEN** no log file
-- **WHEN** the website is asked for the recent activity
-- **THEN** it answers with no lines
-
-#### Scenario: the website page offers Sync now and shows recent activity
-- **GIVEN** the website running
-- **WHEN** the page is opened
-- **THEN** it has a Sync now button and a Recent activity list filled from the website's recent activity
+- **AND** it answers `Already checking for new videos.`
 
 ### Requirement: Lists what it can show
 The website SHALL list what it can show: the playlists named in the schedule, All uploads, My picks, and every season folder and season/playlist folder on the box other than `photos` and `picks`, and its page SHALL offer each of them, black, the durations, and back to the schedule.
@@ -160,3 +142,22 @@ The page's For how long choice SHALL start on Until switched back each time the 
 - **GIVEN** the website running
 - **WHEN** the page is opened
 - **THEN** For how long has Until switched back chosen, and only that option chosen
+
+### Requirement: Shows recent activity and offers new videos
+The website SHALL show the last 20 lines of the box's log, oldest first, and no lines when there is no log yet. Its page SHALL offer to check for new videos now, in a section saying what that does, and show the recent activity, refreshed every few seconds.
+
+#### Scenario: the website shows the last lines of the log
+- **GIVEN** the log has 30 lines, `line 1` to `line 30`
+- **WHEN** the website is asked for the recent activity
+- **THEN** it answers with `line 11` to `line 30`, in that order
+
+#### Scenario: the website shows no log lines when there is no log yet
+- **GIVEN** no log file
+- **WHEN** the website is asked for the recent activity
+- **THEN** it answers with no lines
+
+#### Scenario: the website page offers checking for new videos and shows recent activity
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** it has a New videos from GitHub section saying `The box checks GitHub for new videos every hour by itself.`, with a Check for new videos now button that starts a sync and shows the website's answer just under it
+- **AND** it has a Recent activity list filled from the website's recent activity
