@@ -27,7 +27,7 @@ function site(dirs = {}, extra = {}) {
   const w = createWebsite({
     config,
     videoRoot: ROOT,
-    now: () => SIX_PM,
+    now: () => extra.now || SIX_PM,
     readText: (p) => (p in files ? files[p] : null),
     readTail: (p, bytes) => (p in files ? files[p].slice(-bytes) : null),
     startSync: () => {
@@ -65,6 +65,14 @@ test('the website shows what is on screen now', async () => {
   const r = await s.call('GET', '/api/status');
   assert.equal(r.status, 200);
   assert.equal(r.json.status, 'halloween/kid (scheduled until 7:30 PM)');
+});
+
+test('the website says which season it is today', async () => {
+  const halloween = await site().call('GET', '/api/status');
+  assert.equal(halloween.json.season, 'halloween');
+  const none = await site({}, { now: new Date(2026, 0, 15, 18, 0) }).call('GET', '/api/status');
+  assert.ok('season' in none.json, JSON.stringify(none.json));
+  assert.equal(none.json.season, null);
 });
 
 test('the website says when the box has not started yet', async () => {
@@ -166,6 +174,17 @@ test('the website lists what it can show', async () => {
   const r = await s.call('GET', '/api/choices');
   assert.deepEqual(r.json.playlists, ['kid', 'grownup']);
   assert.deepEqual(r.json.previews, ['halloween', 'halloween/grownup', 'thanksgiving']);
+});
+
+test('the page offers each season as a Play button', async () => {
+  const page = (await site().call('GET', '/')).body;
+  assert.ok(!page.includes('Preview a season') && !page.includes('id="preview"'), 'no Preview a season section');
+  const play = page.slice(page.indexOf('<h2>Play</h2>'), page.indexOf('<h2>', page.indexOf('<h2>Play</h2>') + 1));
+  assert.ok(play.includes('id="seasons"'), 'a row for the seasons in the Play section');
+  const load = page.slice(page.indexOf('async function load()'), page.indexOf('// ---- Adding and removing photos'));
+  assert.ok(/for \(const p of c\.previews\.filter\(\(p\) => !c\.playlists\.includes\(p\)\)\)[\s\S]*?button\(label\(p\), \(\) => show\(p\)\)[\s\S]*?dataset\.choice = p[\s\S]*?\$\('seasons'\)/.test(load),
+    'a button per preview, labelled, showing it for the chosen duration');
+  assertScriptCompiles(page);
 });
 
 test('the page starts For how long on until switched back', async () => {
@@ -385,7 +404,8 @@ test('the website page offers My picks', async () => {
 
 test('the page confirms the picks next to the list', async () => {
   const page = (await site().call('GET', '/')).body;
-  const section = page.slice(page.indexOf('<h2>My picks</h2>'), page.indexOf('<h2>Preview a season</h2>'));
+  const start = page.indexOf('<h2>My picks</h2>');
+  const section = page.slice(start, page.indexOf('<h2>', start + 1));
   assert.ok(section.includes('Each tick is saved straight away.'), 'the section says ticks are saved');
   assert.ok(section.indexOf('id="picklist"') < section.indexOf('id="picknote"'), 'the note is under the list');
   assert.ok(section.includes('id="picknote" role="status" aria-live="polite"'), 'a screen reader reads the note out');
@@ -414,34 +434,42 @@ test('the page shows the status under Play and outlines what is playing', async 
   assert.ok(/button\.current \{[^}]*outline/.test(page), 'the playing button is outlined');
   assert.ok(page.includes("setAttribute('aria-current', 'true')"), 'and marked as current');
   const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let playlistNames'));
-  assert.ok(refresh.includes('playingChoice('), 'the outline follows the status');
+  assert.ok(refresh.includes('outline(playingChoices(r.status, playlistNames, seasonNames, r.season))'), 'the outline follows the status and today\'s season');
+  assert.ok(page.includes('seasonNames = c.previews;'), 'the season buttons can be outlined');
   assertScriptCompiles(page);
 });
 
 test('the page works out which Play button is playing from the status', async () => {
   const page = (await site().call('GET', '/')).body;
-  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function playingChoice'));
-  assert.ok(code, 'the page has playingChoice');
+  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function playingChoices'));
+  assert.ok(code, 'the page has playingChoices');
   const context = {};
-  require('vm').runInNewContext(code + '\nthis.playingChoice = playingChoice;', context);
+  require('vm').runInNewContext(code + '\nthis.playingChoices = playingChoices;', context);
   const playlists = ['kid', 'grownup'];
-  const cases = [
-    ['thanksgiving/kid (scheduled until 7:30 PM)', 'kid'],
-    ['halloween/grownup (override until cleared)', 'grownup'],
-    ['kid (scheduled until 7:00 AM)', 'kid'],
-    ['picks (override until cleared)', 'picks'],
-    ['photos (override until 8:15 PM, then back to the schedule)', 'photos'],
-    ['black (outside schedule until 5:00 PM)', 'black'],
-    ['black (no season today, Nov 2)', 'black'],
-    ['black (waiting for the clock to be set)', 'black'],
-    ['kid (override until cleared)', 'kid'],
-    ['black (override until cleared; asked for kid but no season today)', 'black'],
-    ['halloween/scary (override until cleared)', null],
-    ['thanksgiving (override until cleared)', null],
-    ['', null],
-    [null, null],
+  const seasons = ['halloween', 'halloween/grownup', 'thanksgiving'];
+  const cases = [ // status, today's season, the buttons playing
+    ['thanksgiving/kid (scheduled until 7:30 PM)', 'thanksgiving', ['kid']],
+    ['halloween/grownup (override until cleared)', 'thanksgiving', ['halloween/grownup']],
+    ['halloween/grownup (scheduled until 11:00 PM)', 'halloween', ['grownup', 'halloween/grownup']],
+    ['kid (scheduled until 7:00 AM)', null, ['kid']],
+    ['halloween/kid (override until cleared)', null, []],
+    ['picks (override until cleared)', 'thanksgiving', ['picks']],
+    ['photos (override until 8:15 PM, then back to the schedule)', 'thanksgiving', ['photos']],
+    ['black (outside schedule until 5:00 PM)', 'thanksgiving', ['black']],
+    ['black (no season today, Nov 2)', null, ['black']],
+    ['black (waiting for the clock to be set)', null, ['black']],
+    ['black (override until cleared; asked for kid but no season today)', null, ['black']],
+    ['halloween/scary (override until cleared)', 'halloween', []],
+    ['thanksgiving (override until cleared)', 'thanksgiving', ['thanksgiving']],
+    ['kid (override until cleared)', 'halloween', []],
+    ['', 'thanksgiving', []],
+    [null, null, []],
   ];
-  for (const [status, choice] of cases) assert.equal(context.playingChoice(status, playlists), choice, status);
+  for (const [status, today, choices] of cases) {
+    assert.deepEqual(Array.from(context.playingChoices(status, playlists, seasons, today)).sort(), choices.slice().sort(), String(status) + ' on ' + today);
+  }
+  // With no seasons, a kid/ folder is the Kid button's, counted once.
+  assert.deepEqual(Array.from(context.playingChoices('kid (scheduled until 7:00 AM)', playlists, ['kid', 'easter'], null)), ['kid']);
 });
 
 test('the page puts a ticked item at the end of the picks and closes up an unticked one', async () => {

@@ -110,4 +110,4 @@ Settings each current video was finished with:
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
-- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to preview it: on http://tvbox.local/, **Preview a season** → the season (or season / playlist), with a duration.
+- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, tap the season's button under **Seasons** (or its season / playlist button), with a duration.

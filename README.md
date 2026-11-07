@@ -165,7 +165,7 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
 - play the **Kid** or **Grownup** videos, **My picks**, **All uploads** (your own photos and videos), or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
-- **preview a season**: another season's videos, even on other days;
+- play a **season** (under **Seasons**, below the other Play buttons): another season's videos, even on other days;
 - go **Back to schedule**;
 - **Check for new videos now**, to get new videos from GitHub straight away instead of within the hour. It only brings videos: a change to the dates or times still needs "Get the latest version" below.
 
