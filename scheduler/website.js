@@ -38,6 +38,8 @@ function createWebsite(options) {
   const { config, videoRoot, now, readText, writeText, removeFile, listFolder, readTail, startSync } = options;
   const log = options.log || (() => {});
   const logic = createScheduler(Object.assign({ log() {} }, options));
+  // The configured seasons, read quietly: the player already logs bad entries.
+  const seasons = createScheduler(Object.assign({}, options, { log() {} })).validSeasons(config.seasons);
   const isFolder = (p) => listFolder(p) !== null;
   const visible = (name) => !name.startsWith('.');
   const PHOTOS_DIR = videoRoot + '/' + logic.PHOTOS;
@@ -404,7 +406,8 @@ function createWebsite(options) {
     if (route === 'GET /') return { status: 200, type: 'text/html', body: PAGE };
     if (route === 'GET /api/status') {
       const text = readText(logic.STATUS_PATH);
-      return json(200, { status: text === null ? null : text.trim() });
+      // Today's season, so the page knows what its Kid and Grownup play now.
+      return json(200, { status: text === null ? null : text.trim(), season: logic.activeSeason(seasons, now()) });
     }
     if (route === 'GET /api/choices') return json(200, choices());
     if (route === 'GET /api/uploads') return json(200, listUploads());
@@ -613,6 +616,8 @@ const PAGE = `<!DOCTYPE html>
   <div class="card">
     <div class="now" role="status">Now: <span id="status">Checking…</span></div>
     <div class="grid" id="playlists"><button id="picks" data-choice="picks">My picks</button><button id="photos" data-choice="photos">All uploads</button><button id="black" data-choice="black">Black</button></div>
+    <div class="group" id="seasons-label" hidden>Seasons</div>
+    <div class="grid" id="seasons"></div>
   </div>
   <div id="message"></div>
 
@@ -630,12 +635,6 @@ const PAGE = `<!DOCTYPE html>
     <div class="hint">Tick what you'd like on the window. They play in the order you tick them, round and round. Each tick is saved straight away.</div>
     <div id="picklist">Loading…</div>
     <div class="pickbar"><div id="picknote" role="status" aria-live="polite"></div></div>
-  </div>
-
-  <h2>Preview a season</h2>
-  <div class="row">
-    <select id="preview"></select>
-    <button id="preview-go">Preview</button>
   </div>
 
   <h2>Add photos or videos</h2>
@@ -697,10 +696,10 @@ const PAGE = `<!DOCTYPE html>
   // doesn't read a status line out again on every poll.
   function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
 
-  // Outlines the Play button for what is on the window (none for null).
+  // Outlines the Play buttons for what is on the window (a list, maybe empty).
   function outline(on) {
-    for (const b of $('playlists').querySelectorAll('button')) {
-      const yes = b.dataset.choice === on;
+    for (const b of document.querySelectorAll('button[data-choice]')) {
+      const yes = on.includes(b.dataset.choice);
       b.classList.toggle('current', yes);
       if (yes) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
     }
@@ -710,11 +709,11 @@ const PAGE = `<!DOCTYPE html>
     try {
       const r = await (await fetch('/api/status')).json();
       setText($('status'), r.status || 'The box has not started yet.');
-      outline(playingChoice(r.status, playlistNames));
+      outline(playingChoices(r.status, playlistNames, seasonNames, r.season));
       // Keeps "Showing on the window now" under My picks true.
       const was = $('picknote').className;
       if (pending === 0 && was !== 'error') notePicks(was === 'saved' ? 'saved' : undefined);
-    } catch (e) { setText($('status'), "Couldn't reach the box."); outline(null); }
+    } catch (e) { setText($('status'), "Couldn't reach the box."); outline([]); }
     try {
       const l = await (await fetch('/api/log')).json();
       $('log').textContent = l.lines.length ? l.lines.join('\\n') : 'Nothing yet.';
@@ -722,6 +721,7 @@ const PAGE = `<!DOCTYPE html>
   }
 
   let playlistNames = []; // the schedule's playlists, for outlining the playing one
+  let seasonNames = []; // the season (and season/playlist) folders, likewise
   async function load() {
     const c = await (await fetch('/api/choices')).json();
     const grid = $('playlists');
@@ -731,12 +731,16 @@ const PAGE = `<!DOCTYPE html>
       b.dataset.choice = p;
       grid.insertBefore(b, $('picks'));
     }
-    refresh();
-    for (const p of c.previews) {
-      const o = document.createElement('option');
-      o.value = p; o.textContent = label(p);
-      $('preview').appendChild(o);
+    seasonNames = c.previews;
+    // A folder named like a schedule playlist (with no seasons, kid/ and
+    // grownup/) already has its button above.
+    for (const p of c.previews.filter((p) => !c.playlists.includes(p))) {
+      const b = button(label(p), () => show(p));
+      b.dataset.choice = p;
+      $('seasons').appendChild(b);
     }
+    $('seasons-label').hidden = !$('seasons').children.length;
+    refresh();
   }
 
   // ---- Adding and removing photos ----
@@ -930,7 +934,6 @@ const PAGE = `<!DOCTYPE html>
   $('picks').onclick = () => show('picks');
   $('photos').onclick = () => show('photos');
   $('black').onclick = () => show('black');
-  $('preview-go').onclick = () => $('preview').value && show($('preview').value);
   $('schedule').onclick = () => post('/api/schedule');
   // The answer shows under the button, where it was tapped.
   $('sync').onclick = async () => {
@@ -973,15 +976,19 @@ const PAGE = `<!DOCTYPE html>
     return true;
   }
 
-  // Which Play button is on the window, from the status line: 'black',
-  // 'picks', 'photos', or a schedule playlist ('kid' for halloween/kid or,
-  // without seasons, kid). null for anything no button plays, such as a
-  // whole season previewed.
-  function playingChoice(status, playlists) {
+  // The Play buttons that play what is on the window, from the status line
+  // and today's season: 'black', 'picks', 'photos'; Kid or Grownup when
+  // today's season's playlist of that name is on (with no seasons, that
+  // playlist); and the season button of exactly that name. So on a
+  // Halloween day halloween/grownup is Grownup and Halloween / Grownup, but
+  // on a Thanksgiving day only Halloween / Grownup. Empty for anything no
+  // button plays.
+  function playingChoices(status, playlists, seasons, today) {
     const key = String(status || '').split(' (')[0];
-    if (key === 'black' || key === 'picks' || key === 'photos') return key;
-    const playlist = key.split('/').pop();
-    return playlists.includes(playlist) ? playlist : null;
+    if (key === 'black' || key === 'picks' || key === 'photos') return [key];
+    const on = playlists.filter((p) => key === (today ? today + '/' + p : p));
+    if (seasons.includes(key) && !on.includes(key)) on.push(key);
+    return on;
   }
 
   // Ticking an item puts it at the end of the picks; unticking takes it out,
