@@ -164,6 +164,19 @@ Add a check to `inside.sh` for any new box behaviour it can reach: a website act
 
 The box's software today: Raspberry Pi OS Lite (64-bit), Debian 13 (trixie), Node.js 20.19, mpv 0.40, and ffmpeg 7.1 from the Raspberry Pi archive. When Raspberry Pi OS moves to a new Debian release, update the Dockerfile's `FROM` and the keyring package, and rerun the rehearsal.
 
+## Trying it without the box (the emulator)
+
+`bash scheduler/tests/e2e/emulate.sh` runs a box on the Mac, in the rehearsal's Docker image, until Ctrl-C. Use it when the person is away from the real box, or to try a website or player change by hand before shipping.
+- **What runs:** a copy of this folder as it is (uncommitted changes included), the real `setup.sh` (upload PIN `1234`, or `TVBOX_EMULATOR_PIN`), sync of the real videos from `playlists/`, the player and mpv. Sync pulls from this folder's current branch (`origin` points at `/src`), never from GitHub.
+- **Where:**
+  - the website: http://localhost:8080/ (from a phone on the same Wi‑Fi: the Mac's name, port 8080);
+  - the "TV": http://localhost:8081/ (`emulator/tv.js`), showing the newest frame and the status line.
+- **How the TV works:** `emulator/mpv` wraps mpv with `--vo=null` and saves a JPEG of the picture twice a second to `/tmp/tv`, keeping only the newest few. The page turns the frame back by `rotate`, as the TV standing on its side does, and shows black when no frame is from the last two seconds.
+- **The clock** is the Mac's, in `TVBOX_TIMEZONE` (default America/New_York). So the schedule and seasons are today's, and overrides from the website are the way to see other playlists.
+- **Building:** if the image can't be rebuilt (Docker Desktop offline from Docker Hub), it uses the one built before.
+- **Nothing is kept:** uploads, picks and the log go when it stops.
+- **What it can't show:** smooth motion, sound, and the real TV's colours.
+
 ## The website (overrides)
 
 The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes `~/video-scheduler/override.json` in the same format `show` wrote, so the override rules are unchanged:

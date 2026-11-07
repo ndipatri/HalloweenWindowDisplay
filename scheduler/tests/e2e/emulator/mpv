@@ -1,0 +1,51 @@
+#!/bin/bash
+# Wraps the real mpv for the emulator: there is no TV in the container, so
+# mpv plays with no picture output (--vo=null, keeping real time) and, twice
+# a second, saves the playing picture, turned as on the TV, as a JPEG in
+# /tmp/tv for the TV page (tv.js). Only the newest few are kept. Nothing is
+# saved while mpv is idle, which the TV page shows as black.
+# mpv takes the last value given for an option, so --vo=null wins.
+frames=/tmp/tv
+socket=
+for a in "$@"; do
+  case "$a" in --input-ipc-server=*) socket="${a#--input-ipc-server=}" ;; esac
+done
+
+# A screenshot while idle (black) fails, and mpv would say so in the box's
+# log every half second, so that one line is left out of its output.
+/usr/bin/mpv "$@" --vo=null > >(grep -v --line-buffered 'Taking screenshot failed') 2>&1 &
+mpv=$!
+trap 'kill -TERM $mpv 2>/dev/null' TERM INT
+
+if [ -n "$socket" ]; then
+  node -e '
+    const fs = require("fs");
+    const net = require("net");
+    const [socket, frames] = process.argv.slice(1);
+    let n = 0;
+    (function connect() {
+      const c = net.connect(socket);
+      c.on("error", () => setTimeout(connect, 200)); // not there yet
+      c.on("connect", () => {
+        c.on("close", () => process.exit(0));
+        c.resume();
+        setInterval(() => {
+          n++;
+          const file = frames + "/" + String(n).padStart(8, "0") + ".jpg";
+          c.write(JSON.stringify({ command: ["screenshot-to-file", file, "video"] }) + "\n");
+          // Keep the newest few; mpv may still be writing the very newest.
+          for (const old of fs.readdirSync(frames).sort().slice(0, -4)) {
+            fs.rmSync(frames + "/" + old, { force: true });
+          }
+        }, 500);
+      });
+    })();
+  ' "$socket" "$frames" &
+  shots=$!
+fi
+
+wait $mpv
+code=$?
+kill -0 $mpv 2>/dev/null && { wait $mpv; code=$?; }
+[ -n "${shots:-}" ] && kill $shots 2>/dev/null
+exit $code
