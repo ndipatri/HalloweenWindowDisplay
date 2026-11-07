@@ -587,6 +587,15 @@ const PAGE = `<!DOCTYPE html>
   .pickrow .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pickrow .num { flex: none; min-width: 26px; text-align: center; font-weight: 600; color: #1a1a1a; background: var(--accent); border-radius: 13px; padding: 1px 6px; font-size: 14px; }
   .pickrow .num:empty { display: none; }
+  .hint { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
+  .pickbar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid #3a3a3a; margin-top: 8px; padding: 10px 0 12px; display: flex; gap: 10px; align-items: center; }
+  .pickbar #picknote { flex: 1; font-size: 14px; }
+  .pickbar #picknote.saved { color: #7bd88f; }
+  .pickbar #picknote.error { color: #ff6b6b; }
+  .pickbar #picknote.playing { color: var(--accent); font-weight: 600; }
+  .pickbar button { width: auto; flex: none; min-width: 9.5em; }
+  button:disabled { opacity: .45; cursor: default; }
+  button:active:not(:disabled) { transform: scale(.96); filter: brightness(1.2); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -610,7 +619,9 @@ const PAGE = `<!DOCTYPE html>
 
   <h2>My picks</h2>
   <div class="card">
+    <div class="hint">Tick what you'd like on the window. They play in the order you tick them, round and round. Each tick is saved straight away.</div>
     <div id="picklist">Loading…</div>
+    <div class="pickbar"><div id="picknote" role="status" aria-live="polite"></div><button class="primary" id="play-picks">Play my picks</button></div>
   </div>
 
   <h2>Preview a season</h2>
@@ -652,8 +663,8 @@ const PAGE = `<!DOCTYPE html>
       const data = await r.json();
       say(data.message || data.error, !r.ok);
       setTimeout(refresh, 1500);
-      return r.ok;
-    } catch (e) { say("Couldn't reach the box.", true); return false; }
+      return Object.assign({ ok: r.ok }, data);
+    } catch (e) { say("Couldn't reach the box.", true); return { ok: false, error: "Couldn't reach the box." }; }
   }
   const show = (target) => post('/api/show', { target, until: $('until').value });
 
@@ -669,6 +680,13 @@ const PAGE = `<!DOCTYPE html>
     try {
       const r = await (await fetch('/api/status')).json();
       $('status').textContent = r.status || 'The box has not started yet.';
+      // Keeps "Showing on the window now" under My picks true.
+      const was = $('picknote').className;
+      const showing = /^picks /.test($('status').textContent);
+      const justTapped = Date.now() - playTapped < 5000; // the status may lag the tap
+      if (pending === 0 && was !== 'error' && !(was === 'playing' && (showing || justTapped))) {
+        notePicks(was === 'saved' ? 'saved' : undefined);
+      }
     } catch (e) { $('status').textContent = "Couldn't reach the box."; }
     try {
       const l = await (await fetch('/api/log')).json();
@@ -802,19 +820,35 @@ const PAGE = `<!DOCTYPE html>
   // shown; after a refusal, the list is read from the box again.
   let saving = Promise.resolve();
   let pending = 0;
+  // What the picks are and what to do next, under the list.
+  function notePicks(state, error) {
+    const note = $('picknote');
+    const n = picks.length;
+    const showing = /^picks /.test($('status').textContent);
+    $('play-picks').disabled = n === 0;
+    note.className = state === 'saved' ? 'saved' : state === 'error' ? 'error' : '';
+    if (state === 'saving') note.textContent = 'Saving…';
+    else if (state === 'error') note.textContent = error;
+    else if (n === 0) note.textContent = 'Nothing picked yet.';
+    else {
+      note.textContent = (state === 'saved' ? '✓ Saved. ' : '') + (n === 1 ? '1 picked. ' : n + ' picked. ') +
+        (showing ? 'Showing on the window now.' : 'Tap Play my picks to show them.');
+    }
+  }
   function savePicks() {
     pending++;
+    notePicks('saving');
     saving = saving.then(async () => {
       let saved = null;
+      let error = "Couldn't reach the box.";
       try {
         const r = await fetch('/api/picks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ picks }) });
         const d = await r.json();
-        say(d.message || d.error, !r.ok);
-        if (r.ok) saved = d.picks;
-      } catch (e) { say("Couldn't reach the box.", true); }
+        if (r.ok) saved = d.picks; else error = d.error;
+      } catch (e) { /* the box can't be reached */ }
       pending--;
-      if (saved === null) loadPicks();
-      else if (pending === 0) { picks = saved; numberPicks(); }
+      if (saved === null) notePicks('error', error + ((await loadPicks()) ? ' Your ticks were put back as the box has them.' : ' Your last ticks may not be saved.'));
+      else if (pending === 0) { picks = saved; numberPicks(); notePicks('saved'); }
     });
   }
   function numberPicks() {
@@ -824,9 +858,11 @@ const PAGE = `<!DOCTYPE html>
       row.querySelector('.num').textContent = n === -1 ? '' : String(n + 1);
     }
   }
+  // Reads the list and the picks from the box. Returns whether it could.
   async function loadPicks() {
     try {
       const d = await (await fetch('/api/picks')).json();
+      if (pending > 0) return true; // a save is on its way; its answer wins
       picks = d.picks;
       const list = $('picklist');
       list.textContent = d.items.length ? '' : 'No videos on the box yet.';
@@ -853,10 +889,27 @@ const PAGE = `<!DOCTYPE html>
         list.appendChild(row);
       }
       numberPicks();
-    } catch (e) { /* the status line already says the box can't be reached */ }
+      notePicks();
+      return true;
+    } catch (e) { return false; /* the status line already says the box can't be reached */ }
   }
 
   $('picks').onclick = () => show('picks');
+  // Answers where it was tapped: Starting… on the button, then the box's
+  // answer in the note under the list.
+  let playTapped = 0;
+  $('play-picks').onclick = async () => {
+    playTapped = Date.now();
+    const b = $('play-picks');
+    b.disabled = true;
+    b.textContent = 'Starting…';
+    const r = await show('picks');
+    b.textContent = 'Play my picks';
+    b.disabled = picks.length === 0;
+    const note = $('picknote');
+    note.className = r.ok ? 'playing' : 'error';
+    note.textContent = r.ok ? '▶ ' + r.message.replace(/^Showing picks/, 'Playing your picks') : r.error;
+  };
   $('photos').onclick = () => show('photos');
   $('black').onclick = () => show('black');
   $('preview-go').onclick = () => $('preview').value && show($('preview').value);
