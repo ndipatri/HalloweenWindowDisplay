@@ -361,6 +361,24 @@ test('the website page offers My picks', async () => {
   assertScriptCompiles(page);
 });
 
+test('the page confirms the picks next to the list and offers Play my picks', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const section = page.slice(page.indexOf('<h2>My picks</h2>'), page.indexOf('<h2>Preview a season</h2>'));
+  assert.ok(section.includes('Each tick is saved straight away.'), 'the section says ticks are saved');
+  assert.ok(section.indexOf('id="picklist"') < section.indexOf('id="picknote"'), 'the note is under the list');
+  assert.ok(section.includes('id="picknote" role="status" aria-live="polite"'), 'a screen reader reads the note out');
+  assert.ok(section.includes('id="play-picks">Play my picks<'), 'a Play my picks button next to the list');
+  for (const text of ["'Saving…'", "'✓ Saved. '", "'Tap Play my picks to show them.'", "'Showing on the window now.'", "'Nothing picked yet.'"]) {
+    assert.ok(page.includes(text), 'the note can say ' + text);
+  }
+  const play = page.slice(page.indexOf("$('play-picks').onclick"));
+  assert.ok(/^\$\('play-picks'\)\.onclick = async \(\) => \{[\s\S]*?await show\('picks'\)/.test(play), 'it shows picks for the chosen duration');
+  assert.ok(play.includes("'Starting…'") && play.includes("'Playing your picks'"), 'it answers where it was tapped');
+  assert.ok(/button:active/.test(page), 'buttons look pressed when tapped');
+  assert.ok(/\.pickbar \{[^}]*position: sticky/.test(page), 'the note and button stay in view');
+  assertScriptCompiles(page);
+});
+
 test('the page puts a ticked item at the end of the picks and closes up an unticked one', async () => {
   const page = (await site().call('GET', '/')).body;
   const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function togglePick'));
