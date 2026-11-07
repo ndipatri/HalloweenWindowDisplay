@@ -67,3 +67,21 @@ A season entry with a bad name, day, weekday or `alsoOn` SHALL be skipped and lo
 - **WHEN** the scheduler validates them
 - **THEN** only "ok" is kept
 - **AND** eight lines are logged, one of them `bad alsoOn day "11-4thux"`
+
+### Requirement: The photos name is kept for uploads
+A season named `photos` SHALL be skipped and logged as an error naming the reason, because that name is the uploads' own choice.
+
+#### Scenario: a season named photos is skipped and logged
+- **GIVEN** seasons `photos` from 06-01 to 06-30, then `halloween` from 10-01 to 10-31
+- **WHEN** the scheduler reads them
+- **THEN** only `halloween` is kept
+- **AND** `ERROR: Ignoring season entry 1` is logged, saying the name `photos` is kept for uploads
+
+### Requirement: The picks name is kept for My picks
+A season named `picks` SHALL be skipped and logged as an error naming the reason, because that name is My picks' own choice.
+
+#### Scenario: a season named picks is skipped and logged
+- **GIVEN** seasons `picks` from 06-01 to 06-30, then `halloween` from 10-01 to 10-31
+- **WHEN** the scheduler reads them
+- **THEN** only `halloween` is kept
+- **AND** `ERROR: Ignoring season entry 1` is logged, saying the name `picks` is kept for My picks

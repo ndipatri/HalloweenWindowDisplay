@@ -164,7 +164,7 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-- play the **Kid** or **Grownup** videos, your own **Photos**, or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
+- play the **Kid** or **Grownup** videos, **My picks**, **All uploads** (your own photos and videos), or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
 - **preview a season**: another season's videos, even on other days;
 - go **Back to schedule**;
 - **Sync now**, to pick up new videos from the repo straight away instead of within the hour.
@@ -173,20 +173,29 @@ At the bottom, **Recent activity** shows the last things the box did: each video
 
 Changes show on the TV within a couple of seconds. They end by themselves, so a forgotten one can't leave the scary videos on in the morning (unless you chose "Until switched back").
 
+### Pick the videos you want: My picks
+
+Under **My picks** on the page are all the videos on the box, by season, and the photos and videos you've added (under **Uploads**).
+
+1. Tick the ones you want. Each gets a number: that's the order they'll play in. Untick one to take it out.
+2. Tap **My picks** under Play, for as long as you choose.
+
+They play in that order, round and round; if you pick just one, it plays over and over. The box remembers your picks, on every phone, so next time you only need to tap **My picks**. A photo or video you add joins the end of your picks by itself. Changing the ticks while My picks is on changes what plays straight away. To move one to the end, untick it and tick it again.
+
 ### Put your own photos and videos on the window
 
 1. On your phone, open **http://tvbox.local/**.
 2. Under **Add photos or videos**, type the box's upload PIN. The phone remembers it after the first time.
 3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
-5. Tap **Photos** under Play to show them, for as long as you choose.
+5. Tap **All uploads** under Play to show them all, for as long as you choose. They're also added to **My picks**.
 
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. Photos are shown whole, with black around them, so nothing gets cut off.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
 Good to know:
-- The schedule never shows your photos by itself: they only show when you choose Photos.
+- The schedule never shows your photos or your picks by itself: they only show when you choose All uploads or My picks.
 - They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
 - Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
@@ -199,7 +208,8 @@ Good to know:
 | See what's on screen | Open http://tvbox.local/ |
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Sync now** on the page |
 | Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
-| Show your own photos and videos | On the page: **Add photos or videos**, then **Photos** (see above) |
+| Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
+| Play just the videos you choose | On the page: tick them under **My picks**, then tap **My picks** (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
 | See what it did last week | `ssh tvbox.local`, then `less ~/video-scheduler/scheduler.log.1` (the box keeps about a month of logs) |
@@ -232,5 +242,6 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
 | A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
 | Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
+| My picks shows black | Nothing is ticked under My picks, or what you ticked is no longer on the box: tick something |
 
 For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

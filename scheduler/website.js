@@ -64,7 +64,7 @@ function createWebsite(options) {
     const previews = [];
     const tops = (listFolder(videoRoot) || []).filter(visible).sort(logic.compareNames);
     for (const top of tops) {
-      if (top === logic.PHOTOS) continue; // offered as Photos instead
+      if (top === logic.PHOTOS || top === logic.PICKS) continue; // offered as All uploads and My picks instead
       if (!isFolder(videoRoot + '/' + top)) continue;
       previews.push(top);
       const subs = (listFolder(videoRoot + '/' + top) || []).filter(visible).sort(logic.compareNames);
@@ -72,7 +72,55 @@ function createWebsite(options) {
         if (isFolder(videoRoot + '/' + top + '/' + sub)) previews.push(top + '/' + sub);
       }
     }
-    return { playlists, previews, photos: true };
+    return { playlists, previews, photos: true, picks: true };
+  }
+
+  // ---------- My picks ----------
+
+  function writePicks(picks) {
+    writeText(logic.PICKS_PATH, JSON.stringify({ picks }, null, 2) + '\n');
+  }
+
+  // Lets the player rebuild its queue if the picks are playing. The picks
+  // are saved by then, so a problem here is logged, not the request's.
+  async function picksChanged() {
+    if (!options.picksChanged) return;
+    try {
+      await options.picksChanged();
+    } catch (e) {
+      log("ERROR: Couldn't change what is queued for My picks: " + e.message);
+    }
+  }
+
+  function listPicks() {
+    return { items: logic.pickableItems(), picks: logic.readPicks().filter(logic.pickable) };
+  }
+
+  async function savePicks(body) {
+    if (!body || !Array.isArray(body.picks)) return fail('Bad request.');
+    const picks = [];
+    for (const rel of body.picks) {
+      if (!logic.pickable(rel)) return fail("Can't pick " + (typeof rel === 'string' ? rel : JSON.stringify(rel)) + '.');
+      if (!picks.includes(rel)) picks.push(rel);
+    }
+    writePicks(picks);
+    log('My picks: ' + picks.length + ' picked (from the website).');
+    await picksChanged();
+    return json(200, { message: picks.length ? 'Saved. ' + picks.length + ' picked.' : 'Saved. Nothing picked.', picks });
+  }
+
+  // A new upload joins the end of the picks; a removed one leaves them.
+  async function addPick(rel) {
+    const picks = logic.readPicks();
+    if (picks.includes(rel)) return;
+    writePicks(picks.concat([rel]));
+    await picksChanged();
+  }
+  async function dropPick(rel) {
+    const picks = logic.readPicks();
+    if (!picks.includes(rel)) return;
+    writePicks(picks.filter((p) => p !== rel));
+    await picksChanged();
   }
 
   // ---------- Uploads ----------
@@ -180,9 +228,13 @@ function createWebsite(options) {
       },
     });
     // The phone going away is expected; the box failing to write is not.
+    // Newer Node passes the phone's own error on to the file too, so that
+    // one isn't the box failing to write.
     let failure = null;
+    let dropped = null;
+    stream.on('error', (e) => { dropped = e; });
     const out = fs.createWriteStream(part, { flags: 'wx' });
-    out.on('error', (e) => { failure = e; });
+    out.on('error', (e) => { if (e !== dropped) failure = e; });
     try {
       await pipeline(stream, counter, out);
     } catch (e) {
@@ -196,6 +248,7 @@ function createWebsite(options) {
     }
     const saved = numberIntoPlace(part, name);
     log('Uploaded photos/' + saved + ' (' + (length / MB).toFixed(1) + ' MB)');
+    await addPick(logic.PHOTOS + '/' + saved);
     return ok('Added ' + name + '.');
   }
 
@@ -254,6 +307,7 @@ function createWebsite(options) {
     if (options.beforeRemove) await options.beforeRemove(file);
     removeFile(file);
     log('Removed photos/' + name + ' (from the website)');
+    await dropPick(logic.PHOTOS + '/' + name);
     return ok('Removed ' + name + '.');
   }
 
@@ -308,7 +362,10 @@ function createWebsite(options) {
       return fail('Not a playlist name: ' + (target || '(none)') + '. Choose kid, grownup, a season, or a season/playlist.');
     }
     if (!black && target.startsWith(logic.PHOTOS + '/')) {
-      return fail('Not a playlist name: ' + target + '. Photos plays all the uploads together.');
+      return fail('Not a playlist name: ' + target + '. All uploads plays all the uploads together.');
+    }
+    if (!black && target.startsWith(logic.PICKS + '/')) {
+      return fail('Not a playlist name: ' + target + '. My picks plays the picked items.');
     }
     if (!black && target.includes('/')) {
       const season = target.split('/')[0];
@@ -348,6 +405,12 @@ function createWebsite(options) {
     }
     if (route === 'GET /api/choices') return json(200, choices());
     if (route === 'GET /api/uploads') return json(200, listUploads());
+    if (route === 'GET /api/picks') return json(200, listPicks());
+    if (route === 'POST /api/picks') {
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
+      return savePicks(parsed);
+    }
     if (route === 'POST /api/uploads/check' || route === 'POST /api/uploads/remove') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
@@ -517,6 +580,13 @@ const PAGE = `<!DOCTYPE html>
   .upload img, .upload video { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: #000; }
   .upload .name { display: block; margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .upload button { padding: 6px; font-size: 13px; }
+  .group { font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
+  .group:first-child { margin-top: 0; }
+  .pickrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #2c2c2c; cursor: pointer; }
+  .pickrow input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  .pickrow .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pickrow .num { flex: none; min-width: 26px; text-align: center; font-weight: 600; color: #1a1a1a; background: var(--accent); border-radius: 13px; padding: 1px 6px; font-size: 14px; }
+  .pickrow .num:empty { display: none; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -527,7 +597,7 @@ const PAGE = `<!DOCTYPE html>
   <div id="message"></div>
 
   <h2>Play</h2>
-  <div class="grid" id="playlists"><button id="photos">Photos</button><button id="black">Black</button></div>
+  <div class="grid" id="playlists"><button id="picks">My picks</button><button id="photos">All uploads</button><button id="black">Black</button></div>
 
   <h2>For how long</h2>
   <select id="until">
@@ -537,6 +607,11 @@ const PAGE = `<!DOCTYPE html>
     <option value="60">60 minutes</option>
     <option value="cleared">Until switched back</option>
   </select>
+
+  <h2>My picks</h2>
+  <div class="card">
+    <div id="picklist">Loading…</div>
+  </div>
 
   <h2>Preview a season</h2>
   <div class="row">
@@ -577,7 +652,8 @@ const PAGE = `<!DOCTYPE html>
       const data = await r.json();
       say(data.message || data.error, !r.ok);
       setTimeout(refresh, 1500);
-    } catch (e) { say("Couldn't reach the box.", true); }
+      return r.ok;
+    } catch (e) { say("Couldn't reach the box.", true); return false; }
   }
   const show = (target) => post('/api/show', { target, until: $('until').value });
 
@@ -603,7 +679,7 @@ const PAGE = `<!DOCTYPE html>
   async function load() {
     const c = await (await fetch('/api/choices')).json();
     const grid = $('playlists');
-    for (const p of c.playlists) grid.insertBefore(button(label(p), () => show(p)), $('black'));
+    for (const p of c.playlists) grid.insertBefore(button(label(p), () => show(p)), $('picks'));
     for (const p of c.previews) {
       const o = document.createElement('option');
       o.value = p; o.textContent = label(p);
@@ -676,6 +752,7 @@ const PAGE = `<!DOCTYPE html>
     for (const k of Object.keys(rows)) delete rows[k];
     await sendBatch(files, pin, api, ui);
     loadUploads();
+    loadPicks();
   };
 
   async function removeUpload(name) {
@@ -692,6 +769,7 @@ const PAGE = `<!DOCTYPE html>
       if (refusedPin(d.error)) forgetPin(); else remember(pin);
     } catch (e) { say("Couldn't reach the box.", true); }
     loadUploads();
+    loadPicks();
   }
 
   async function loadUploads() {
@@ -715,6 +793,70 @@ const PAGE = `<!DOCTYPE html>
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
+  // ---- My picks ----
+
+  let picks = [];
+  const pickRows = {};
+  // One save at a time, each sending the list as it is when it goes, so
+  // quick ticks arrive in order. After the last one, the box's own list is
+  // shown; after a refusal, the list is read from the box again.
+  let saving = Promise.resolve();
+  let pending = 0;
+  function savePicks() {
+    pending++;
+    saving = saving.then(async () => {
+      let saved = null;
+      try {
+        const r = await fetch('/api/picks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ picks }) });
+        const d = await r.json();
+        say(d.message || d.error, !r.ok);
+        if (r.ok) saved = d.picks;
+      } catch (e) { say("Couldn't reach the box.", true); }
+      pending--;
+      if (saved === null) loadPicks();
+      else if (pending === 0) { picks = saved; numberPicks(); }
+    });
+  }
+  function numberPicks() {
+    for (const [path, row] of Object.entries(pickRows)) {
+      const n = picks.indexOf(path);
+      row.querySelector('input').checked = n !== -1;
+      row.querySelector('.num').textContent = n === -1 ? '' : String(n + 1);
+    }
+  }
+  async function loadPicks() {
+    try {
+      const d = await (await fetch('/api/picks')).json();
+      picks = d.picks;
+      const list = $('picklist');
+      list.textContent = d.items.length ? '' : 'No videos on the box yet.';
+      for (const k of Object.keys(pickRows)) delete pickRows[k];
+      let group = null;
+      for (const item of d.items) {
+        if (item.group !== group) {
+          group = item.group;
+          const h = document.createElement('div');
+          h.className = 'group';
+          h.textContent = group;
+          list.appendChild(h);
+        }
+        const row = document.createElement('label');
+        row.className = 'pickrow';
+        row.innerHTML = '<input type="checkbox"><span class="name"></span><span class="num"></span>';
+        row.querySelector('.name').textContent = item.path.split('/').pop();
+        row.querySelector('input').onchange = () => {
+          picks = togglePick(picks, item.path);
+          numberPicks();
+          savePicks();
+        };
+        pickRows[item.path] = row;
+        list.appendChild(row);
+      }
+      numberPicks();
+    } catch (e) { /* the status line already says the box can't be reached */ }
+  }
+
+  $('picks').onclick = () => show('picks');
   $('photos').onclick = () => show('photos');
   $('black').onclick = () => show('black');
   $('preview-go').onclick = () => $('preview').value && show($('preview').value);
@@ -722,6 +864,9 @@ const PAGE = `<!DOCTYPE html>
   $('sync').onclick = () => post('/api/sync');
   load().catch(() => say("Couldn't reach the box.", true));
   loadUploads();
+  loadPicks();
+  // Back on the page (another phone may have changed the picks meanwhile).
+  window.addEventListener('focus', () => { if (pending === 0) loadPicks(); });
   refresh();
   setInterval(refresh, 3000);
 </script>
@@ -750,6 +895,12 @@ const PAGE = `<!DOCTYPE html>
     }
     ui.say(files.length === 1 ? 'Added 1 file.' : 'Added ' + files.length + ' files.');
     return true;
+  }
+
+  // Ticking an item puts it at the end of the picks; unticking takes it out,
+  // and the numbers after it close up.
+  function togglePick(picks, path) {
+    return picks.includes(path) ? picks.filter((p) => p !== path) : picks.concat([path]);
   }
 </script>
 </body>

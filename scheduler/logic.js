@@ -24,14 +24,20 @@ function createScheduler(io) {
   const PHOTOS = 'photos';
   const NO_UPLOADS = 'No photos or videos uploaded yet. Showing black until one is added.';
 
+  // My picks: items chosen on the website from the season folders and the
+  // uploads, kept in order in picks.json, and played as their own choice.
+  const PICKS = 'picks';
+  const PICKS_PATH = videoRoot + '/picks.json';
+  const NO_PICKS = 'Nothing picked yet. Showing black until something is ticked in My picks.';
+
   // ---------- Schedule ----------
 
   function validSchedule(periods) {
     return periods.filter((period, i) => {
-      if (period && period.playlist === PHOTOS) {
+      if (period && (period.playlist === PHOTOS || period.playlist === PICKS)) {
         log(
           'ERROR: Ignoring schedule entry ' + (i + 1) + ': ' + JSON.stringify(period) +
-          ': photos plays only when chosen on the website, never on the schedule.',
+          ': ' + period.playlist + ' plays only when chosen on the website, never on the schedule.',
         );
         return false;
       }
@@ -110,6 +116,7 @@ function createScheduler(io) {
     if (!season || typeof season !== 'object') return 'not an object';
     if (!isFolderName(season.name)) return 'bad name';
     if (season.name === PHOTOS) return 'the name photos is kept for uploads from the website';
+    if (season.name === PICKS) return 'the name picks is kept for My picks on the website';
     if (!parseDay(season.from, false)) return 'bad from';
     if (!parseDay(season.to, false)) return 'bad to';
     if (season.days !== undefined && parseWeekdays(season.days) === null) return 'bad days';
@@ -241,7 +248,7 @@ function createScheduler(io) {
   // or no season today. Without seasons, names are used as they are.
   function resolve(name, seasons, date) {
     if (name === null) return null;
-    if (name === PHOTOS || !seasons.length || name.includes('/')) return name;
+    if (name === PHOTOS || name === PICKS || !seasons.length || name.includes('/')) return name;
     if (seasons.some((s) => s.name === name)) return name;
     const season = activeSeason(seasons, date);
     return season ? season + '/' + name : null;
@@ -250,6 +257,7 @@ function createScheduler(io) {
   // The folders (relative to videoRoot) whose videos make up `key`:
   // 'halloween/grownup' plays halloween/ plus halloween/grownup/.
   function foldersFor(key, seasons) {
+    if (key === PICKS) return [];
     if (key === PHOTOS || !seasons.length) return [key];
     const slash = key.indexOf('/');
     return slash < 0 ? [key] : [key.slice(0, slash), key];
@@ -410,6 +418,8 @@ function createScheduler(io) {
       name,
       folders: foldersFor(name, seasons).map((f) => videoRoot + '/' + f),
       photos: name === PHOTOS, // photo files play too
+      ordered: name === PICKS, // plays picks.json in its own order, not by name
+      order: [], // ordered: the items as last read, to find what follows a pick
       lastQueued: null, // the last video put in mpv's queue
       resumeAt: null, // when the playlist comes back: the video to start at
       nowPlaying: null, // the playing video, as { name, path }
@@ -462,7 +472,15 @@ function createScheduler(io) {
     let queued = entries.length;
     if (queued >= QUEUE_AHEAD) return true;
 
-    const videos = listVideos(playlist.folders, playlist.photos);
+    const videos = playlist.ordered ? pickedItems(playlist) : listVideos(playlist.folders, playlist.photos);
+    if (playlist.ordered) {
+      playlist.order = videos;
+      if (videos.length === 0) {
+        warnOnce(playlist, 'none', NO_PICKS);
+        return queued > 0;
+      }
+      clearWarning(playlist, 'none');
+    }
     if (playlist.photos && (videos === null || videos.length === 0)) {
       warnOnce(playlist, 'none', NO_UPLOADS);
       return queued > 0;
@@ -493,8 +511,14 @@ function createScheduler(io) {
       let video;
       if (playlist.resumeAt) {
         const at = playlist.resumeAt;
-        video = videos.find((v) => compareVideos(v, at) >= 0) || videos[0];
+        video = playlist.ordered
+          ? videos.find((v) => v.path === at.path) || videos[0]
+          : videos.find((v) => compareVideos(v, at) >= 0) || videos[0];
         playlist.resumeAt = null;
+      } else if (playlist.ordered) {
+        const last = playlist.lastQueued;
+        const i = last ? videos.findIndex((v) => v.path === last.path) : -1;
+        video = videos[(i + 1) % videos.length];
       } else {
         video = nextVideo(videos, playlist.lastQueued);
       }
@@ -536,6 +560,78 @@ function createScheduler(io) {
     return videos.sort(compareVideos);
   }
 
+  // ---------- My picks ----------
+
+  // The saved picks, as paths relative to videoRoot, in order. A missing or
+  // unreadable file is no picks.
+  function readPicks() {
+    const text = readText(PICKS_PATH);
+    if (text === null) return [];
+    try {
+      const o = JSON.parse(text);
+      return o && Array.isArray(o.picks) ? o.picks.filter((p) => typeof p === 'string') : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Whether `rel` can be picked: a video in a season folder or one of its
+  // subfolders, or a photo or video in photos/, that is on the box now.
+  function pickable(rel) {
+    if (typeof rel !== 'string') return false;
+    const parts = rel.split('/');
+    if (parts.length < 2 || parts.length > 3) return false;
+    if (parts.some((part) => part === '' || part.startsWith('.') || part.includes('\\'))) return false;
+    if (parts[0] === PICKS) return false;
+    const isUpload = parts[0] === PHOTOS;
+    if (isUpload && parts.length !== 2) return false;
+    const name = parts[parts.length - 1];
+    if (!isVideoFile(name, isUpload)) return false;
+    const names = listFolder(videoRoot + '/' + parts.slice(0, -1).join('/'));
+    return names !== null && names.includes(name);
+  }
+
+  // Everything that can be picked, as { path, group }: the season folders and
+  // their subfolders in name order, then the uploads.
+  function pickableItems() {
+    const items = [];
+    const isFolder = (rel) => listFolder(videoRoot + '/' + rel) !== null;
+    const visible = (n) => !n.startsWith('.');
+    const label = (rel) => rel.split('/').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' / ');
+    const add = (folder, group, withPhotos) => {
+      const names = (listFolder(videoRoot + '/' + folder) || []).filter((n) => isVideoFile(n, withPhotos)).sort(compareNames);
+      names.forEach((n) => items.push({ path: folder + '/' + n, group }));
+    };
+    const tops = (listFolder(videoRoot) || []).filter(visible).sort(compareNames);
+    for (const top of tops) {
+      if (top === PHOTOS || top === PICKS || !isFolder(top)) continue;
+      add(top, label(top), false);
+      const subs = (listFolder(videoRoot + '/' + top) || []).filter(visible).sort(compareNames);
+      for (const sub of subs) {
+        if (isFolder(top + '/' + sub)) add(top + '/' + sub, label(top + '/' + sub), false);
+      }
+    }
+    add(PHOTOS, 'Uploads', true);
+    return items;
+  }
+
+  // The picks playlist's items, as { name, path } with absolute paths,
+  // skipping (and saying once) any that are no longer on the box.
+  function pickedItems(playlist) {
+    const items = [];
+    for (const rel of readPicks()) {
+      if (!pickable(rel)) {
+        warnOnce(playlist, 'gone:' + rel, 'Skipping ' + rel + ' in picks: it is no longer on the box.');
+        continue;
+      }
+      clearWarning(playlist, 'gone:' + rel);
+      if (!items.some((v) => v.path === videoRoot + '/' + rel)) {
+        items.push({ name: baseName(rel), path: videoRoot + '/' + rel });
+      }
+    }
+    return items;
+  }
+
   function isVideoFile(name, withPhotos) {
     if (name.startsWith('.') || !name.includes('.')) return false;
     const extension = name.split('.').pop().toLowerCase();
@@ -572,7 +668,8 @@ function createScheduler(io) {
   }
 
   return {
-    CONFIG, OVERRIDE_PATH, STATUS_PATH, QUEUE_AHEAD, PHOTOS,
+    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, QUEUE_AHEAD, PHOTOS, PICKS, PICKS_PATH,
+    readPicks, pickable, pickableItems,
     validSchedule, validSeasons, describeSeason, activeSeason, resolve, parseDay,
     foldersFor, whatToShow, parseOverride, formatTime, createPlaylist, keepPlaying,
     setAside, listVideos, compareNames, isVideoFile,
