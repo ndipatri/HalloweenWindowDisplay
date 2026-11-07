@@ -188,10 +188,10 @@ The player serves it at http://tvbox.local/ (`scheduler/website.js`). It writes 
   - Black;
   - a preview of any season folder or season/playlist folder on the box other than `photos` and `picks`;
   - Back to schedule.
-- **Durations:** until the schedule changes, 15, 30 or 60 minutes, or until switched back (`untilCleared`).
+- **Durations:** until the schedule changes, 15, 30 or 60 minutes, or until switched back (`untilCleared`). The page starts on until switched back (the person's choice); `POST /api/show` without `until` still lasts until the schedule changes.
 - **API:** `GET /api/status`, `GET /api/choices`, `POST /api/show {target, until: 'schedule'|'cleared'|minutes}`, `POST /api/schedule`, `POST /api/sync` (runs `~/video-scheduler/sync` with output appended to the log; answers at once, or `A sync is already running.`), `GET /api/log` (`{lines}`: the last 20 non-empty lines, read from the last 16 KB).
 - **Sync now and Recent activity** are on the page. The activity list refreshes with the status every few seconds.
-- An override with no time lasts until the schedule next changes (outside the schedule, until the next period starts). Overrides end by themselves, so the scary videos can't be left on in the morning. On a day with no season, a plain playlist is black, so preview the season instead.
+- An override with no time lasts until the schedule next changes (outside the schedule, until the next period starts). Overrides with a time end by themselves; one until switched back (the page's default) stays until Back to schedule, so a forgotten grownup choice plays on into the morning. On a day with no season, a plain playlist is black, so preview the season instead.
 - **Uploads** (Add photos or videos): the page checks the whole batch first, then sends each file as one raw POST (`XMLHttpRequest`, for progress), stopping at the first refusal; a wrong PIN or a lock forgets the PIN kept in `localStorage`. The batch flow is `sendBatch` in its own `<script>` block, so the tests run it in `vm`. Each file streams into `photos/.upload-<random>` and is linked to its numbered name only when every byte has arrived; one that stops partway is deleted and logged. Limits come from `config.uploads`: at most 1 GB a file, 2 GB must stay free (`fs.statfsSync`), 5 wrong PINs in a row (uploads, checks and removals together) lock for 5 minutes (in memory; a restart clears it). The server has no overall request timeout (`requestTimeout: 0`) and closes a connection idle for 2 minutes.
 
   | Route | Request | Success | Refusals |

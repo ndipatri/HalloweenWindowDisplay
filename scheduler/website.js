@@ -618,7 +618,7 @@ const PAGE = `<!DOCTYPE html>
     <option value="15">15 minutes</option>
     <option value="30">30 minutes</option>
     <option value="60">60 minutes</option>
-    <option value="cleared">Until switched back</option>
+    <option value="cleared" selected>Until switched back</option>
   </select>
 
   <h2>My picks</h2>

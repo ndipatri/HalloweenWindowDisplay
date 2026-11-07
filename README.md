@@ -171,7 +171,7 @@ Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It show
 
 At the bottom, **Recent activity** shows the last things the box did: each video as it starts, changes, and syncs.
 
-Changes show on the TV within a couple of seconds. They end by themselves, so a forgotten one can't leave the scary videos on in the morning (unless you chose "Until switched back").
+Changes show on the TV within a couple of seconds. **For how long** starts on "Until switched back", so whatever you choose stays on until you press **Back to schedule**, even overnight. To have it end by itself, pick "Until the schedule changes" or a number of minutes first.
 
 ### Pick the videos you want: My picks
 

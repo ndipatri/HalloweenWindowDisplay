@@ -168,6 +168,15 @@ test('the website lists what it can show', async () => {
   assert.deepEqual(r.json.previews, ['halloween', 'halloween/grownup', 'thanksgiving']);
 });
 
+test('the page starts For how long on until switched back', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const select = page.slice(page.indexOf('<select id="until">'), page.indexOf('</select>', page.indexOf('<select id="until">')));
+  const chosen = select.split('<option').filter((o) => /\sselected[\s>]/.test(o.split('>')[0] + '>'));
+  assert.equal(chosen.length, 1, 'one option chosen: ' + select);
+  assert.ok(chosen[0].includes('value="cleared"'), chosen[0]);
+  for (const v of ['schedule', '15', '30', '60']) assert.ok(select.includes('value="' + v + '"'), 'still offers ' + v);
+});
+
 test('the website page offers each choice', async () => {
   const s = site();
   const r = await s.call('GET', '/');
