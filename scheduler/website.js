@@ -597,8 +597,6 @@ const PAGE = `<!DOCTYPE html>
   .pickbar #picknote { flex: 1; font-size: 14px; }
   .pickbar #picknote.saved { color: #7bd88f; }
   .pickbar #picknote.error { color: #ff6b6b; }
-  .pickbar #picknote.playing { color: var(--accent); font-weight: 600; }
-  .pickbar button { width: auto; flex: none; min-width: 9.5em; }
   button:disabled { opacity: .45; cursor: default; }
   button:active:not(:disabled) { transform: scale(.96); filter: brightness(1.2); }
   [hidden] { display: none !important; }
@@ -628,7 +626,7 @@ const PAGE = `<!DOCTYPE html>
   <div class="card">
     <div class="hint">Tick what you'd like on the window. They play in the order you tick them, round and round. Each tick is saved straight away.</div>
     <div id="picklist">Loading…</div>
-    <div class="pickbar"><div id="picknote" role="status" aria-live="polite"></div><button class="primary" id="play-picks">Play my picks</button></div>
+    <div class="pickbar"><div id="picknote" role="status" aria-live="polite"></div></div>
   </div>
 
   <h2>Preview a season</h2>
@@ -703,11 +701,7 @@ const PAGE = `<!DOCTYPE html>
       outline(playingChoice(r.status, playlistNames));
       // Keeps "Showing on the window now" under My picks true.
       const was = $('picknote').className;
-      const showing = /^picks /.test($('status').textContent);
-      const justTapped = Date.now() - playTapped < 5000; // the status may lag the tap
-      if (pending === 0 && was !== 'error' && !(was === 'playing' && (showing || justTapped))) {
-        notePicks(was === 'saved' ? 'saved' : undefined);
-      }
+      if (pending === 0 && was !== 'error') notePicks(was === 'saved' ? 'saved' : undefined);
     } catch (e) { setText($('status'), "Couldn't reach the box."); outline(null); }
     try {
       const l = await (await fetch('/api/log')).json();
@@ -853,14 +847,13 @@ const PAGE = `<!DOCTYPE html>
     const note = $('picknote');
     const n = picks.length;
     const showing = /^picks /.test($('status').textContent);
-    $('play-picks').disabled = n === 0;
     note.className = state === 'saved' ? 'saved' : state === 'error' ? 'error' : '';
     if (state === 'saving') setText(note, 'Saving…');
     else if (state === 'error') setText(note, error);
     else if (n === 0) setText(note, 'Nothing picked yet.');
     else {
       setText(note, (state === 'saved' ? '✓ Saved. ' : '') + (n === 1 ? '1 picked. ' : n + ' picked. ') +
-        (showing ? 'Showing on the window now.' : 'Tap Play my picks to show them.'));
+        (showing ? 'Showing on the window now.' : 'Tap My picks under Play to show them.'));
     }
   }
   function savePicks() {
@@ -923,21 +916,6 @@ const PAGE = `<!DOCTYPE html>
   }
 
   $('picks').onclick = () => show('picks');
-  // Answers where it was tapped: Starting… on the button, then the box's
-  // answer in the note under the list.
-  let playTapped = 0;
-  $('play-picks').onclick = async () => {
-    playTapped = Date.now();
-    const b = $('play-picks');
-    b.disabled = true;
-    b.textContent = 'Starting…';
-    const r = await show('picks');
-    b.textContent = 'Play my picks';
-    b.disabled = picks.length === 0;
-    const note = $('picknote');
-    note.className = r.ok ? 'playing' : 'error';
-    note.textContent = r.ok ? '▶ ' + r.message.replace(/^Showing picks/, 'Playing your picks') : r.error;
-  };
   $('photos').onclick = () => show('photos');
   $('black').onclick = () => show('black');
   $('preview-go').onclick = () => $('preview').value && show($('preview').value);
