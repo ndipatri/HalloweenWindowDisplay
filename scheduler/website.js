@@ -367,6 +367,9 @@ function createWebsite(options) {
     if (!black && target.startsWith(logic.PICKS + '/')) {
       return fail('Not a playlist name: ' + target + '. My picks plays the picked items.');
     }
+    if (target === logic.PICKS && !logic.readPicks().some(logic.pickable)) {
+      return fail('Nothing is picked yet. Tick something under My picks first.');
+    }
     if (!black && target.includes('/')) {
       const season = target.split('/')[0];
       if (!isFolder(videoRoot + '/' + season)) return fail('No ' + season + ' folder on the box.');

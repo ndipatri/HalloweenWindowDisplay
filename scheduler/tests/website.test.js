@@ -353,6 +353,17 @@ test("a problem rebuilding the queue doesn't undo a save", async () => {
   assert.ok(logs.some((l) => l.startsWith('ERROR:') && l.includes('mpv went away')), logs.join('\n'));
 });
 
+test('the website refuses My picks while nothing is picked', async () => {
+  const s = site({ thanksgiving: ['dusk.mp4'] });
+  for (const picks of [null, ['halloween/gone.mp4']]) {
+    if (picks) s.files[PICKS] = picksFile(...picks);
+    const r = await show(s, { target: 'picks', until: 'cleared' });
+    assert.equal(r.status, 400, r.body);
+    assert.equal(r.json.error, 'Nothing is picked yet. Tick something under My picks first.');
+    assert.equal(s.override(), null);
+  }
+});
+
 test("the website won't show a folder inside picks", async () => {
   const s = site({ picks: ['old'], 'picks/old': [] });
   const r = await show(s, { target: 'picks/old' });

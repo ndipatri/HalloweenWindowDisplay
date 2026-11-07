@@ -129,3 +129,12 @@ The page SHALL offer a My picks section listing every item from the website's li
 - **THEN** the My picks section says `Each tick is saved straight away.`
 - **AND** under the list it shows `Saving…` while a tick is saved, then `✓ Saved.` with how many are picked and `Tap Play my picks to show them.`, or `Showing on the window now.` while My picks is on, or `Nothing picked yet.`
 - **AND** it has a Play my picks button there that shows `picks` for the chosen duration, reading `Starting…` while it does, after which the note says `▶ Playing your picks` and until when
+
+### Requirement: My picks needs something picked
+The website SHALL refuse to show `picks` while nothing on the box is picked, saying so and writing no override, so the window stays as it was.
+
+#### Scenario: the website refuses My picks while nothing is picked
+- **GIVEN** a `thanksgiving` folder with `dusk.mp4`, and no picks file, then a picks file holding just `halloween/gone.mp4`
+- **WHEN** the website is asked each time to show `picks` until switched back
+- **THEN** each request is refused with `Nothing is picked yet. Tick something under My picks first.`
+- **AND** no override file is written
