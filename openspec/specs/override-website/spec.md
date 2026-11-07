@@ -152,3 +152,11 @@ The page SHALL show the status line inside the Play section, above its buttons, 
 - **GIVEN** the page, and the playlists `kid` and `grownup`
 - **WHEN** the status is `thanksgiving/kid (scheduled until 7:30 PM)`, `halloween/grownup (override until cleared)`, `kid (scheduled until 7:00 AM)`, `picks (override until cleared)`, `photos (override until 8:15 PM, then back to the schedule)`, `black (outside schedule until 5:00 PM)`, `black (no season today, Nov 2)`, `black (waiting for the clock to be set)`, `kid (override until cleared)`, `black (override until cleared; asked for kid but no season today)`, `halloween/scary (override until cleared)`, `thanksgiving (override until cleared)`, and no status
 - **THEN** the button playing is Kid, Grownup, Kid, My picks, All uploads, Black, Black, Black, Kid, Black, none, none, and none
+
+### Requirement: The page starts on until switched back
+The page's For how long choice SHALL start on Until switched back each time the page is opened, with the other durations still offered. A request to show something that gives no duration SHALL still last until the schedule changes.
+
+#### Scenario: the page starts For how long on until switched back
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** For how long has Until switched back chosen, and only that option chosen
