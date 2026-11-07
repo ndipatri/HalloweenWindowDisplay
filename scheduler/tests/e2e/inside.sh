@@ -278,12 +278,12 @@ check "changing the picks while they play moves on to the new pick" within 8 log
 check "My picks logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
 echo "   $(post /api/schedule '{}')"
 
-echo "== Sync now, and the recent activity"
+echo "== Check for new videos now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")
 echo "   $(post /api/sync '{}')"
-check "Sync now starts a sync that finishes in the log" \
+check "Check for new videos now starts a sync that finishes in the log" \
   within 60 bash -c "[ \$(grep -c 'sync: Done:' '$LOG') -gt $syncs_before ]"
-check "Sync now leaves the uploads alone" test "$(ls -A "$VIDEOS/photos")" = "$uploads_before"
+check "Check for new videos now leaves the uploads alone" test "$(ls -A "$VIDEOS/photos")" = "$uploads_before"
 check "the website shows the log's last lines" bash -c "
   curl -fsS $SITE/api/log | node -e '
     const l = JSON.parse(require(\"fs\").readFileSync(0)).lines;

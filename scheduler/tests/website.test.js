@@ -196,7 +196,7 @@ test('the website starts a sync when asked', async () => {
   const r = await s.call('POST', '/api/sync');
   assert.equal(r.status, 200);
   assert.equal(s.sync.started, 1);
-  assert.equal(r.json.message, 'Syncing now. New videos play within a minute or two.');
+  assert.equal(r.json.message, 'Checking GitHub for new videos. New ones play within a minute or two; watch Recent activity below.');
 });
 
 test("the website doesn't start a second sync while one is running", async () => {
@@ -205,7 +205,7 @@ test("the website doesn't start a second sync while one is running", async () =>
   const r = await s.call('POST', '/api/sync');
   assert.equal(r.status, 200);
   assert.equal(s.sync.started, 0);
-  assert.equal(r.json.message, 'A sync is already running.');
+  assert.equal(r.json.message, 'Already checking for new videos.');
 });
 
 // ---- Shows recent activity ----
@@ -226,10 +226,12 @@ test('the website shows no log lines when there is no log yet', async () => {
   assert.deepEqual(r.json.lines, []);
 });
 
-test('the website page offers Sync now and shows recent activity', async () => {
+test('the website page offers checking for new videos and shows recent activity', async () => {
   const s = site();
   const page = (await s.call('GET', '/')).body;
-  for (const text of ['>Sync now<', 'Recent activity', 'id="log"', "fetch('/api/log')", "post('/api/sync')"]) {
+  assert.ok(!page.includes('Sync now'), 'the old wording is gone');
+  for (const text of ['<h2>New videos from GitHub</h2>', 'The box checks GitHub for new videos every hour by itself.',
+    'id="sync">Check for new videos now<', 'id="sync-note"', "setText($('sync-note')", 'Recent activity', 'id="log"', "fetch('/api/log')", "post('/api/sync', {}, true)"]) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
   assertScriptCompiles(page);

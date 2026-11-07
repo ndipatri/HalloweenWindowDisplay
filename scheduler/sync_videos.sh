@@ -123,7 +123,7 @@ copy_videos() {
   log "Done: $copied copied, $set_aside moved aside."
 }
 
-# One sync at a time: the hourly timer and the website's Sync now could
+# One sync at a time: the hourly timer and the website's Check for new videos now could
 # otherwise both write the same video at once. The lock is released when this
 # script ends, however it ends.
 one_at_a_time() {

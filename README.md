@@ -167,7 +167,7 @@ Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It show
 - play the **Kid** or **Grownup** videos, **My picks**, **All uploads** (your own photos and videos), or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
 - **preview a season**: another season's videos, even on other days;
 - go **Back to schedule**;
-- **Sync now**, to pick up new videos from the repo straight away instead of within the hour.
+- **Check for new videos now**, to get new videos from GitHub straight away instead of within the hour. It only brings videos: a change to the dates or times still needs "Get the latest version" below.
 
 At the bottom, **Recent activity** shows the last things the box did: each video as it starts, changes, and syncs.
 
@@ -206,7 +206,7 @@ Good to know:
 | To | Do this |
 |---|---|
 | See what's on screen | Open http://tvbox.local/ |
-| Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Sync now** on the page |
+| Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
 | Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
 | Play just the videos you choose | On the page: tick them under **My picks**, then tap **My picks** (see above) |
@@ -232,7 +232,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The wrong season is playing | The box has an old version: see "Get the latest version" above |
 | It says `no season today` | Nothing is scheduled for today, so black is expected |
 | It's not following the schedule | Someone changed it on the page: press **Back to schedule** |
-| A new video doesn't play | Press **Sync now** on the page, and watch Recent activity for `Copied` |
+| A new video doesn't play | Press **Check for new videos now** on the page, and watch Recent activity for `Copied` |
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
