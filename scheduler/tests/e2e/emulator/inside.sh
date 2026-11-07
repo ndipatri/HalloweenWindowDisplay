@@ -13,8 +13,8 @@ ln -sf "/usr/share/zoneinfo/${TZ:-America/New_York}" /etc/localtime
 echo "== Copying the repo as it is in your folder"
 cp -a /src "$REPO"
 # Sync pulls from your folder (its current branch), never from GitHub.
-git -C "$REPO" remote set-url origin /src
 git config --system --add safe.directory '*'
+git -C "$REPO" remote set-url origin /src
 chown -R pi: "$REPO"
 
 echo "== Running setup (sudo bash scheduler/setup.sh)"

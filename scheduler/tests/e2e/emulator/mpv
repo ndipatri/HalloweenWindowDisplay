@@ -11,7 +11,9 @@ for a in "$@"; do
   case "$a" in --input-ipc-server=*) socket="${a#--input-ipc-server=}" ;; esac
 done
 
-/usr/bin/mpv "$@" --vo=null &
+# A screenshot while idle (black) fails, and mpv would say so in the box's
+# log every half second, so that one line is left out of its output.
+/usr/bin/mpv "$@" --vo=null > >(grep -v --line-buffered 'Taking screenshot failed') 2>&1 &
 mpv=$!
 trap 'kill -TERM $mpv 2>/dev/null' TERM INT
 
