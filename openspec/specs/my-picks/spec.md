@@ -109,8 +109,17 @@ When the picks are saved while My picks plays, the box SHALL replace what is que
 - **THEN** mpv's playlist is `photos/00001-a.jpg`, playing, then `halloween/fuzzy.mp4`, `photos/00001-a.jpg`
 - **AND** no `ERROR:` line is logged
 
-### Requirement: The page picks and plays
-The page SHALL offer a My picks section listing every item from the website's list under its group, each with a tick box, the picked ones ticked and numbered in pick order, and SHALL save the picks whenever one is ticked or unticked: a ticked item goes to the end, and an unticked one comes out with the numbers after it closing up. It SHALL say at the top of the section that each tick is saved straight away, and under the list, in view while the list scrolls, SHALL confirm each save there with how many are picked and what to do next, and offer a Play my picks button that answers there when tapped.
+### Requirement: My picks needs something picked
+The website SHALL refuse to show `picks` while nothing on the box is picked, saying so and writing no override, so the window stays as it was.
+
+#### Scenario: the website refuses My picks while nothing is picked
+- **GIVEN** a `thanksgiving` folder with `dusk.mp4`, and no picks file, then a picks file holding just `halloween/gone.mp4`
+- **WHEN** the website is asked each time to show `picks` until switched back
+- **THEN** each request is refused with `Nothing is picked yet. Tick something under My picks first.`
+- **AND** no override file is written
+
+### Requirement: The page picks
+The page SHALL offer a My picks section listing each item from the website's list under its group with a tick box, the picked ones numbered in pick order. It SHALL save the picks on every tick or untick (a ticked item goes to the end; the numbers after an unticked one close up), and confirm each save under the list, in view while it scrolls.
 
 #### Scenario: the website page offers My picks
 - **GIVEN** the website running
@@ -123,18 +132,9 @@ The page SHALL offer a My picks section listing every item from the website's li
 - **WHEN** the person ticks `halloween/grownup/jump.mp4`, then unticks `photos/00001-a.jpg`
 - **THEN** the picks saved are first `thanksgiving/dusk.mp4`, `photos/00001-a.jpg`, `halloween/fuzzy.mp4`, `halloween/grownup/jump.mp4`, then `thanksgiving/dusk.mp4`, `halloween/fuzzy.mp4`, `halloween/grownup/jump.mp4`
 
-#### Scenario: the page confirms the picks next to the list and offers Play my picks
+#### Scenario: the page confirms the picks next to the list
 - **GIVEN** the website running
 - **WHEN** the page is opened
 - **THEN** the My picks section says `Each tick is saved straight away.`
-- **AND** under the list it shows `Saving…` while a tick is saved, then `✓ Saved.` with how many are picked and `Tap Play my picks to show them.`, or `Showing on the window now.` while My picks is on, or `Nothing picked yet.`
-- **AND** it has a Play my picks button there that shows `picks` for the chosen duration, reading `Starting…` while it does, after which the note says `▶ Playing your picks` and until when
-
-### Requirement: My picks needs something picked
-The website SHALL refuse to show `picks` while nothing on the box is picked, saying so and writing no override, so the window stays as it was.
-
-#### Scenario: the website refuses My picks while nothing is picked
-- **GIVEN** a `thanksgiving` folder with `dusk.mp4`, and no picks file, then a picks file holding just `halloween/gone.mp4`
-- **WHEN** the website is asked each time to show `picks` until switched back
-- **THEN** each request is refused with `Nothing is picked yet. Tick something under My picks first.`
-- **AND** no override file is written
+- **AND** under the list it shows `Saving…` while a tick is saved, then `✓ Saved.` with how many are picked and `Tap My picks under Play to show them.`, or `Showing on the window now.` while My picks is on, or `Nothing picked yet.`
+- **AND** the section has no button of its own to play the picks
