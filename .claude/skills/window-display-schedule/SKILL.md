@@ -175,7 +175,7 @@ The box's software today: Raspberry Pi OS Lite (64-bit), Debian 13 (trixie), Nod
 
 ## Trying it without the box (the emulator)
 
-`bash scheduler/tests/e2e/emulate.sh` runs a box on the Mac, in the rehearsal's Docker image, until Ctrl-C. Use it when the person is away from the real box, or to try a website or player change by hand before shipping.
+`bash scheduler/tests/e2e/emulate.sh` runs a box on the Mac, in the rehearsal's Docker image, until Ctrl-C. Use it when the person is away from the real box, or to try a website or player change by hand before shipping. **For starting, restarting and testing with it, use the window-display-emulator skill.**
 - **What runs:** a copy of this folder as it is (uncommitted changes included), the real `setup.sh` (upload PIN `1234`, or `TVBOX_EMULATOR_PIN`), sync of the real videos from `playlists/`, the player and mpv. Sync pulls from this folder's current branch (`origin` points at `/src`), never from GitHub.
 - **Where:**
   - the website: http://localhost:8080/ (from a phone on the same Wi‑Fi: the Mac's name, port 8080);
