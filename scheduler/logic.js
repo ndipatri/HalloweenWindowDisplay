@@ -711,7 +711,10 @@ function createScheduler(io) {
       } else {
         video = nextVideo(videos, playlist.lastQueued);
       }
-      await mpv.command('loadfile', video.path, 'append-play');
+      // A photo fills the screen, its edges cropped (panscan for that item
+      // only); a video stays fitted whole, with black around it.
+      if (isPhotoFile(video.path)) await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0');
+      else await mpv.command('loadfile', video.path, 'append-play');
       playlist.lastQueued = video;
       queued++;
     }
@@ -736,6 +739,10 @@ function createScheduler(io) {
     const extension = name.split('.').pop().toLowerCase();
     return CONFIG.videoExtensions.includes(extension) ||
       (!!withPhotos && CONFIG.photoExtensions.includes(extension));
+  }
+
+  function isPhotoFile(path) {
+    return CONFIG.photoExtensions.includes(path.split('.').pop().toLowerCase());
   }
 
   // Name order, with numbers compared as numbers: 2-ghost.mp4 before 10-hand.mp4.

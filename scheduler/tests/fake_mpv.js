@@ -16,9 +16,10 @@ class FakeMpv {
     this.commands.push(args);
     const [name, ...rest] = args;
     if (name === 'loadfile') {
-      const [filename, mode] = rest;
+      const [filename, mode, index, options] = rest;
       if (mode !== 'append-play') throw new Error('fake mpv only supports append-play');
-      this.entries.push({ id: this.nextId++, filename });
+      if (index !== undefined && index !== -1) throw new Error('fake mpv only appends at the end');
+      this.entries.push({ id: this.nextId++, filename, options: options || '' });
       if (this.pos === -1) this.pos = this.entries.length - 1;
     } else if (name === 'playlist-remove') {
       const i = rest[0];
