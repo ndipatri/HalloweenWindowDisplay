@@ -5,90 +5,20 @@ Puts the right videos on the TV from the Raspberry Pi box through mpv, keeps the
 
 ## Requirements
 
-### Requirement: Plays the schedule through mpv
-While the clock is set, the box SHALL play what the schedule and any override choose, as queued videos in mpv, and SHALL switch as soon as that choice changes.
-
-#### Scenario: the box plays today's season playlist on schedule
-- **GIVEN** the shipped schedule and seasons, a `halloween` folder with `fuzzy.mp4` and `mochi.mp4`, and the clock set
-- **WHEN** the box runs at 6:00 PM on Tuesday, Oct 20, 2026
-- **THEN** mpv's playlist is `halloween/fuzzy.mp4`, `halloween/mochi.mp4`, `halloween/fuzzy.mp4`, and fuzzy is playing
-
-#### Scenario: the box switches playlists when the schedule changes
-- **GIVEN** the shipped schedule and seasons, a `halloween` folder with `fuzzy.mp4` and a `halloween/grownup` folder with `jump.mp4`, and the clock set
-- **WHEN** the box runs at 7:29 PM and then at 7:30 PM on Oct 20, 2026
-- **THEN** at 7:30 PM mpv's playlist is replaced with the grownup playlist's videos, starting with `halloween/fuzzy.mp4` then `halloween/grownup/jump.mp4`
-
-#### Scenario: a playlist that comes back resumes at the video it was on
-- **GIVEN** a `halloween` folder with `a.mp4`, `b.mp4` and `c.mp4`, and the kid playlist on `b.mp4` when an override to black starts
-- **WHEN** the override ends and the kid playlist plays again
-- **THEN** mpv's playlist starts with `halloween/b.mp4`
-
-#### Scenario: a video added while playing is queued without a restart
-- **GIVEN** the kid playlist playing from a `halloween` folder with only `a.mp4`
-- **WHEN** `b.mp4` is added to the folder and the queue next needs topping up
-- **THEN** `halloween/b.mp4` is queued after `halloween/a.mp4`
-
-### Requirement: Keeps the next videos queued
-While a playlist plays, mpv's playlist SHALL hold the playing video and the next two, so each video follows the last without a gap, and SHALL drop videos once they have played.
-
-#### Scenario: the box keeps the next videos queued
-- **GIVEN** the kid playlist playing from a `halloween` folder with `a.mp4`, `b.mp4` and `c.mp4`
-- **WHEN** five videos in a row finish
-- **THEN** after each one, mpv's playlist holds exactly three videos, the first of them playing
-
-### Requirement: Black when nothing should play
-The box SHALL show black, with mpv stopped, outside the schedule, on a day with no season, and while an override chooses black.
-
-#### Scenario: the box shows black outside the schedule
-- **GIVEN** the shipped schedule and seasons, kid playing at 6:00 PM on Oct 20, 2026, and the clock set
-- **WHEN** the box runs at 11:30 PM
-- **THEN** mpv is stopped with an empty playlist
-- **AND** the status is `black (outside schedule until Wed 5:00 AM)`
-
-#### Scenario: the box shows black on a day with no season
-- **GIVEN** the shipped schedule and seasons, a `halloween` folder with videos, and the clock set
-- **WHEN** the box runs at 6:00 PM on Thursday, Jan 15, 2026
-- **THEN** mpv is stopped with an empty playlist
-- **AND** the status is `black (no season today, Jan 15)`
-
-#### Scenario: the box shows black while an override chooses black
-- **GIVEN** the shipped schedule and seasons, kid playing at 6:00 PM on Oct 20, 2026, and the clock set
-- **WHEN** an override to black until cleared is written and the box runs again
-- **THEN** mpv is stopped with an empty playlist
-- **AND** the status is `black (override until cleared)`
-
 ### Requirement: Black until the clock is set
 The box SHALL show black and play nothing until the system says its clock has been set from the network, and SHALL then follow the schedule.
 
 #### Scenario: the box stays black until the clock is set
-- **GIVEN** the shipped schedule and seasons and a `halloween` folder with videos, at 6:00 PM on Oct 20, 2026, with the clock not yet set
+- **GIVEN** the starting filters and a `halloween` folder with videos, at 6:00 PM on Oct 20, 2026, with the clock not yet set
 - **WHEN** the box runs
 - **THEN** mpv plays nothing
 - **AND** the status is `black (waiting for the clock to be set)`
 
 #### Scenario: the box starts playing once the clock is set
-- **GIVEN** the box waiting for the clock at 6:00 PM on Oct 20, 2026, with a `halloween` folder with videos
+- **GIVEN** the box waiting for the clock at 6:00 PM on Oct 20, 2026, with the starting filters and a `halloween` folder with videos
 - **WHEN** the clock is set and the box runs again
-- **THEN** mpv plays the halloween kid playlist
-- **AND** the status is `halloween/kid (scheduled until 7:30 PM)`
-
-### Requirement: Reports what it shows
-The box SHALL write the current status line to `~/video-scheduler/status` and log it each time it changes, and SHALL log each video as it starts.
-
-#### Scenario: the box writes what it is showing to the status file and the log
-- **GIVEN** the shipped schedule and seasons and a `halloween` folder with `fuzzy.mp4`, and the clock set
-- **WHEN** the box runs at 6:00 PM on Oct 20, 2026, twice
-- **THEN** the status file holds `halloween/kid (scheduled until 7:30 PM)`
-- **AND** the log has `Now showing: halloween/kid (scheduled until 7:30 PM)` once and `halloween/kid: playing fuzzy.mp4` once
-
-### Requirement: Skips videos mpv cannot play
-When mpv fails to play a video, the box SHALL log it once and carry on with the next video.
-
-#### Scenario: the box skips a video mpv can't play and logs it once
-- **GIVEN** the kid playlist playing `halloween/bad.mp4` and then `halloween/good.mp4`
-- **WHEN** mpv reports twice that `bad.mp4` failed to play
-- **THEN** `ERROR: Skipping bad.mp4 in halloween/kid` is logged once
-- **AND** `halloween/good.mp4` plays
+- **THEN** mpv plays Halloween kid
+- **AND** the status is `Halloween kid (scheduled until 7:30 PM)`
 
 ### Requirement: Recovers when mpv stops
 When mpv exits, the box SHALL log it and exit with an error, so the system service starts the box again with a fresh mpv.
@@ -115,3 +45,67 @@ The box SHALL have mpv decode HEVC videos, which phones record, with the Raspber
 - **GIVEN** the shipped configuration
 - **WHEN** the box starts mpv
 - **THEN** mpv is told to use the `drm` hardware decoder for HEVC only
+
+### Requirement: Plays the filters through mpv
+While the clock is set, the box SHALL play what the filters' schedules and any override choose, as queued items in mpv, and SHALL switch as soon as that choice changes.
+
+#### Scenario: the box plays the scheduled filter
+- **GIVEN** the starting filters, a `halloween` folder with `fuzzy.mp4` and `mochi.mp4`, and the clock set
+- **WHEN** the box runs at 6:00 PM on Tuesday, Oct 20, 2026
+- **THEN** mpv's playlist is `halloween/fuzzy.mp4`, `halloween/mochi.mp4`, `halloween/fuzzy.mp4`, and fuzzy is playing
+
+#### Scenario: the box switches filters when the schedule changes
+- **GIVEN** the starting filters, a `halloween` folder with `fuzzy.mp4` and a `halloween/grownup` folder with `jump.mp4`, and the clock set
+- **WHEN** the box runs at 7:29 PM and then at 7:30 PM on Oct 20, 2026
+- **THEN** at 7:30 PM mpv's playlist is replaced with Halloween grownup's items, starting with `halloween/fuzzy.mp4` then `halloween/grownup/jump.mp4`
+
+#### Scenario: a filter that comes back resumes at the item it was on
+- **GIVEN** a `halloween` folder with `a.mp4`, `b.mp4` and `c.mp4`, and Halloween kid on `b.mp4` when an override to black starts
+- **WHEN** the override ends and Halloween kid plays again
+- **THEN** mpv's playlist starts with `halloween/b.mp4`
+
+#### Scenario: an item added while playing is queued without a restart
+- **GIVEN** Halloween kid playing from a `halloween` folder with only `a.mp4`
+- **WHEN** `b.mp4` is added to the folder and the queue next needs topping up
+- **THEN** `halloween/b.mp4` is queued after `halloween/a.mp4`
+
+### Requirement: Keeps the next items queued
+While a filter plays, mpv's playlist SHALL hold the playing item and the next two, so each follows the last without a gap, and SHALL drop items once they have played.
+
+#### Scenario: the box keeps the next items queued
+- **GIVEN** Halloween kid playing from a `halloween` folder with `a.mp4`, `b.mp4` and `c.mp4`
+- **WHEN** five items in a row finish
+- **THEN** after each one, mpv's playlist holds exactly three items, the first of them playing
+
+### Requirement: Black when nothing should play, with filters
+The box SHALL show black, with mpv stopped, when no filter is scheduled and while an override chooses black.
+
+#### Scenario: the box shows black when nothing is scheduled
+- **GIVEN** the starting filters, Halloween kid playing at 6:00 PM on Oct 20, 2026, and the clock set
+- **WHEN** the box runs at 11:30 PM
+- **THEN** mpv is stopped with an empty playlist
+- **AND** the status is `black (nothing scheduled until Wed 5:00 AM)`
+
+#### Scenario: the box shows black while an override chooses black
+- **GIVEN** the starting filters, Halloween kid playing at 6:00 PM on Oct 20, 2026, and the clock set
+- **WHEN** an override to black until cleared is written and the box runs again
+- **THEN** mpv is stopped with an empty playlist
+- **AND** the status is `black (override until cleared)`
+
+### Requirement: Reports what it shows, naming the filter
+The box SHALL write the current status line to `~/video-scheduler/status` and log it each time it changes, and SHALL log each item as it starts, naming the filter.
+
+#### Scenario: the box writes what it is showing to the status file and the log
+- **GIVEN** the starting filters and a `halloween` folder with `fuzzy.mp4`, and the clock set
+- **WHEN** the box runs at 6:00 PM on Oct 20, 2026, twice
+- **THEN** the status file holds `Halloween kid (scheduled until 7:30 PM)`
+- **AND** the log has `Now showing: Halloween kid (scheduled until 7:30 PM)` once and `Halloween kid: playing fuzzy.mp4` once
+
+### Requirement: Skips items mpv cannot play
+When mpv fails to play an item, the box SHALL log it once and carry on with the next item.
+
+#### Scenario: the box skips an item mpv can't play and logs it once
+- **GIVEN** Halloween kid playing `halloween/bad.mp4` and then `halloween/good.mp4`
+- **WHEN** mpv reports twice that `bad.mp4` failed to play
+- **THEN** `ERROR: Skipping bad.mp4 in Halloween kid` is logged once
+- **AND** `halloween/good.mp4` plays

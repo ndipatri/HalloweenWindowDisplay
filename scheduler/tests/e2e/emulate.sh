@@ -10,7 +10,7 @@
 #   http://localhost:8081/  the "TV": what mpv is showing, about twice a
 #                           second (a slideshow of frames, no sound)
 # A phone on the same Wi-Fi can use the Mac's name or address instead of
-# localhost, e.g. http://<this-mac>.local:8080/, to try uploads and My picks.
+# localhost, e.g. http://<this-mac>.local:8080/, to try uploads, tags and filters.
 #
 # The upload PIN is 1234 (TVBOX_EMULATOR_PIN=5678 to change it). It runs the
 # code as it is in this folder, uncommitted changes included, and sync pulls

@@ -10,10 +10,6 @@ const { Transform, pipeline: pipeStreams } = require('stream');
 const { pipeline } = require('stream/promises');
 const { createScheduler } = require('./logic.js');
 
-// Plain names: 'kid', 'christmas', 'christmas/kid'. No hidden names, no
-// paths out of the video folder, no quotes or backslashes.
-const PLAYLIST_NAME = /^[^/.\\"][^/\\"]*(\/[^/.\\"][^/\\"]*)?$/;
-
 // How much of the log to show, and how much of its end to read for that.
 const LOG_LINES = 20;
 const LOG_TAIL_BYTES = 16 * 1024;
@@ -37,11 +33,9 @@ const COUNTS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Ei
 function createWebsite(options) {
   const { config, videoRoot, now, readText, writeText, removeFile, listFolder, readTail, startSync } = options;
   const log = options.log || (() => {});
-  const logic = createScheduler(Object.assign({ log() {} }, options));
-  // The configured seasons, read quietly: the player already logs bad entries.
-  const seasons = createScheduler(Object.assign({}, options, { log() {} })).validSeasons(config.seasons);
-  const isFolder = (p) => listFolder(p) !== null;
-  const visible = (name) => !name.startsWith('.');
+  // The scheduler's functions, read quietly: the player logs what is wrong
+  // with the filters and tags files.
+  const logic = createScheduler(Object.assign({}, options, { log() {} }));
   const PHOTOS_DIR = videoRoot + '/' + logic.PHOTOS;
   const PIN_PATH = videoRoot + '/upload-pin';
   const COUNTER_PATH = PHOTOS_DIR + '/.last-number';
@@ -57,72 +51,131 @@ function createWebsite(options) {
   } catch (e) { /* no photos folder yet */ }
 
   function choices() {
-    const playlists = [];
-    for (const period of config.schedule) {
-      if (period && typeof period.playlist === 'string' && !playlists.includes(period.playlist)) {
-        playlists.push(period.playlist);
-      }
-    }
-    const previews = [];
-    const tops = (listFolder(videoRoot) || []).filter(visible).sort(logic.compareNames);
-    for (const top of tops) {
-      if (top === logic.PHOTOS || top === logic.PICKS) continue; // offered as All uploads and My picks instead
-      if (!isFolder(videoRoot + '/' + top)) continue;
-      previews.push(top);
-      const subs = (listFolder(videoRoot + '/' + top) || []).filter(visible).sort(logic.compareNames);
-      for (const sub of subs) {
-        if (isFolder(videoRoot + '/' + top + '/' + sub)) previews.push(top + '/' + sub);
-      }
-    }
-    return { playlists, previews, photos: true, picks: true };
+    return { filters: logic.readFilters().map((f) => f.name) };
   }
 
-  // ---------- My picks ----------
-
-  function writePicks(picks) {
-    writeText(logic.PICKS_PATH, JSON.stringify({ picks }, null, 2) + '\n');
-  }
-
-  // Lets the player rebuild its queue if the picks are playing. The picks
-  // are saved by then, so a problem here is logged, not the request's.
-  async function picksChanged() {
-    if (!options.picksChanged) return;
+  // Lets the player rebuild its queue for what is on screen. The change is
+  // saved by then, so a problem here is logged, not the request's.
+  async function filtersChanged() {
+    if (!options.filtersChanged) return;
     try {
-      await options.picksChanged();
+      await options.filtersChanged();
     } catch (e) {
-      log("ERROR: Couldn't change what is queued for My picks: " + e.message);
+      log("ERROR: Couldn't change what is queued: " + e.message);
     }
   }
 
-  function listPicks() {
-    return { items: logic.pickableItems(), picks: logic.readPicks().filter(logic.pickable) };
+  // ---------- Tags ----------
+
+  function writeBoxTags(tags) {
+    const kept = {};
+    for (const p of Object.keys(tags).sort(logic.compareNames)) if (tags[p].length) kept[p] = tags[p];
+    writeText(logic.TAGS_PATH, JSON.stringify({ tags: kept }, null, 2) + '\n');
   }
 
-  async function savePicks(body) {
-    if (!body || !Array.isArray(body.picks)) return fail('Bad request.');
-    const picks = [];
-    for (const rel of body.picks) {
-      if (!logic.pickable(rel)) return fail("Can't pick " + (typeof rel === 'string' ? rel : JSON.stringify(rel)) + '.');
-      if (!picks.includes(rel)) picks.push(rel);
+  function listItems() {
+    const list = logic.items();
+    return {
+      items: list.map((i) => ({ path: i.path, group: i.group, folderTags: i.folderTags, boxTags: i.boxTags, kind: i.kind })),
+      tags: logic.tagsInUse(list),
+    };
+  }
+
+  // POST /api/tags { path, add | remove }: a box tag on any item, no PIN.
+  async function changeTag(body) {
+    const rel = body && typeof body.path === 'string' ? body.path : '';
+    const adding = typeof body.add === 'string';
+    const tag = adding ? body.add : body.remove;
+    if (typeof tag !== 'string') return fail('Bad request.');
+    const item = logic.items().find((i) => i.path === rel);
+    if (!item) return json(404, { error: 'No item ' + (rel || '(none)') + ' on the box.' });
+    if (tag === logic.UPLOAD_TAG) return fail('upload is given to every upload by the box.');
+    if (!logic.isTagName(tag)) return fail('Not a tag name: ' + JSON.stringify(tag) + '. Use lowercase letters, digits and dashes.');
+    if (item.folderTags.includes(tag) && !adding) {
+      return fail(tag + " comes from the folder in GitHub, so it can't be taken off here.");
     }
-    writePicks(picks);
-    log('My picks: ' + picks.length + ' picked (from the website).');
-    await picksChanged();
-    return json(200, { message: picks.length ? 'Saved. ' + picks.length + ' picked.' : 'Saved. Nothing picked.', picks });
+    const tags = logic.readBoxTags();
+    const own = (Array.isArray(tags[rel]) ? tags[rel] : []).filter((t) => logic.isTagName(t));
+    if (adding && item.folderTags.includes(tag)) return ok(item.name + ' already has ' + tag + ', from its folder.');
+    if (adding) {
+      if (!own.includes(tag)) own.push(tag);
+    } else {
+      const at = own.indexOf(tag);
+      if (at !== -1) own.splice(at, 1);
+    }
+    tags[rel] = own;
+    writeBoxTags(tags);
+    log('Tags: ' + rel + (adding ? ' + ' : ' - ') + tag + ' (from the website).');
+    await filtersChanged();
+    return adding ? ok('Tagged ' + item.name + ' ' + tag + '.') : ok('Took ' + tag + ' off ' + item.name + '.');
   }
 
-  // A new upload joins the end of the picks; a removed one leaves them.
-  async function addPick(rel) {
-    const picks = logic.readPicks();
-    if (picks.includes(rel)) return;
-    writePicks(picks.concat([rel]));
-    await picksChanged();
+  // A removed upload's box tags go with it.
+  function dropTags(rel) {
+    const tags = logic.readBoxTags();
+    if (!(rel in tags)) return;
+    delete tags[rel];
+    writeBoxTags(tags);
   }
-  async function dropPick(rel) {
-    const picks = logic.readPicks();
-    if (!picks.includes(rel)) return;
-    writePicks(picks.filter((p) => p !== rel));
-    await picksChanged();
+
+  // The old My picks become favorites, once. picks.json is only removed
+  // once the tags are saved; a problem is logged and tried again next start.
+  const PICKS_PATH = videoRoot + '/picks.json';
+  (function movePicks() {
+    const text = readText(PICKS_PATH);
+    if (text === null) return;
+    try {
+      const picks = JSON.parse(text).picks;
+      if (!Array.isArray(picks)) throw new Error('no list of picks');
+      const here = new Set(logic.items().map((i) => i.path));
+      const tags = logic.readBoxTags();
+      let moved = 0;
+      for (const rel of picks) {
+        if (typeof rel !== 'string' || !here.has(rel)) continue;
+        const own = tags[rel] || [];
+        if (!own.includes('favorites')) own.push('favorites');
+        tags[rel] = own;
+        moved++;
+      }
+      if (moved) writeBoxTags(tags);
+      removeFile(PICKS_PATH);
+      log('My picks are now tagged favorites (' + moved + ').');
+    } catch (e) {
+      log("ERROR: Couldn't turn the old My picks (" + PICKS_PATH + ') into favorites: ' + e.message);
+    }
+  })();
+
+  // ---------- Filters ----------
+
+  // POST /api/filters { filters } with the upload PIN: replaces the box's
+  // filters, after checking every one.
+  async function saveFilters(headers, body) {
+    if (savedPin() === null) return json(403, { error: 'Editing filters is off until a PIN is set on the box.' });
+    const refused = checkPin(pinFrom(headers));
+    if (refused) return refused;
+    if (!body || !Array.isArray(body.filters)) return fail('Bad request.');
+    const checked = logic.checkFilters(body.filters);
+    if (checked.errors.length) {
+      const e = checked.errors[0];
+      return fail((e.name || 'Filter ' + (e.index + 1)) + ': ' + e.error + '.');
+    }
+    const clean = body.filters.map((f) => {
+      const out = { name: f.name, anyOf: f.anyOf, except: f.except || [], schedule: [] };
+      for (const e of f.schedule || []) {
+        const entry = {};
+        if (e.from) { entry.from = e.from; entry.to = e.to; }
+        if (e.weekdays && e.weekdays.length) entry.weekdays = e.weekdays;
+        if (e.also && e.also.length) entry.also = e.also;
+        if (e.times && e.times.length) entry.times = e.times.map((w) => ({ start: w.start, stop: w.stop }));
+        out.schedule.push(entry);
+      }
+      return out;
+    });
+    writeText(logic.FILTERS_PATH, JSON.stringify({ filters: clean }, null, 2) + '\n');
+    const names = clean.map((f) => f.name).join(', ');
+    log('Filters changed (from the website): ' + (names || 'none') + '.');
+    await filtersChanged();
+    return ok('Saved ' + clean.length + (clean.length === 1 ? ' filter.' : ' filters.'));
   }
 
   // ---------- Uploads ----------
@@ -250,7 +303,6 @@ function createWebsite(options) {
     }
     const saved = numberIntoPlace(part, name);
     log('Uploaded photos/' + saved + ' (' + (length / MB).toFixed(1) + ' MB)');
-    await addPick(logic.PHOTOS + '/' + saved);
     return ok('Added ' + name + '.');
   }
 
@@ -309,7 +361,8 @@ function createWebsite(options) {
     if (options.beforeRemove) await options.beforeRemove(file);
     removeFile(file);
     log('Removed photos/' + name + ' (from the website)');
-    await dropPick(logic.PHOTOS + '/' + name);
+    dropTags(logic.PHOTOS + '/' + name);
+    await filtersChanged();
     return ok('Removed ' + name + '.');
   }
 
@@ -359,22 +412,11 @@ function createWebsite(options) {
 
   function show(body) {
     const target = typeof body.target === 'string' ? body.target.trim() : '';
-    const black = target === 'black' || target === 'off';
-    if (!black && !PLAYLIST_NAME.test(target)) {
-      return fail('Not a playlist name: ' + (target || '(none)') + '. Choose kid, grownup, a season, or a season/playlist.');
-    }
-    if (!black && target.startsWith(logic.PHOTOS + '/')) {
-      return fail('Not a playlist name: ' + target + '. All uploads plays all the uploads together.');
-    }
-    if (!black && target.startsWith(logic.PICKS + '/')) {
-      return fail('Not a playlist name: ' + target + '. My picks plays the picked items.');
-    }
-    if (target === logic.PICKS && !logic.readPicks().some(logic.pickable)) {
-      return fail('Nothing is picked yet. Tick something under My picks first.');
-    }
-    if (!black && target.includes('/')) {
-      const season = target.split('/')[0];
-      if (!isFolder(videoRoot + '/' + season)) return fail('No ' + season + ' folder on the box.');
+    const black = target === 'black';
+    const filter = black ? null : logic.findFilter(logic.readFilters(), target);
+    if (!black && !filter) return fail('No filter called ' + (target || '(none)') + ' on the box.');
+    if (filter && logic.filterItems(filter).length === 0) {
+      return fail('Nothing in ' + filter.name + ' yet. Tag something ' + filter.anyOf.join(' or ') + ' first.');
     }
 
     const until = body.until === undefined ? 'schedule' : body.until;
@@ -385,13 +427,13 @@ function createWebsite(options) {
 
     const at = now();
     const override = {
-      playlist: black ? null : target,
+      filter: black ? null : filter.name,
       setAt: at.getTime(),
       expires: until === 'schedule' || until === 'cleared' ? null : at.getTime() + minutes * 60 * 1000,
       untilCleared: until === 'cleared',
     };
     const text = JSON.stringify(override) + '\n';
-    if (!logic.parseOverride(text).ok) return fail('Not a playlist name: ' + target);
+    if (!logic.parseOverride(text).ok) return fail('No filter called ' + target + ' on the box.');
     writeText(logic.OVERRIDE_PATH, text);
 
     const label = black ? 'black' : target;
@@ -406,16 +448,17 @@ function createWebsite(options) {
     if (route === 'GET /') return { status: 200, type: 'text/html', body: PAGE };
     if (route === 'GET /api/status') {
       const text = readText(logic.STATUS_PATH);
-      // Today's season, so the page knows what its Kid and Grownup play now.
-      return json(200, { status: text === null ? null : text.trim(), season: logic.activeSeason(seasons, now()) });
+      return json(200, { status: text === null ? null : text.trim() });
     }
     if (route === 'GET /api/choices') return json(200, choices());
     if (route === 'GET /api/uploads') return json(200, listUploads());
-    if (route === 'GET /api/picks') return json(200, listPicks());
-    if (route === 'POST /api/picks') {
+    if (route === 'GET /api/items') return json(200, listItems());
+    if (route === 'GET /api/filters') return json(200, { filters: logic.readRawFilters() });
+    if (route === 'POST /api/tags' || route === 'POST /api/filters') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
-      return savePicks(parsed);
+      if (!parsed || typeof parsed !== 'object') return fail('Bad request.');
+      return route === 'POST /api/tags' ? changeTag(parsed) : saveFilters(headers, parsed);
     }
     if (route === 'POST /api/uploads/check' || route === 'POST /api/uploads/remove') {
       let parsed;
@@ -509,13 +552,20 @@ function startWebsite(options, port) {
       return undefined;
     }
 
+    // A list of filters can be long; anything else is small.
+    const cap = urlPath === '/api/filters' ? 200000 : 10000;
     let body = '';
+    let tooLong = false;
     req.setEncoding('utf8');
     req.on('data', (chunk) => {
+      if (tooLong) return;
       body += chunk;
-      if (body.length > 10000) req.destroy();
+      if (body.length > cap) tooLong = true;
     });
     req.on('end', () => {
+      if (tooLong) {
+        return send(json(413, { error: urlPath === '/api/filters' ? 'That list of filters is too long.' : 'That request is too long.' }));
+      }
       site.handle({ method: req.method, path: req.url, headers: req.headers, body }).then(send, failed);
     });
     return undefined;
@@ -590,21 +640,32 @@ const PAGE = `<!DOCTYPE html>
   .upload button { padding: 6px; font-size: 13px; }
   .group { font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
   .group:first-child { margin-top: 0; }
-  .pickrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #2c2c2c; cursor: pointer; }
-  .pickrow input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
-  .pickrow .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pickrow .num { flex: none; min-width: 26px; text-align: center; font-weight: 600; color: #1a1a1a; background: var(--accent); border-radius: 13px; padding: 1px 6px; font-size: 14px; }
-  .pickrow .num:empty { display: none; }
   .hint { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
   .note { font-size: 14px; color: var(--accent); margin-top: 8px; }
   .note:empty { display: none; }
   .note.error { color: #ff6b6b; }
-  .pickbar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid #3a3a3a; margin-top: 8px; padding: 10px 0 12px; display: flex; gap: 10px; align-items: center; }
-  .pickbar #picknote { flex: 1; font-size: 14px; }
-  .pickbar #picknote.saved { color: #7bd88f; }
-  .pickbar #picknote.error { color: #ff6b6b; }
   button:disabled { opacity: .45; cursor: default; }
   button:active:not(:disabled) { transform: scale(.96); filter: brightness(1.2); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; margin: 2px 4px 2px 0; border-radius: 12px; background: #2c2c2c; font-size: 13px; }
+  .chip.fixed { color: var(--dim); }
+  .chip button { width: auto; padding: 0 2px; border: none; background: none; font-size: 15px; line-height: 1; color: var(--dim); }
+  .tagrow { padding: 8px 0; border-top: 1px solid #2c2c2c; }
+  .tagrow .top { display: flex; align-items: center; gap: 8px; }
+  .tagrow .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tagrow .star { width: auto; padding: 2px 8px; font-size: 20px; color: var(--accent); background: none; border: none; }
+  .tagrow .add, .editor .add { display: flex; gap: 6px; margin-top: 4px; }
+  .tagrow .add input, .editor input[type=text] { font: inherit; font-size: 14px; color: var(--text); background: #2c2c2c; border: 1px solid #3a3a3a; border-radius: 8px; padding: 6px 8px; flex: 1; min-width: 0; width: 100%; }
+  .tagrow .add button { width: auto; padding: 6px 12px; }
+  .filterrow { padding: 8px 0; border-top: 1px solid #2c2c2c; }
+  .filterrow .top { display: flex; align-items: center; gap: 6px; }
+  .filterrow .name { flex: 1; font-weight: 600; }
+  .filterrow button, .editor button { width: auto; padding: 6px 10px; font-size: 14px; margin: 4px 4px 0 0; }
+  .filterrow .what { font-size: 13px; color: var(--dim); }
+  .editor { border: 1px solid #3a3a3a; border-radius: 10px; padding: 10px; margin: 8px 0; }
+  .editor label { display: block; font-size: 14px; color: var(--dim); margin: 8px 0 4px; }
+  .editor .ticks label { display: inline-flex; align-items: center; gap: 4px; margin: 2px 10px 2px 0; color: var(--text); }
+  .editor .entry { border-top: 1px dashed #3a3a3a; margin-top: 8px; padding-top: 6px; }
+  #filter-pin { margin: 10px 0; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -615,9 +676,7 @@ const PAGE = `<!DOCTYPE html>
   <h2>Play</h2>
   <div class="card">
     <div class="now" role="status">Now: <span id="status">Checking…</span></div>
-    <div class="grid" id="playlists"><button id="picks" data-choice="picks">My picks</button><button id="photos" data-choice="photos">All uploads</button><button id="black" data-choice="black">Black</button></div>
-    <div class="group" id="seasons-label" hidden>Seasons</div>
-    <div class="grid" id="seasons"></div>
+    <div class="grid" id="playlists"><button id="black" data-choice="black">Black</button></div>
   </div>
   <div id="message"></div>
 
@@ -630,11 +689,22 @@ const PAGE = `<!DOCTYPE html>
     <option value="cleared" selected>Until switched back</option>
   </select>
 
-  <h2>My picks</h2>
+  <h2>Tags</h2>
   <div class="card">
-    <div class="hint">Tick what you'd like on the window. They play in the order you tick them, round and round. Each tick is saved straight away.</div>
-    <div id="picklist">Loading…</div>
-    <div class="pickbar"><div id="picknote" role="status" aria-live="polite"></div></div>
+    <div class="hint">Tap ☆ to add something to Favorites, or add any tag to put it in the filters with that tag. Tags from folders in GitHub can't be taken off. Each change is saved straight away.</div>
+    <div id="taglist">Loading…</div>
+    <datalist id="tagnames"></datalist>
+  </div>
+
+  <h2>Filters</h2>
+  <div class="card">
+    <div class="hint">A filter plays everything with any of its tags, except its "except" tags. Where schedules overlap, the higher filter wins. Changes need the PIN, and Save filters.</div>
+    <div id="filterlist">Loading…</div>
+    <div id="filter-editor" class="editor" hidden></div>
+    <button id="filter-new">New filter</button>
+    <input id="filter-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
+    <button class="primary" id="filter-save">Save filters</button>
+    <div id="filter-note" class="note" role="status" aria-live="polite"></div>
   </div>
 
   <h2>Add photos or videos</h2>
@@ -655,7 +725,7 @@ const PAGE = `<!DOCTYPE html>
 
   <h2>New videos from GitHub</h2>
   <div class="card">
-    <div class="hint">The box checks GitHub for new videos every hour by itself. New ones play within a minute or two; ones taken out are set aside on the box, not deleted. Your uploads and picks aren't touched, and the box's own settings and schedule don't change.</div>
+    <div class="hint">The box checks GitHub for new videos every hour by itself. New ones play within a minute or two; ones taken out are set aside on the box, not deleted. Your uploads, tags and filters aren't touched, and the box's own software doesn't change.</div>
     <button id="sync">Check for new videos now</button>
     <div id="sync-note" class="note" role="status" aria-live="polite"></div>
   </div>
@@ -666,7 +736,6 @@ const PAGE = `<!DOCTYPE html>
 <script>
   const $ = (id) => document.getElementById(id);
   const say = (text, error) => { $('message').textContent = text; $('message').className = error ? 'error' : ''; };
-  const label = (name) => name.split('/').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' / ');
 
   // Sends a request and shows the answer in the message line, unless
   // quiet (the caller shows it next to its own button).
@@ -696,10 +765,10 @@ const PAGE = `<!DOCTYPE html>
   // doesn't read a status line out again on every poll.
   function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
 
-  // Outlines the Play buttons for what is on the window (a list, maybe empty).
+  // Outlines the Play button for what is on the window (none for null).
   function outline(on) {
     for (const b of document.querySelectorAll('button[data-choice]')) {
-      const yes = on.includes(b.dataset.choice);
+      const yes = b.dataset.choice === on;
       b.classList.toggle('current', yes);
       if (yes) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
     }
@@ -709,37 +778,28 @@ const PAGE = `<!DOCTYPE html>
     try {
       const r = await (await fetch('/api/status')).json();
       setText($('status'), r.status || 'The box has not started yet.');
-      outline(playingChoices(r.status, playlistNames, seasonNames, r.season));
-      // Keeps "Showing on the window now" under My picks true.
-      const was = $('picknote').className;
-      if (pending === 0 && was !== 'error') notePicks(was === 'saved' ? 'saved' : undefined);
-    } catch (e) { setText($('status'), "Couldn't reach the box."); outline([]); }
+      // playingFilter is in the second script block, loaded by the time this runs (after an await).
+      outline(playingFilter(r.status, filterNames));
+    } catch (e) { setText($('status'), "Couldn't reach the box."); outline(null); }
     try {
       const l = await (await fetch('/api/log')).json();
       $('log').textContent = l.lines.length ? l.lines.join('\\n') : 'Nothing yet.';
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
-  let playlistNames = []; // the schedule's playlists, for outlining the playing one
-  let seasonNames = []; // the season (and season/playlist) folders, likewise
+  let filterNames = []; // the box's filters, for outlining the playing one
+
+  // The Play buttons: one per filter, in the box's order, then Black.
   async function load() {
     const c = await (await fetch('/api/choices')).json();
     const grid = $('playlists');
-    playlistNames = c.playlists;
-    for (const p of c.playlists) {
-      const b = button(label(p), () => show(p));
-      b.dataset.choice = p;
-      grid.insertBefore(b, $('picks'));
+    for (const b of Array.from(grid.querySelectorAll('button'))) if (b.id !== 'black') b.remove();
+    filterNames = c.filters;
+    for (const name of c.filters) {
+      const b = button(name, () => show(name));
+      b.dataset.choice = name;
+      grid.insertBefore(b, $('black'));
     }
-    seasonNames = c.previews;
-    // A folder named like a schedule playlist (with no seasons, kid/ and
-    // grownup/) already has its button above.
-    for (const p of c.previews.filter((p) => !c.playlists.includes(p))) {
-      const b = button(label(p), () => show(p));
-      b.dataset.choice = p;
-      $('seasons').appendChild(b);
-    }
-    $('seasons-label').hidden = !$('seasons').children.length;
     refresh();
   }
 
@@ -808,7 +868,7 @@ const PAGE = `<!DOCTYPE html>
     for (const k of Object.keys(rows)) delete rows[k];
     await sendBatch(files, pin, api, ui);
     loadUploads();
-    loadPicks();
+    loadItems();
   };
 
   async function removeUpload(name) {
@@ -825,7 +885,7 @@ const PAGE = `<!DOCTYPE html>
       if (refusedPin(d.error)) forgetPin(); else remember(pin);
     } catch (e) { say("Couldn't reach the box.", true); }
     loadUploads();
-    loadPicks();
+    loadItems();
   }
 
   async function loadUploads() {
@@ -849,61 +909,59 @@ const PAGE = `<!DOCTYPE html>
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
-  // ---- My picks ----
+  // ---- Tags ----
 
-  let picks = [];
-  const pickRows = {};
-  // One save at a time, each sending the list as it is when it goes, so
-  // quick ticks arrive in order. After the last one, the box's own list is
-  // shown; after a refusal, the list is read from the box again.
-  let saving = Promise.resolve();
-  let pending = 0;
-  // What the picks are and what to do next, under the list.
-  function notePicks(state, error) {
-    const note = $('picknote');
-    const n = picks.length;
-    const showing = /^picks /.test($('status').textContent);
-    note.className = state === 'saved' ? 'saved' : state === 'error' ? 'error' : '';
-    if (state === 'saving') setText(note, 'Saving…');
-    else if (state === 'error') setText(note, error);
-    else if (n === 0) setText(note, 'Nothing picked yet.');
-    else {
-      setText(note, (state === 'saved' ? '✓ Saved. ' : '') + (n === 1 ? '1 picked. ' : n + ' picked. ') +
-        (showing ? 'Showing on the window now.' : 'Tap My picks under Play to show them.'));
+  let tagNames = []; // every tag in use, for suggestions and the filter editor
+  const tagNotes = {}; // path -> { text, error }: each row's last answer, kept when the list is redrawn
+
+  const typed = {}; // path -> text typed in its add-a-tag field, kept across redraws
+  // The note of the row for path, as the page is now (rows are redrawn).
+  function rowNote(path) {
+    const row = Array.from(document.querySelectorAll('.tagrow')).find((r) => r.dataset.path === path);
+    return row ? row.querySelector('.note') : null;
+  }
+
+  async function changeTag(path, change) {
+    const show = (text, error) => {
+      tagNotes[path] = { text, error };
+      const note = rowNote(path);
+      if (note) { note.className = 'note' + (error ? ' error' : ''); setText(note, text); }
+    };
+    show('Saving…', false);
+    const r = await post('/api/tags', Object.assign({ path }, change), true);
+    show(r.ok ? '✓ ' + r.message : r.error, !r.ok);
+    if (r.ok) {
+      if (change.add) delete typed[path];
+      loadItems();
     }
   }
-  function savePicks() {
-    pending++;
-    notePicks('saving');
-    saving = saving.then(async () => {
-      let saved = null;
-      let error = "Couldn't reach the box.";
-      try {
-        const r = await fetch('/api/picks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ picks }) });
-        const d = await r.json();
-        if (r.ok) saved = d.picks; else error = d.error;
-      } catch (e) { /* the box can't be reached */ }
-      pending--;
-      if (saved === null) notePicks('error', error + ((await loadPicks()) ? ' Your ticks were put back as the box has them.' : ' Your last ticks may not be saved.'));
-      else if (pending === 0) { picks = saved; numberPicks(); notePicks('saved'); }
-    });
-  }
-  function numberPicks() {
-    for (const [path, row] of Object.entries(pickRows)) {
-      const n = picks.indexOf(path);
-      row.querySelector('input').checked = n !== -1;
-      row.querySelector('.num').textContent = n === -1 ? '' : String(n + 1);
+
+  function chip(text, onRemove) {
+    const c = document.createElement('span');
+    c.className = 'chip' + (onRemove ? '' : ' fixed');
+    c.textContent = text;
+    if (onRemove) {
+      const x = document.createElement('button');
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Take ' + text + ' off');
+      x.onclick = onRemove;
+      c.appendChild(x);
     }
+    return c;
   }
-  // Reads the list and the picks from the box. Returns whether it could.
-  async function loadPicks() {
+
+  async function loadItems() {
     try {
-      const d = await (await fetch('/api/picks')).json();
-      if (pending > 0) return true; // a save is on its way; its answer wins
-      picks = d.picks;
-      const list = $('picklist');
-      list.textContent = d.items.length ? '' : 'No videos on the box yet.';
-      for (const k of Object.keys(pickRows)) delete pickRows[k];
+      const d = await (await fetch('/api/items')).json();
+      tagNames = d.tags;
+      $('tagnames').textContent = '';
+      for (const t of d.tags) {
+        const o = document.createElement('option');
+        o.value = t;
+        $('tagnames').appendChild(o);
+      }
+      const list = $('taglist');
+      list.textContent = d.items.length ? '' : 'Nothing on the box yet.';
       let group = null;
       for (const item of d.items) {
         if (item.group !== group) {
@@ -913,26 +971,202 @@ const PAGE = `<!DOCTYPE html>
           h.textContent = group;
           list.appendChild(h);
         }
-        const row = document.createElement('label');
-        row.className = 'pickrow';
-        row.innerHTML = '<input type="checkbox"><span class="name"></span><span class="num"></span>';
+        const row = document.createElement('div');
+        row.className = 'tagrow';
+        row.dataset.path = item.path;
+        row.innerHTML = '<div class="top"><button class="star"></button><span class="name"></span></div>' +
+          '<div class="chips"></div><div class="add"><input list="tagnames" placeholder="add a tag"><button>Add</button></div>' +
+          '<div class="note" role="status"></div>';
+        const note = row.querySelector('.note');
+        if (tagNotes[item.path]) {
+          note.textContent = tagNotes[item.path].text;
+          note.className = 'note' + (tagNotes[item.path].error ? ' error' : '');
+        }
+        const fav = item.boxTags.includes('favorites');
+        const star = row.querySelector('.star');
+        star.textContent = fav ? '★' : '☆';
+        star.setAttribute('aria-label', fav ? 'Take out of Favorites' : 'Add to Favorites');
+        star.onclick = () => changeTag(item.path, fav ? { remove: 'favorites' } : { add: 'favorites' });
         row.querySelector('.name').textContent = item.path.split('/').pop();
-        row.querySelector('input').onchange = () => {
-          picks = togglePick(picks, item.path);
-          numberPicks();
-          savePicks();
-        };
-        pickRows[item.path] = row;
+        const chips = row.querySelector('.chips');
+        for (const t of item.folderTags) chips.appendChild(chip(t));
+        for (const t of item.boxTags) chips.appendChild(chip(t, () => changeTag(item.path, { remove: t })));
+        const input = row.querySelector('.add input');
+        input.value = typed[item.path] || '';
+        input.oninput = () => { typed[item.path] = input.value; };
+        const add = () => { const t = input.value.trim(); if (t) changeTag(item.path, { add: t }); };
+        row.querySelector('.add button').onclick = add;
+        input.onkeydown = (e) => { if (e.key === 'Enter') add(); };
         list.appendChild(row);
       }
-      numberPicks();
-      notePicks();
-      return true;
-    } catch (e) { return false; /* the status line already says the box can't be reached */ }
+    } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
-  $('picks').onclick = () => show('picks');
-  $('photos').onclick = () => show('photos');
+  // ---- Filters ----
+
+  let filters = []; // as saved on the box, plus any changes not saved yet
+  let editing = -1; // the filter open in the editor, or -1 for a new one
+  const WEEK = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const timesText = (times) => (times || []).map((w) => w.start + '-' + w.stop).join(', ');
+  function describe(f) {
+    let text = 'Any of ' + f.anyOf.join(', ');
+    if ((f.except || []).length) text += ', except ' + f.except.join(', ');
+    const entries = (f.schedule || []).map((e) => {
+      let days = e.from ? e.from + ' to ' + e.to : '';
+      if ((e.weekdays || []).length) days += ' (' + e.weekdays.join('/') + ')';
+      if ((e.also || []).length) days += (days ? ' plus ' : '') + e.also.join(', ');
+      return days + ': ' + (timesText(e.times) || 'all day');
+    });
+    return text + '. ' + (entries.length ? entries.join('; ') : 'Not scheduled: only when chosen.');
+  }
+
+  function noteFilters(text, error) {
+    $('filter-note').className = 'note' + (error ? ' error' : '');
+    setText($('filter-note'), text);
+  }
+
+  function drawFilters() {
+    const list = $('filterlist');
+    list.textContent = filters.length ? '' : 'No filters yet.';
+    filters.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'filterrow';
+      row.innerHTML = '<div class="top"><span class="name"></span></div><div class="what"></div>';
+      row.querySelector('.name').textContent = f.name;
+      row.querySelector('.what').textContent = describe(f);
+      const top = row.querySelector('.top');
+      const act = (text, label, fn) => { const b = button(text, fn); b.setAttribute('aria-label', label + ' ' + f.name); top.appendChild(b); };
+      act('↑', 'Move up', () => { filters = moveFilter(filters, i, -1); changed(); });
+      act('↓', 'Move down', () => { filters = moveFilter(filters, i, 1); changed(); });
+      act('Edit', 'Edit', () => openEditor(i));
+      act('Delete', 'Delete', () => { filters = filters.filter((x, j) => j !== i); changed(); });
+      list.appendChild(row);
+    });
+  }
+
+  function changed() {
+    editing = -1;
+    $('filter-editor').hidden = true;
+    drawFilters();
+    noteFilters('Not saved yet: tap Save filters.');
+  }
+
+  function ticks(chosen) {
+    const box = document.createElement('div');
+    box.className = 'ticks';
+    for (const t of Array.from(new Set(tagNames.concat(chosen)))) {
+      const l = document.createElement('label');
+      l.innerHTML = '<input type="checkbox">';
+      l.firstChild.dataset.tag = t;
+      l.firstChild.checked = chosen.includes(t);
+      l.appendChild(document.createTextNode(t));
+      box.appendChild(l);
+    }
+    return box;
+  }
+
+  function entryForm(e) {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.innerHTML = '<label>From and to (e.g. 10-01 and 10-31, or 11-01 and 11-4thu)</label><div class="add"><input type="text" class="from"><input type="text" class="to"></div>' +
+      '<label>Only on</label><div class="ticks wk"></div>' +
+      '<label>Extra days (e.g. 11-4thu-1, 2026-12-24)</label><input type="text" class="also">' +
+      '<label>Times (e.g. 05:00-07:00, 17:00-19:30; empty for all day)</label><input type="text" class="times">';
+    div.querySelector('.from').value = e.from || '';
+    div.querySelector('.to').value = e.to || '';
+    div.querySelector('.also').value = (e.also || []).join(', ');
+    div.querySelector('.times').value = timesText(e.times);
+    for (const d of WEEK) {
+      const l = document.createElement('label');
+      l.innerHTML = '<input type="checkbox">';
+      l.firstChild.dataset.day = d;
+      l.firstChild.checked = (e.weekdays || []).includes(d);
+      l.appendChild(document.createTextNode(d));
+      div.querySelector('.wk').appendChild(l);
+    }
+    div.appendChild(button('Remove these days', () => div.remove()));
+    return div;
+  }
+
+  // The editor's fields, read back as a filter.
+  function readEditor(ed) {
+    const words = (text) => text.split(',').map((x) => x.trim()).filter(Boolean);
+    const chosen = (sel) => Array.from(ed.querySelectorAll(sel + ' input:checked')).map((x) => x.dataset.tag);
+    return {
+      name: ed.querySelector('.fname').value.trim(),
+      anyOf: Array.from(new Set(chosen('.any').concat(words(ed.querySelector('.anymore').value)))),
+      except: chosen('.except'),
+      schedule: Array.from(ed.querySelectorAll('.entry')).map((div) => {
+        const e = {};
+        const from = div.querySelector('.from').value.trim();
+        const to = div.querySelector('.to').value.trim();
+        if (from || to) { e.from = from; e.to = to; }
+        const wk = Array.from(div.querySelectorAll('.wk input:checked')).map((x) => x.dataset.day);
+        if (wk.length) e.weekdays = wk;
+        const also = words(div.querySelector('.also').value);
+        if (also.length) e.also = also;
+        const times = words(div.querySelector('.times').value).map((w) => {
+          const parts = w.split('-').map((x) => x.trim());
+          return { start: parts[0] || '', stop: parts[1] || '' };
+        });
+        if (times.length) e.times = times;
+        return e;
+      }),
+    };
+  }
+
+  function openEditor(i) {
+    editing = i;
+    const f = i === -1 ? { name: '', anyOf: [], except: [], schedule: [] } : filters[i];
+    const ed = $('filter-editor');
+    ed.hidden = false;
+    ed.innerHTML = '<label>Name</label><input type="text" class="fname" maxlength="30">' +
+      '<label>Any of</label><div class="any"></div><input type="text" class="anymore" placeholder="other tags, with commas">' +
+      '<label>Except</label><div class="except"></div><label>Days and times</label><div class="entries"></div>';
+    ed.querySelector('.fname').value = f.name;
+    ed.querySelector('.any').appendChild(ticks(f.anyOf));
+    ed.querySelector('.except').appendChild(ticks(f.except || []));
+    for (const e of f.schedule || []) ed.querySelector('.entries').appendChild(entryForm(e));
+    ed.appendChild(button('Add days and times', () => ed.querySelector('.entries').appendChild(entryForm({}))));
+    ed.appendChild(button('Done', () => {
+      const next = readEditor(ed);
+      filters = editing === -1 ? filters.concat([next]) : filters.map((x, j) => (j === editing ? next : x));
+      changed();
+    }));
+    ed.appendChild(button('Cancel', () => { editing = -1; ed.hidden = true; }));
+    ed.scrollIntoView({ block: 'nearest' });
+  }
+
+  async function loadFilters() {
+    try {
+      filters = (await (await fetch('/api/filters')).json()).filters;
+      drawFilters();
+    } catch (e) { /* the status line already says the box can't be reached */ }
+  }
+
+  $('filter-new').onclick = () => openEditor(-1);
+  try { $('filter-pin').value = localStorage.getItem(PIN_KEY) || ''; } catch (e) { /* type it */ }
+  $('filter-save').onclick = async () => {
+    const pin = $('filter-pin').value.trim();
+    if (!pin) { noteFilters('Type the PIN first.', true); $('filter-pin').focus(); return; }
+    noteFilters('Saving…');
+    try {
+      const r = await fetch('/api/filters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Upload-Pin': pin },
+        body: JSON.stringify({ filters }),
+      });
+      const d = await r.json();
+      noteFilters(r.ok ? '✓ ' + d.message : d.error, !r.ok);
+      if (refusedPin(d.error)) {
+        try { localStorage.removeItem(PIN_KEY); } catch (e) { /* nothing kept */ }
+        $('filter-pin').value = '';
+        $('filter-pin').focus();
+      } else if (r.ok) remember(pin);
+      if (r.ok) { loadFilters(); load(); }
+    } catch (e) { noteFilters("Couldn't reach the box.", true); }
+  };
+
   $('black').onclick = () => show('black');
   $('schedule').onclick = () => post('/api/schedule');
   // The answer shows under the button, where it was tapped.
@@ -943,9 +1177,8 @@ const PAGE = `<!DOCTYPE html>
   };
   load().catch(() => say("Couldn't reach the box.", true));
   loadUploads();
-  loadPicks();
-  // Back on the page (another phone may have changed the picks meanwhile).
-  window.addEventListener('focus', () => { if (pending === 0) loadPicks(); });
+  loadItems();
+  loadFilters();
   refresh();
   setInterval(refresh, 3000);
 </script>
@@ -976,25 +1209,23 @@ const PAGE = `<!DOCTYPE html>
     return true;
   }
 
-  // The Play buttons that play what is on the window, from the status line
-  // and today's season: 'black', 'picks', 'photos'; Kid or Grownup when
-  // today's season's playlist of that name is on (with no seasons, that
-  // playlist); and the season button of exactly that name. So on a
-  // Halloween day halloween/grownup is Grownup and Halloween / Grownup, but
-  // on a Thanksgiving day only Halloween / Grownup. Empty for anything no
-  // button plays.
-  function playingChoices(status, playlists, seasons, today) {
+  // The Play button for what is on the window, from the status line: the
+  // filter it names ('Halloween kid (scheduled until 7:30 PM)'), 'black', or
+  // null for anything else. Filter names can't contain '('.
+  function playingFilter(status, names) {
     const key = String(status || '').split(' (')[0];
-    if (key === 'black' || key === 'picks' || key === 'photos') return [key];
-    const on = playlists.filter((p) => key === (today ? today + '/' + p : p));
-    if (seasons.includes(key) && !on.includes(key)) on.push(key);
-    return on;
+    if (key === 'black') return 'black';
+    return names.includes(key) ? key : null;
   }
 
-  // Ticking an item puts it at the end of the picks; unticking takes it out,
-  // and the numbers after it close up.
-  function togglePick(picks, path) {
-    return picks.includes(path) ? picks.filter((p) => p !== path) : picks.concat([path]);
+  // The list with item i moved by step (-1 up, 1 down), staying in bounds.
+  function moveFilter(list, i, step) {
+    const j = i + step;
+    if (j < 0 || j >= list.length) return list.slice();
+    const out = list.slice();
+    const moved = out.splice(i, 1)[0];
+    out.splice(j, 0, moved);
+    return out;
   }
 </script>
 </body>
