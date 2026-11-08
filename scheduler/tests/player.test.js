@@ -268,13 +268,13 @@ test('removing a queued upload takes it out of the queue', async () => {
 
 // ---- Tags or filters changing while a filter plays ----
 
-// The box playing Favorites: a on screen; b, c, d tagged as given.
+// The box playing Favorites: uploads a, b, c, tagged favorites as given.
 async function favoritesPlaying(tagged) {
-  const b = box({ halloween: ['a.mp4', 'b.mp4', 'c.mp4'] });
+  const b = box({ photos: ['00001-a.jpg', '00002-b.jpg', '00003-c.jpg'] });
   b.files[ROOT + '/override.json'] = JSON.stringify({ filter: 'Favorites', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   b.tag = (paths) => {
     const tags = {};
-    for (const p of paths) tags['halloween/' + p] = ['favorites'];
+    for (const p of paths) tags['photos/' + p] = ['favorites'];
     b.files[ROOT + '/tags.json'] = JSON.stringify({ tags });
   };
   b.tag(tagged);
@@ -287,40 +287,40 @@ async function favoritesPlaying(tagged) {
 }
 
 test('tagging an item while its filter plays queues it in its place', async () => {
-  const b = await favoritesPlaying(['a.mp4', 'c.mp4']);
-  assert.deepEqual(b.rel(), ['halloween/a.mp4', 'halloween/c.mp4', 'halloween/a.mp4']);
-  b.tag(['a.mp4', 'b.mp4', 'c.mp4']);
+  const b = await favoritesPlaying(['00001-a.jpg', '00003-c.jpg']);
+  assert.deepEqual(b.rel(), ['photos/00001-a.jpg', 'photos/00003-c.jpg', 'photos/00001-a.jpg']);
+  b.tag(['00001-a.jpg', '00002-b.jpg', '00003-c.jpg']);
   await b.refilter();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/a.mp4');
-  assert.deepEqual(b.rel(), ['halloween/a.mp4', 'halloween/b.mp4', 'halloween/c.mp4']);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+  assert.deepEqual(b.rel(), ['photos/00001-a.jpg', 'photos/00002-b.jpg', 'photos/00003-c.jpg']);
 });
 
 test('untagging the item on screen moves on to the next item', async () => {
-  const b = await favoritesPlaying(['a.mp4', 'b.mp4', 'c.mp4']);
+  const b = await favoritesPlaying(['00001-a.jpg', '00002-b.jpg', '00003-c.jpg']);
   const stops = () => b.mpv.commands.filter((c) => c[0] === 'stop').length;
   const before = stops();
-  b.tag(['b.mp4', 'c.mp4']);
+  b.tag(['00002-b.jpg', '00003-c.jpg']);
   await b.refilter();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
-  assert.deepEqual(b.rel(), ['halloween/b.mp4', 'halloween/c.mp4', 'halloween/b.mp4']);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00002-b.jpg');
+  assert.deepEqual(b.rel(), ['photos/00002-b.jpg', 'photos/00003-c.jpg', 'photos/00002-b.jpg']);
   assert.equal(stops(), before, 'mpv was never stopped (no black gap)');
   await b.tick();
   assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
 });
 
 test('untagging the last item on screen goes round to the first', async () => {
-  const b = await favoritesPlaying(['a.mp4', 'b.mp4', 'c.mp4']);
+  const b = await favoritesPlaying(['00001-a.jpg', '00002-b.jpg', '00003-c.jpg']);
   b.mpv.finish(); b.mpv.finish(); // c, the last, on screen
   await b.tick();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/c.mp4');
-  b.tag(['a.mp4', 'b.mp4']);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00003-c.jpg');
+  b.tag(['00001-a.jpg', '00002-b.jpg']);
   await b.refilter();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/a.mp4');
-  assert.ok(!b.rel().includes('halloween/c.mp4'), b.rel().join(' '));
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+  assert.ok(!b.rel().includes('photos/00003-c.jpg'), b.rel().join(' '));
 });
 
 test('untagging everything while a filter plays shows black and says so once', async () => {
-  const b = await favoritesPlaying(['a.mp4', 'b.mp4']);
+  const b = await favoritesPlaying(['00001-a.jpg', '00002-b.jpg']);
   b.tag([]);
   await b.refilter();
   await b.tick();
@@ -333,16 +333,16 @@ test('untagging everything while a filter plays shows black and says so once', a
 test('tagging while a filter shows black starts it at once', async () => {
   const b = await favoritesPlaying([]);
   assert.equal(b.mpv.playing(), null);
-  b.tag(['b.mp4']);
+  b.tag(['00002-b.jpg']);
   await b.refilter();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00002-b.jpg');
 });
 
 test("changing tags that don't touch the playing filter leaves its queue as it was", async () => {
-  const b = box({ halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'] });
+  const b = box({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] });
   await b.tick(); // Halloween kid, scheduled
   const before = b.rel();
-  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'thanksgiving/dusk.mp4': ['favorites'] } });
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-a.jpg': ['favorites'] } });
   await b.player.refilter();
   assert.deepEqual(b.rel(), before);
 });

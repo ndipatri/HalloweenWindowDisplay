@@ -67,21 +67,31 @@ function createWebsite(options) {
 
   // ---------- Tags ----------
 
+  // Saves the box's tags: only uploads' (box tags on videos from GitHub are dropped).
   function writeBoxTags(tags) {
     const kept = {};
-    for (const p of Object.keys(tags).sort(logic.compareNames)) if (tags[p].length) kept[p] = tags[p];
+    for (const p of Object.keys(tags).sort(logic.compareNames)) {
+      if (p.startsWith(logic.PHOTOS + '/') && tags[p].length) kept[p] = tags[p];
+    }
     writeText(logic.TAGS_PATH, JSON.stringify({ tags: kept }, null, 2) + '\n');
   }
 
+  // The uploads, for tagging, and every tag in use (folder tags too, for the filter editor).
   function listItems() {
     const list = logic.items();
     return {
-      items: list.map((i) => ({ path: i.path, group: i.group, folderTags: i.folderTags, boxTags: i.boxTags, kind: i.kind })),
+      items: list.filter(isUpload)
+        .map((i) => ({ path: i.path, group: i.group, folderTags: i.folderTags, boxTags: i.boxTags, kind: i.kind })),
       tags: logic.tagsInUse(list),
     };
   }
 
-  // POST /api/tags { path, add | remove }: a box tag on any item, no PIN.
+  // An upload is in photos/ (a GitHub folder can't be: sync skips that name).
+  function isUpload(item) {
+    return item.path.startsWith(logic.PHOTOS + '/');
+  }
+
+  // POST /api/tags { path, add | remove }: a box tag on an upload, no PIN.
   async function changeTag(body) {
     const rel = body && typeof body.path === 'string' ? body.path : '';
     const adding = typeof body.add === 'string';
@@ -89,14 +99,11 @@ function createWebsite(options) {
     if (typeof tag !== 'string') return fail('Bad request.');
     const item = logic.items().find((i) => i.path === rel);
     if (!item) return json(404, { error: 'No item ' + (rel || '(none)') + ' on the box.' });
+    if (!isUpload(item)) return fail(rel + ' comes from GitHub: its tag comes from its folder there.');
     if (tag === logic.UPLOAD_TAG) return fail('upload is given to every upload by the box.');
     if (!logic.isTagName(tag)) return fail('Not a tag name: ' + JSON.stringify(tag) + '. Use lowercase letters, digits and dashes.');
-    if (item.folderTags.includes(tag) && !adding) {
-      return fail(tag + " comes from the folder in GitHub, so it can't be taken off here.");
-    }
     const tags = logic.readBoxTags();
     const own = (Array.isArray(tags[rel]) ? tags[rel] : []).filter((t) => logic.isTagName(t));
-    if (adding && item.folderTags.includes(tag)) return ok(item.name + ' already has ' + tag + ', from its folder.');
     if (adding) {
       if (!own.includes(tag)) own.push(tag);
     } else {
@@ -127,7 +134,7 @@ function createWebsite(options) {
     try {
       const picks = JSON.parse(text).picks;
       if (!Array.isArray(picks)) throw new Error('no list of picks');
-      const here = new Set(logic.items().map((i) => i.path));
+      const here = new Set(logic.items().filter(isUpload).map((i) => i.path));
       const tags = logic.readBoxTags();
       let moved = 0;
       for (const rel of picks) {
@@ -691,7 +698,7 @@ const PAGE = `<!DOCTYPE html>
 
   <h2>Tags</h2>
   <div class="card">
-    <div class="hint">Tap ☆ to add something to Favorites, or add any tag to put it in the filters with that tag. Tags from folders in GitHub can't be taken off. Each change is saved straight away.</div>
+    <div class="hint">Your photos and videos. Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Videos from GitHub take their tags from their folders there.</div>
     <div id="taglist">Loading…</div>
     <datalist id="tagnames"></datalist>
   </div>
@@ -961,7 +968,7 @@ const PAGE = `<!DOCTYPE html>
         $('tagnames').appendChild(o);
       }
       const list = $('taglist');
-      list.textContent = d.items.length ? '' : 'Nothing on the box yet.';
+      list.textContent = d.items.length ? '' : 'Nothing added yet: add photos or videos below.';
       let group = null;
       for (const item of d.items) {
         if (item.group !== group) {

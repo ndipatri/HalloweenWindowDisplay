@@ -5,27 +5,6 @@ Decides what a filter shows (every item with any of its tags and none of its exc
 
 ## Requirements
 
-### Requirement: A filter shows the items with any of its tags, except its except tags
-A filter SHALL show every item that has at least one of its "any of" tags and none of its "except" tags, counting folder tags, `upload` and box tags alike.
-
-#### Scenario: a filter plays the items with any of its tags
-- **GIVEN** `halloween/fuzzy.mp4`, `halloween/kid/x.mp4`, `halloween/grownup/y.mp4` and `thanksgiving/dusk.mp4`
-- **AND** the filter Halloween kid, any of `halloween` and `halloween-kid`
-- **WHEN** Halloween kid plays four items
-- **THEN** they are `halloween/fuzzy.mp4`, `halloween/kid/x.mp4`, then the same two again
-
-#### Scenario: a filter leaves out items with an except tag
-- **GIVEN** `christmas/tree.mp4`, `photos/00001-a.jpg` tagged `family`, and `photos/00002-b.jpg` tagged `family` and `scary`
-- **AND** the filter Christmas, any of `christmas` and `family`, except `scary`
-- **WHEN** Christmas plays three items
-- **THEN** they are `photos/00001-a.jpg`, `christmas/tree.mp4`, then `photos/00001-a.jpg` again
-
-#### Scenario: a box tag puts any item in a filter
-- **GIVEN** `halloween/fuzzy.mp4` and `thanksgiving/dusk.mp4` with the box tag `favorites`, and `thanksgiving/fall.mp4`
-- **AND** the filter Favorites, any of `favorites`
-- **WHEN** Favorites plays two items
-- **THEN** they are `thanksgiving/dusk.mp4` and `halloween/fuzzy.mp4`, in name order
-
 ### Requirement: Items play in name order, round and round
 A filter's items SHALL play sorted by file name with numbers sorted as numbers (then by folder), round and round, and a filter that comes back SHALL start again at the item it was on.
 
@@ -48,14 +27,14 @@ When a filter's tags match no item, the screen SHALL be black and the box SHALL 
 When tags or the filters are saved while a filter plays, the box SHALL replace what is queued behind the item on screen with that filter's items as they now are, continuing after that item. If the item on screen no longer belongs, the box SHALL move on at once, without going black, to the next item after it in name order, or else the first, logging no error.
 
 #### Scenario: tagging an item while its filter plays queues it in its place
-- **GIVEN** Favorites playing `halloween/a.mp4`, with `halloween/c.mp4` queued, all tagged `favorites`
-- **WHEN** `halloween/b.mp4` is tagged `favorites`
-- **THEN** mpv's playlist is `halloween/a.mp4`, playing, then `halloween/b.mp4`, `halloween/c.mp4`
+- **GIVEN** Favorites playing `photos/00001-a.jpg`, with `photos/00003-c.jpg` queued, all tagged `favorites`
+- **WHEN** `photos/00002-b.jpg` is tagged `favorites`
+- **THEN** mpv's playlist is `photos/00001-a.jpg`, playing, then `photos/00002-b.jpg`, `photos/00003-c.jpg`
 
 #### Scenario: untagging the item on screen moves on to the next item
-- **GIVEN** Favorites playing `halloween/a.mp4`, with `halloween/b.mp4` and `halloween/c.mp4` queued, all tagged `favorites`
-- **WHEN** `favorites` is taken off `halloween/a.mp4`
-- **THEN** mpv's playlist is `halloween/b.mp4`, playing, then `halloween/c.mp4`, `halloween/b.mp4`
+- **GIVEN** Favorites playing `photos/00001-a.jpg`, with `photos/00002-b.jpg` and `photos/00003-c.jpg` queued, all tagged `favorites`
+- **WHEN** `favorites` is taken off `photos/00001-a.jpg`
+- **THEN** mpv's playlist is `photos/00002-b.jpg`, playing, then `photos/00003-c.jpg`, `photos/00002-b.jpg`
 - **AND** no `ERROR:` line is logged
 
 ### Requirement: A removed upload leaves the screen cleanly
@@ -158,3 +137,24 @@ The repo's starting filters SHALL be Halloween kid and grownup at today's days a
   - Thanksgiving: any of `thanksgiving`; Fridays and Saturdays from Nov 1 to `11-4thu`, plus `11-4thu-1` and `11-4thu`; 17:00–23:00;
   - Favorites: any of `favorites`; not scheduled;
   - All uploads: any of `upload`; not scheduled
+
+### Requirement: A filter shows what has any of its tags, except its except tags
+A filter SHALL show every item that has at least one of its "any of" tags and none of its "except" tags, counting folder tags, `upload` and uploads' box tags alike.
+
+#### Scenario: a filter plays the items with any of its tags
+- **GIVEN** `halloween/fuzzy.mp4`, `halloween/kid/x.mp4`, `halloween/grownup/y.mp4` and `thanksgiving/dusk.mp4`
+- **AND** the filter Halloween kid, any of `halloween` and `halloween-kid`
+- **WHEN** Halloween kid plays four items
+- **THEN** they are `halloween/fuzzy.mp4`, `halloween/kid/x.mp4`, then the same two again
+
+#### Scenario: a filter leaves out items with an except tag
+- **GIVEN** `christmas/tree.mp4`, `photos/00001-a.jpg` tagged `family`, and `photos/00002-b.jpg` tagged `family` and `scary`
+- **AND** the filter Christmas, any of `christmas` and `family`, except `scary`
+- **WHEN** Christmas plays three items
+- **THEN** they are `photos/00001-a.jpg`, `christmas/tree.mp4`, then `photos/00001-a.jpg` again
+
+#### Scenario: a box tag puts an upload in a filter
+- **GIVEN** `photos/00001-a.jpg` and `photos/00003-c.jpg` with the box tag `favorites`, `photos/00002-b.jpg`, and `halloween/fuzzy.mp4`
+- **AND** the filter Favorites, any of `favorites`
+- **WHEN** Favorites plays three items
+- **THEN** they are `photos/00001-a.jpg`, `photos/00003-c.jpg`, then `photos/00001-a.jpg` again

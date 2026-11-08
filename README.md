@@ -30,7 +30,7 @@ It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry 
 
 A Raspberry Pi box, plugged into the TV's HDMI, plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. What's on screen is decided by **filters**:
 
-- **Tags:** every video has a tag from its folder (`halloween`, `halloween-grownup`, …), and you can add your own, like `favorites`.
+- **Tags:** every video has a tag from its folder in GitHub (`halloween`, `halloween-grownup`, …), and you can add your own, like `favorites`, to the photos and videos you add from your phone.
 - **Filters:** a filter plays everything with its tags, on the days and at the times you give it: gentler "kid" Halloween videos in the early morning and early evening, scarier "grownup" ones later, and a black screen the rest of the time.
 
 The videos are kept in this repo, and the box picks up the latest by itself every hour. A page on your phone shows what's playing, lets you change it for a while, and is where you tag things and set the filters.
@@ -44,7 +44,7 @@ Each box chooses what plays with **filters**, set on its own website (see "Chang
 | Halloween kid | The fuzzy creatures and Mochi the ghost-dog | Every day in October, 5–7 am and 5–7:30 pm |
 | Halloween grownup | Those two plus the monster, the jump scare and the woman | Every day in October, 7:30–11 pm |
 | Thanksgiving | The fall sunset, Mochi the pilgrim and the steady fall sun | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm |
-| Favorites | Whatever you've starred | Only when you choose it |
+| Favorites | Your photos and videos you've starred | Only when you choose it |
 | All uploads | Your own photos and videos | Only when you choose it |
 
 At any other time the window stays black. There's no Christmas filter yet, as there are no Christmas videos.
@@ -169,13 +169,12 @@ Changes show on the TV within a couple of seconds. **For how long** starts on "U
 
 ### Favorites and tags
 
-Under **Tags** on the page is everything on the box, by folder, and the photos and videos you've added (under **Uploads**).
+Under **Tags** on the page are the photos and videos you've added from your phone.
 
-- Tap **☆** to add something to **Favorites** (it turns to ★). Tap **Favorites** under Play to show them all, in name order, round and round.
-- Every video has a tag from its folder in GitHub, like `halloween` or `halloween-grownup`, and every photo or video you add has `upload`. Those can't be taken off.
-- You can add your own tags too, like `family`, by typing one and tapping **Add**, then make a filter for it. Tap × on a tag to take it off.
-- Tags you add are kept on this box only.
-- Changes show on the window straight away if that filter is playing.
+- Tap **☆** to add one to **Favorites** (it turns to ★). Tap **Favorites** under Play to show them all, in name order, round and round.
+- Each one is tagged `upload`. You can add your own tags too, like `family`, by typing one and tapping **Add**, then make a filter for it. Tap × on a tag to take it off.
+- The videos from GitHub aren't listed here: each one's tag comes from its folder there (`halloween`, `halloween-grownup`, …), and filters use those tags. To play a GitHub video in a different filter, it goes in a different folder in GitHub.
+- Tags you add are kept on this box only, and changes show on the window straight away if that filter is playing.
 
 ### Change what plays when: filters
 
@@ -219,7 +218,7 @@ Good to know:
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
 | Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
-| Play just the videos you choose | On the page: star them under **Tags**, then tap **Favorites** (see above) |
+| Play just the photos and videos you choose | On the page: star them under **Tags**, then tap **Favorites** (see above) |
 | Change the dates or times | On the page, under **Filters**: **Edit**, then **Save filters** with the PIN (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |

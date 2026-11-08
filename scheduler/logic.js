@@ -17,7 +17,7 @@ function createScheduler(io) {
   const STATUS_PATH = videoRoot + '/status';
   // The box's filters, in order, with their schedules (edited on the website).
   const FILTERS_PATH = videoRoot + '/filters.json';
-  // The box's own tags on items, by path: { "tags": { "halloween/x.mp4": ["favorites"] } }.
+  // The box's own tags on items, by path: { "tags": { "photos/00001-a.jpg": ["favorites"] } }.
   const TAGS_PATH = videoRoot + '/tags.json';
 
   // Videos queued ahead of time, so one follows the next without a gap.
@@ -88,7 +88,8 @@ function createScheduler(io) {
         .filter((n) => isVideoFile(n, withPhotos)).sort(compareNames);
       for (const name of names) {
         const rel = folder + '/' + name;
-        const own = Array.isArray(boxTags[rel]) ? boxTags[rel] : [];
+        // Only uploads have box tags: a video from GitHub has just its folder's tag.
+        const own = withPhotos && Array.isArray(boxTags[rel]) ? boxTags[rel] : [];
         const extra = [];
         for (const t of own) if (isTagName(t) && t !== tag && t !== UPLOAD_TAG && !extra.includes(t)) extra.push(t);
         out.push({

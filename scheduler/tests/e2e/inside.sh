@@ -48,6 +48,9 @@ echo "not a video" > "$TESTREPO/playlists/halloween/broken.mp4"
 # A repo folder with the uploads' name, which sync must leave alone.
 mkdir -p "$TESTREPO/playlists/photos"
 clip "$TESTREPO/playlists/photos/x.mp4" white
+# The copy keeps the Mac's file owner, which git (run as root here) would
+# otherwise refuse as "dubious ownership".
+git config --system --add safe.directory '*'
 git -C "$TESTREPO" init -q -b main && git -C "$TESTREPO" add -A && \
   git -C "$TESTREPO" -c user.name=e2e -c user.email=e2e@example.com commit -qm e2e
 chown -R pi: "$TESTREPO"
@@ -262,26 +265,29 @@ echo "   $(post /api/schedule '{}')"
 uploads_before="$(ls -A "$VIDEOS/photos")"
 
 echo "== Tags and filters"
-upload_left="$(ls "$VIDEOS/photos" | head -1)"
-echo "   $(post /api/tags '{"path":"halloween/grownup/c.mp4","add":"favorites"}')"
-echo "   $(post /api/tags "{\"path\":\"photos/$upload_left\",\"add\":\"favorites\"}")"
+up1="$(ls "$VIDEOS/photos" | head -1)"
+up2="$(ls "$VIDEOS/photos" | sed -n 2p)"
+echo "   $(post /api/tags "{\"path\":\"photos/$up1\",\"add\":\"favorites\"}")"
+echo "   $(post /api/tags "{\"path\":\"photos/$up2\",\"add\":\"favorites\"}")"
 check "tagging writes the box's tags and logs them" \
-  bash -c "grep -q 'halloween/grownup/c.mp4' '$VIDEOS/tags.json' && logged 'Tags: halloween/grownup/c.mp4 + favorites (from the website).'"
-check "the website lists the items with their tags" bash -c "
+  bash -c "grep -q 'photos/$up1' '$VIDEOS/tags.json' && logged 'Tags: photos/$up1 + favorites (from the website).'"
+check "the website lists the uploads with their tags" bash -c "
   curl -fsS $SITE/api/items | node -e '
     const d = JSON.parse(require(\"fs\").readFileSync(0));
-    const c = d.items.find((i) => i.path === \"halloween/grownup/c.mp4\");
-    process.exit(c && c.folderTags.join() === \"halloween-grownup\" && c.boxTags.join() === \"favorites\" ? 0 : 1);'"
+    const u = d.items.find((i) => i.path === \"photos/$up1\");
+    process.exit(u && u.boxTags.join() === \"favorites\" && d.items.every((i) => i.path.startsWith(\"photos/\")) ? 0 : 1);'"
+github_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"path":"halloween/grownup/c.mp4","add":"favorites"}' "$SITE/api/tags")"
+check "a video from GitHub can't be tagged" test "$github_code" = 400
 errors_before=$(grep -c 'ERROR' "$LOG")
 echo "   $(post /api/show '{"target":"Favorites","until":"cleared"}')"
 check "Favorites shows in the status" within 20 bash -c '[ "$(status)" = "Favorites (override until cleared)" ]'
-check "Favorites plays the first favorite" within 30 logged "Favorites: playing $upload_left"
-check "Favorites plays the next favorite" within 30 logged "Favorites: playing c.mp4"
+check "Favorites plays the first favorite" within 30 logged "Favorites: playing $up1"
+check "Favorites plays the next favorite" within 30 logged "Favorites: playing $up2"
 # Untag whatever is on screen: the other favorite comes on at once.
 on_screen="$(grep -o 'Favorites: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
-case "$on_screen" in c.mp4) gone="halloween/grownup/c.mp4"; next="$upload_left" ;; *) gone="photos/$on_screen"; next="c.mp4" ;; esac
+if [ "$on_screen" = "$up1" ]; then next="$up2"; else next="$up1"; fi
 lines=$(grep -c "Favorites: playing $next" "$LOG")
-echo "   $(post /api/tags "{\"path\":\"$gone\",\"remove\":\"favorites\"}")"
+echo "   $(post /api/tags "{\"path\":\"photos/$on_screen\",\"remove\":\"favorites\"}")"
 check "untagging the item on screen moves on to the next favorite" \
   within 8 bash -c "[ \$(grep -c 'Favorites: playing $next' '$LOG') -gt $lines ]"
 check "Favorites logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
