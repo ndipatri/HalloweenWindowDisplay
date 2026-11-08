@@ -130,14 +130,14 @@ test('a filter leaves out items with an except tag', async () => {
   assert.deepEqual(await play(t, 'Christmas', 3), ['photos/00001-a.jpg', 'christmas/tree.mp4', 'photos/00001-a.jpg']);
 });
 
-test('a box tag puts any item in a filter', async () => {
+test('a box tag puts an upload in a filter', async () => {
   const { T: t } = load({
-    dirs: { halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4', 'fall.mp4'] },
-    tags: { 'halloween/fuzzy.mp4': ['favorites'], 'thanksgiving/dusk.mp4': ['favorites'] },
+    dirs: { halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg', '00002-b.jpg', '00003-c.jpg'] },
+    tags: { 'photos/00001-a.jpg': ['favorites'], 'photos/00003-c.jpg': ['favorites'], 'halloween/fuzzy.mp4': ['favorites'] },
     filters: [{ name: 'Favorites', anyOf: ['favorites'] }],
   });
   fn(t, 'readFilters');
-  assert.deepEqual(await play(t, 'Favorites', 2), ['thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4']);
+  assert.deepEqual(await play(t, 'Favorites', 3), ['photos/00001-a.jpg', 'photos/00003-c.jpg', 'photos/00001-a.jpg']);
 });
 
 test('a filter plays its items in name order, round and round', async () => {
@@ -410,11 +410,11 @@ test('a filter called off is refused, as it means Black', () => {
 });
 
 test('a bad entry in tags.json is skipped, not fatal', () => {
-  const { T: t } = load({ dirs: { halloween: ['fuzzy.mp4', 'b.mp4'] },
-    files: { 'tags.json': JSON.stringify({ tags: { 'halloween/fuzzy.mp4': null, 'halloween/b.mp4': ['favorites', 7] } }) } });
+  const { T: t } = load({ dirs: { photos: ['00001-a.jpg', '00002-b.jpg'] },
+    files: { 'tags.json': JSON.stringify({ tags: { 'photos/00001-a.jpg': null, 'photos/00002-b.jpg': ['favorites', 7] } }) } });
   const items = t.items();
-  assert.deepEqual(items.find((i) => i.path === 'halloween/fuzzy.mp4').boxTags, []);
-  assert.deepEqual(items.find((i) => i.path === 'halloween/b.mp4').boxTags, ['favorites']);
+  assert.deepEqual(items.find((i) => i.path === 'photos/00001-a.jpg').boxTags, []);
+  assert.deepEqual(items.find((i) => i.path === 'photos/00002-b.jpg').boxTags, ['favorites']);
 });
 
 test("an override for a missing filter isn't ended while filters.json has mistakes", () => {

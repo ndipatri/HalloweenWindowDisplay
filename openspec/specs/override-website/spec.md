@@ -152,12 +152,12 @@ The page SHALL show the status line inside the Play section, above its buttons, 
 - **THEN** the button playing is Halloween kid, Favorites, Black, Black, none, and none
 
 ### Requirement: The page tags items
-The page SHALL offer a Tags section listing every item from the website's list under its group, each with its folder tags (which can't be taken off), its box tags (each with a way to take it off), a star that adds or takes off `favorites`, and a way to add a tag, suggesting the tags in use. Each change SHALL be saved straight away and confirmed next to the item.
+The page SHALL offer a Tags section listing every upload from the website's list, each with its box tags (each with a way to take it off), a star that adds or takes off `favorites`, and a way to add a tag, suggesting the tags in use, and SHALL say that videos from GitHub take their tags from their folders. Each change SHALL be saved straight away and confirmed next to the upload.
 
 #### Scenario: the website page offers tagging items
 - **GIVEN** the website running
 - **WHEN** the page is opened
-- **THEN** it has a Tags section filled from the website's items, with folder tags, box tags with a way to take each off, a favorites star, and an add-a-tag field suggesting the tags in use, each change posted to the website straight away
+- **THEN** it has a Tags section filled from the website's items (the uploads), saying videos from GitHub take their tags from their folders, with box tags with a way to take each off, a favorites star, and an add-a-tag field suggesting the tags in use, each change posted to the website straight away
 
 ### Requirement: The page edits filters
 The page SHALL offer a Filters section listing the box's filters in order, with ways to move each up or down, edit, delete and add one. Editing SHALL cover the name, "any of" and "except" tags chosen from the tags in use, and schedule entries (first and last day, weekdays, extra days, and times). Saving SHALL send the whole list with the upload PIN, and show the website's answer there.

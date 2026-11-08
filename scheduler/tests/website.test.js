@@ -95,7 +95,7 @@ test('the website says when the box has not started yet', async () => {
 
 // A box with something in each starting filter.
 const FULL = { halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'] };
-const fullSite = (extra) => site(FULL, Object.assign({ tags: { 'halloween/fuzzy.mp4': ['favorites'] } }, extra));
+const fullSite = (extra) => site(FULL, Object.assign({ tags: { 'photos/00001-a.jpg': ['favorites'] } }, extra));
 
 test('the website shows a filter until the schedule changes', async () => {
   const s = fullSite();
@@ -231,27 +231,27 @@ test('the page works out which filter is playing from the status', async () => {
 
 // ---- Tags ----
 
-test('the website adds a box tag to an item', async () => {
+test('the website adds a box tag to an upload', async () => {
   const logs = [];
   let changed = 0;
-  const s = site({ halloween: ['fuzzy.mp4'] }, { log: (m) => logs.push(m), filtersChanged: async () => { changed++; } });
-  const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', add: 'favorites' });
+  const s = site({ photos: ['00001-a.jpg'] }, { log: (m) => logs.push(m), filtersChanged: async () => { changed++; } });
+  const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'favorites' });
   assert.equal(r.status, 200, r.body);
   assert.equal(changed, 1, 'the player is told');
-  assert.equal(r.json.message, 'Tagged fuzzy.mp4 favorites.');
-  assert.deepEqual(JSON.parse(s.files[TAGS]).tags['halloween/fuzzy.mp4'], ['favorites']);
-  const item = (await s.call('GET', '/api/items')).json.items.find((i) => i.path === 'halloween/fuzzy.mp4');
-  assert.deepEqual(item.folderTags.concat(item.boxTags), ['halloween', 'favorites']);
-  assert.ok(logs.includes('Tags: halloween/fuzzy.mp4 + favorites (from the website).'), logs.join('\n'));
+  assert.equal(r.json.message, 'Tagged 00001-a.jpg favorites.');
+  assert.deepEqual(JSON.parse(s.files[TAGS]).tags['photos/00001-a.jpg'], ['favorites']);
+  const item = (await s.call('GET', '/api/items')).json.items.find((i) => i.path === 'photos/00001-a.jpg');
+  assert.deepEqual(item.folderTags.concat(item.boxTags), ['upload', 'favorites']);
+  assert.ok(logs.includes('Tags: photos/00001-a.jpg + favorites (from the website).'), logs.join('\n'));
 });
 
-test('the website removes a box tag from an item', async () => {
-  const s = site({ halloween: ['fuzzy.mp4'] }, { tags: { 'halloween/fuzzy.mp4': ['favorites'] } });
-  const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', remove: 'favorites' });
+test('the website removes a box tag from an upload', async () => {
+  const s = site({ photos: ['00001-a.jpg'] }, { tags: { 'photos/00001-a.jpg': ['favorites'] } });
+  const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', remove: 'favorites' });
   assert.equal(r.status, 200, r.body);
-  assert.equal(r.json.message, 'Took favorites off fuzzy.mp4.');
-  const item = (await s.call('GET', '/api/items')).json.items.find((i) => i.path === 'halloween/fuzzy.mp4');
-  assert.deepEqual(item.boxTags, []);
+  assert.equal(r.json.message, 'Took favorites off 00001-a.jpg.');
+  const item = (await s.call('GET', '/api/items')).json.items.find((i) => i.path === 'photos/00001-a.jpg');
+  assert.deepEqual(item.folderTags.concat(item.boxTags), ['upload']);
 });
 
 test('a box tag can repeat a folder tag', async () => {
@@ -263,28 +263,33 @@ test('a box tag can repeat a folder tag', async () => {
 });
 
 test("the website refuses a tag name it can't use", async () => {
-  const s = site({ halloween: ['fuzzy.mp4'] });
+  const s = site({ photos: ['00001-a.jpg'] });
   for (const bad of ['Fav Orites', '', '-x', 'a'.repeat(31)]) {
-    const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', add: bad });
+    const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: bad });
     assert.equal(r.status, 400, JSON.stringify(bad));
     assert.ok(r.json.error.startsWith('Not a tag name:') && r.json.error.endsWith('Use lowercase letters, digits and dashes.'), r.json.error);
   }
-  const u = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', add: 'upload' });
-  assert.equal(u.json.error, 'upload is given to every upload by the box.');
+  for (const change of [{ add: 'upload' }, { remove: 'upload' }]) {
+    const u = await s.call('POST', '/api/tags', Object.assign({ path: 'photos/00001-a.jpg' }, change));
+    assert.equal(u.json.error, 'upload is given to every upload by the box.');
+  }
   assert.ok(!(TAGS in s.files), 'nothing saved');
 });
 
-test("a folder tag can't be removed", async () => {
+test('the website refuses to tag a video from GitHub', async () => {
   const s = site({ halloween: ['fuzzy.mp4'] });
-  const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', remove: 'halloween' });
-  assert.equal(r.status, 400, r.body);
-  assert.equal(r.json.error, "halloween comes from the folder in GitHub, so it can't be taken off here.");
+  for (const change of [{ add: 'favorites' }, { remove: 'halloween' }]) {
+    const r = await s.call('POST', '/api/tags', Object.assign({ path: 'halloween/fuzzy.mp4' }, change));
+    assert.equal(r.status, 400, r.body);
+    assert.equal(r.json.error, 'halloween/fuzzy.mp4 comes from GitHub: its tag comes from its folder there.');
+  }
+  assert.ok(!(TAGS in s.files), 'nothing saved');
 });
 
 test("the website refuses to tag something that isn't an item", async () => {
-  const s = site({ halloween: ['fuzzy.mp4', 'poster.jpg'] });
+  const s = site({ halloween: ['poster.jpg'], photos: ['00001-a.jpg'] });
   s.files[ROOT + '/status'] = 'x\n';
-  for (const p of ['../status', 'halloween/poster.jpg', 'halloween/missing.mp4']) {
+  for (const p of ['../status', 'halloween/poster.jpg', 'photos/missing.jpg']) {
     const r = await s.call('POST', '/api/tags', { path: p, add: 'favorites' });
     assert.equal(r.status, 404, p);
     assert.ok(r.json.error.startsWith('No item') && r.json.error.includes(p), r.json.error);
@@ -292,37 +297,53 @@ test("the website refuses to tag something that isn't an item", async () => {
   assert.ok(!(TAGS in s.files));
 });
 
-test('the website lists the items and their tags', async () => {
-  const s = site({ halloween: ['fuzzy.mp4'], 'halloween/kid': ['x.mp4'], thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'] },
-    { tags: { 'halloween/fuzzy.mp4': ['favorites'], 'photos/00001-a.jpg': ['family'] } });
+test('the website lists the uploads and their tags', async () => {
+  const s = site({ halloween: ['fuzzy.mp4'], 'halloween/kid': ['x.mp4'], photos: ['00001-a.jpg', '00002-b.mov'] },
+    { tags: { 'photos/00001-a.jpg': ['family'] } });
   const r = await s.call('GET', '/api/items');
-  assert.deepEqual(r.json.items.map((i) => [i.path, i.group, i.folderTags.join(), i.boxTags.join()]), [
-    ['halloween/fuzzy.mp4', 'Halloween', 'halloween', 'favorites'],
-    ['halloween/kid/x.mp4', 'Halloween / Kid', 'halloween-kid', ''],
-    ['thanksgiving/dusk.mp4', 'Thanksgiving', 'thanksgiving', ''],
-    ['photos/00001-a.jpg', 'Uploads', 'upload', 'family'],
+  assert.deepEqual(r.json.items.map((i) => [i.path, i.folderTags.join(), i.boxTags.join()]), [
+    ['photos/00001-a.jpg', 'upload', 'family'],
+    ['photos/00002-b.mov', 'upload', ''],
   ]);
-  assert.deepEqual(r.json.tags, ['family', 'favorites', 'halloween', 'halloween-kid', 'thanksgiving', 'upload']);
+  assert.deepEqual(r.json.tags, ['family', 'halloween', 'halloween-kid', 'upload']);
 });
 
 test('box tags of an item no longer on the box are left out', async () => {
-  const s = site({ halloween: ['fuzzy.mp4'] }, { tags: { 'halloween/gone.mp4': ['favorites'] } });
+  const s = site({ photos: ['00001-a.jpg'] }, { tags: { 'photos/00009-gone.jpg': ['family'] } });
   const r = await s.call('GET', '/api/items');
-  assert.ok(!r.json.items.some((i) => i.path === 'halloween/gone.mp4'));
-  assert.ok(!r.json.tags.includes('favorites'));
+  assert.ok(!r.json.items.some((i) => i.path === 'photos/00009-gone.jpg'));
+  assert.ok(!r.json.tags.includes('family'));
+});
+
+test('box tags on a video from GitHub are ignored and dropped', async () => {
+  const s = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] },
+    { filters: [{ name: 'Favorites', anyOf: ['favorites'] }],
+      tags: { 'halloween/fuzzy.mp4': ['favorites'], 'photos/00001-a.jpg': ['favorites'] } });
+  // With only the GitHub video tagged, Favorites has nothing in it.
+  const onlyRepo = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] },
+    { filters: [{ name: 'Favorites', anyOf: ['favorites'] }], tags: { 'halloween/fuzzy.mp4': ['favorites'] } });
+  const refused = await show(onlyRepo, { target: 'Favorites', until: 'cleared' });
+  assert.equal(refused.status, 400, refused.body);
+  const show1 = await show(s, { target: 'Favorites', until: 'cleared' });
+  assert.equal(show1.status, 200, show1.body);
+  const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'family' });
+  assert.equal(r.status, 200, r.body);
+  const tags = JSON.parse(s.files[TAGS]).tags;
+  assert.ok(!('halloween/fuzzy.mp4' in tags), JSON.stringify(tags));
+  assert.deepEqual(tags['photos/00001-a.jpg'], ['favorites', 'family']);
 });
 
 test('the box turns the old picks into favorites', async () => {
   const logs = [];
   const s = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] }, {
     log: (m) => logs.push(m),
-    files: { [ROOT + '/picks.json']: JSON.stringify({ picks: ['halloween/fuzzy.mp4', 'photos/00001-a.jpg', 'halloween/gone.mp4'] }) },
+    files: { [ROOT + '/picks.json']: JSON.stringify({ picks: ['halloween/fuzzy.mp4', 'photos/00001-a.jpg', 'photos/00009-gone.jpg'] }) },
   });
   const tags = JSON.parse(s.files[TAGS] || '{"tags":{}}').tags;
-  assert.deepEqual(tags['halloween/fuzzy.mp4'], ['favorites']);
   assert.deepEqual(tags['photos/00001-a.jpg'], ['favorites']);
+  assert.ok(!('halloween/fuzzy.mp4' in tags), JSON.stringify(tags));
   assert.ok(!(ROOT + '/picks.json' in s.files), 'picks.json is gone');
-  assert.ok(logs.includes('My picks are now tagged favorites (2).'), logs.join('\n'));
+  assert.ok(logs.includes('My picks are now tagged favorites (1).'), logs.join('\n'));
 });
 
 // ---- Filters ----
@@ -396,6 +417,7 @@ test("the website refuses a filter it can't use", async () => {
 test('the website page offers tagging items', async () => {
   const page = (await site().call('GET', '/')).body;
   for (const text of ['<h2>Tags</h2>', 'id="taglist"', "fetch('/api/items')", "'/api/tags'", '<datalist id="tagnames">',
+    'Videos from GitHub take their tags from their folders',
     "c.className = 'chip'", "{ add: 'favorites' }", "{ remove: 'favorites' }", '☆', '★', '×']) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
@@ -784,7 +806,7 @@ test('removing an upload drops its box tags', async () => {
   assert.equal(r.status, 200, r.body);
   const tags = JSON.parse(fs.readFileSync(u.root + '/tags.json', 'utf8')).tags;
   assert.ok(!('photos/00001-a.jpg' in tags), JSON.stringify(tags));
-  assert.deepEqual(tags['halloween/fuzzy.mp4'], ['favorites']);
+  assert.ok(!('halloween/fuzzy.mp4' in tags), 'box tags on a video from GitHub are dropped too');
   assert.equal(u.filtersChanged, 1, 'the player is told');
 });
 
@@ -956,15 +978,36 @@ test("a picks file that can't be read is kept, and logged", async () => {
 });
 
 test('tagging still works with a bad entry in tags.json', async () => {
-  const s = site({ halloween: ['fuzzy.mp4'] }, { files: { [TAGS]: JSON.stringify({ tags: { 'halloween/x.mp4': null } }) } });
-  const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', add: 'favorites' });
+  const s = site({ photos: ['00001-a.jpg'] }, { files: { [TAGS]: JSON.stringify({ tags: { 'photos/00009-x.jpg': null } }) } });
+  const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'favorites' });
   assert.equal(r.status, 200, r.body);
 });
 
-test('adding a tag the item has from its folder says so', async () => {
+test('a video from GitHub is refused before its tag is even checked', async () => {
   const s = site({ halloween: ['fuzzy.mp4'] });
-  const r = await s.call('POST', '/api/tags', { path: 'halloween/fuzzy.mp4', add: 'halloween' });
-  assert.equal(r.json.message, 'fuzzy.mp4 already has halloween, from its folder.');
+  for (const change of [{ add: 'upload' }, { add: 'Bad Name' }]) {
+    const r = await s.call('POST', '/api/tags', Object.assign({ path: 'halloween/fuzzy.mp4' }, change));
+    assert.equal(r.json.error, 'halloween/fuzzy.mp4 comes from GitHub: its tag comes from its folder there.');
+  }
+});
+
+test('with no uploads the website lists no items, but still every tag in use', async () => {
+  const r = await site({ halloween: ['fuzzy.mp4'] }).call('GET', '/api/items');
+  assert.deepEqual(r.json.items, []);
+  assert.deepEqual(r.json.tags, ['halloween']);
+});
+
+test('a GitHub folder named upload is still not an upload', async () => {
+  const s = site({ upload: ['x.mp4'] });
+  const r = await s.call('POST', '/api/tags', { path: 'upload/x.mp4', add: 'favorites' });
+  assert.equal(r.status, 400, r.body);
+  assert.deepEqual((await s.call('GET', '/api/items')).json.items, []);
+});
+
+test("adding upload's own tag again is refused, not stored", async () => {
+  const s = site({ photos: ['00001-a.jpg'] });
+  const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'upload' });
+  assert.equal(r.status, 400);
 });
 
 (async () => {
