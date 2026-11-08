@@ -1,0 +1,31 @@
+{
+  "filters": [
+    {
+      "name": "Halloween kid",
+      "anyOf": ["halloween", "halloween-kid"],
+      "except": [],
+      "schedule": [
+        { "from": "10-01", "to": "10-31", "times": [{ "start": "05:00", "stop": "07:00" }, { "start": "17:00", "stop": "19:30" }] }
+      ]
+    },
+    {
+      "name": "Halloween grownup",
+      "anyOf": ["halloween", "halloween-grownup"],
+      "except": [],
+      "schedule": [
+        { "from": "10-01", "to": "10-31", "times": [{ "start": "19:30", "stop": "23:00" }] }
+      ]
+    },
+    {
+      "name": "Thanksgiving",
+      "anyOf": ["thanksgiving"],
+      "except": [],
+      "schedule": [
+        { "from": "11-01", "to": "11-4thu", "weekdays": ["fri", "sat"], "also": ["11-4thu-1", "11-4thu"],
+          "times": [{ "start": "17:00", "stop": "23:00" }] }
+      ]
+    },
+    { "name": "Favorites", "anyOf": ["favorites"], "except": [], "schedule": [] },
+    { "name": "All uploads", "anyOf": ["upload"], "except": [], "schedule": [] }
+  ]
+}

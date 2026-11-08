@@ -8,6 +8,7 @@ const { createPlayer, watchMpv } = require('../player.js');
 const { FakeMpv, FakeChild } = require('./fake_mpv.js');
 
 const ROOT = '/home/test/video-scheduler';
+const STARTING = require('fs').readFileSync(require('path').join(__dirname, '..', 'filters.default.json'), 'utf8');
 const at = (month, day, h = 12, m = 0) => new Date(2026, month - 1, day, h, m);
 
 let passed = 0;
@@ -18,10 +19,13 @@ function test(name, fn) { tests.push([name, fn]); }
 // video folder) to the names in them. Set `box.now` and `box.clockSet`
 // before each tick.
 function box(dirs = {}) {
-  const files = {};
+  const files = { [ROOT + '/filters.json']: STARTING };
   const logs = [];
-  const folders = {};
-  for (const [k, v] of Object.entries(dirs)) folders[ROOT + '/' + k] = v;
+  const folders = { [ROOT]: [] };
+  for (const [k, v] of Object.entries(dirs)) {
+    folders[ROOT + '/' + k] = v;
+    if (!k.includes('/') && !folders[ROOT].includes(k)) folders[ROOT].push(k);
+  }
   const mpv = new FakeMpv();
   const b = {
     files, logs, folders, mpv, now: at(10, 20, 18), clockSet: true,
@@ -49,14 +53,16 @@ function box(dirs = {}) {
 
 // ---- Plays the schedule through mpv ----
 
-test("the box plays today's season playlist on schedule", async () => {
+test('the box plays the scheduled filter', async () => {
   const b = box({ halloween: ['fuzzy.mp4', 'mochi.mp4'] });
   await b.tick();
   assert.deepEqual(b.rel(), ['halloween/fuzzy.mp4', 'halloween/mochi.mp4', 'halloween/fuzzy.mp4']);
   assert.equal(b.mpv.playing(), ROOT + '/halloween/fuzzy.mp4');
+  await b.tick(); // what started playing is logged on the next tick
+  assert.ok(b.logs.includes('Halloween kid: playing fuzzy.mp4'), b.logs.join('\n'));
 });
 
-test('the box switches playlists when the schedule changes', async () => {
+test('the box switches filters when the schedule changes', async () => {
   const b = box({ halloween: ['fuzzy.mp4', 'grownup'], 'halloween/grownup': ['jump.mp4'] });
   b.now = at(10, 20, 19, 29);
   await b.tick();
@@ -64,16 +70,17 @@ test('the box switches playlists when the schedule changes', async () => {
   b.now = at(10, 20, 19, 30);
   await b.tick();
   assert.deepEqual(b.rel().slice(0, 2), ['halloween/fuzzy.mp4', 'halloween/grownup/jump.mp4']);
+  assert.equal(b.files[ROOT + '/status'], 'Halloween grownup (scheduled until 11:00 PM)\n');
 });
 
-test('a playlist that comes back resumes at the video it was on', async () => {
+test('a filter that comes back resumes at the item it was on', async () => {
   const b = box({ halloween: ['a.mp4', 'b.mp4', 'c.mp4'] });
   await b.tick();
   b.mpv.finish(); // a ends, b plays
   await b.tick();
   assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
   const override = ROOT + '/override.json';
-  b.files[override] = JSON.stringify({ playlist: null, setAt: +b.now, expires: null, untilCleared: true });
+  b.files[override] = JSON.stringify({ filter: null, setAt: +b.now, expires: null, untilCleared: true });
   await b.tick();
   assert.deepEqual(b.rel(), []);
   delete b.files[override];
@@ -81,7 +88,7 @@ test('a playlist that comes back resumes at the video it was on', async () => {
   assert.equal(b.rel()[0], 'halloween/b.mp4');
 });
 
-test('a video added while playing is queued without a restart', async () => {
+test('an item added while playing is queued without a restart', async () => {
   const b = box({ halloween: ['a.mp4'] });
   await b.tick();
   b.folders[ROOT + '/halloween'].push('b.mp4');
@@ -89,9 +96,10 @@ test('a video added while playing is queued without a restart', async () => {
   await b.tick();
   const files = b.rel();
   assert.ok(files.indexOf('halloween/b.mp4') > files.indexOf('halloween/a.mp4'), files.join(', '));
+  assert.ok(b.logs.includes('Halloween kid: playing a.mp4'), b.logs.join('\n'));
 });
 
-test('the box keeps the next videos queued', async () => {
+test('the box keeps the next items queued', async () => {
   const b = box({ halloween: ['a.mp4', 'b.mp4', 'c.mp4'] });
   for (let i = 0; i < 5; i++) {
     await b.tick();
@@ -100,11 +108,12 @@ test('the box keeps the next videos queued', async () => {
     assert.equal(b.mpv.playing(), b.mpv.files()[0]);
     b.mpv.finish();
   }
+  assert.ok(b.logs.includes('Halloween kid: playing c.mp4'), b.logs.join('\n'));
 });
 
 // ---- Black when nothing should play ----
 
-test('the box shows black outside the schedule', async () => {
+test('the box shows black when nothing is scheduled', async () => {
   const b = box({ halloween: ['fuzzy.mp4'] });
   await b.tick();
   assert.ok(b.mpv.playing());
@@ -112,23 +121,14 @@ test('the box shows black outside the schedule', async () => {
   await b.tick();
   assert.equal(b.mpv.playing(), null);
   assert.deepEqual(b.rel(), []);
-  assert.equal(b.files[ROOT + '/status'], 'black (outside schedule until Wed 5:00 AM)\n');
-});
-
-test('the box shows black on a day with no season', async () => {
-  const b = box({ halloween: ['fuzzy.mp4'] });
-  b.now = new Date(2026, 0, 15, 18, 0);
-  await b.tick();
-  assert.equal(b.mpv.playing(), null);
-  assert.deepEqual(b.rel(), []);
-  assert.equal(b.files[ROOT + '/status'], 'black (no season today, Jan 15)\n');
+  assert.equal(b.files[ROOT + '/status'], 'black (nothing scheduled until Wed 5:00 AM)\n');
 });
 
 test('the box shows black while an override chooses black', async () => {
   const b = box({ halloween: ['fuzzy.mp4'] });
   await b.tick();
   assert.ok(b.mpv.playing());
-  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: null, setAt: +b.now, expires: null, untilCleared: true });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: null, setAt: +b.now, expires: null, untilCleared: true });
   await b.tick();
   assert.equal(b.mpv.playing(), null);
   assert.deepEqual(b.rel(), []);
@@ -153,7 +153,7 @@ test('the box starts playing once the clock is set', async () => {
   b.clockSet = true;
   await b.tick();
   assert.equal(b.mpv.playing(), ROOT + '/halloween/fuzzy.mp4');
-  assert.equal(b.files[ROOT + '/status'], 'halloween/kid (scheduled until 7:30 PM)\n');
+  assert.equal(b.files[ROOT + '/status'], 'Halloween kid (scheduled until 7:30 PM)\n');
 });
 
 // ---- Reports what it shows ----
@@ -162,14 +162,14 @@ test('the box writes what it is showing to the status file and the log', async (
   const b = box({ halloween: ['fuzzy.mp4'] });
   await b.tick();
   await b.tick();
-  assert.equal(b.files[ROOT + '/status'], 'halloween/kid (scheduled until 7:30 PM)\n');
-  assert.equal(b.logs.filter((l) => l === 'Now showing: halloween/kid (scheduled until 7:30 PM)').length, 1);
-  assert.equal(b.logs.filter((l) => l === 'halloween/kid: playing fuzzy.mp4').length, 1);
+  assert.equal(b.files[ROOT + '/status'], 'Halloween kid (scheduled until 7:30 PM)\n');
+  assert.equal(b.logs.filter((l) => l === 'Now showing: Halloween kid (scheduled until 7:30 PM)').length, 1);
+  assert.equal(b.logs.filter((l) => l === 'Halloween kid: playing fuzzy.mp4').length, 1);
 });
 
 // ---- Skips videos mpv cannot play ----
 
-test("the box skips a video mpv can't play and logs it once", async () => {
+test("the box skips an item mpv can't play and logs it once", async () => {
   const b = box({ halloween: ['bad.mp4', 'good.mp4'] });
   await b.tick(); // queue: bad, good, bad
   b.mpv.fail(); // bad fails, good plays
@@ -180,7 +180,7 @@ test("the box skips a video mpv can't play and logs it once", async () => {
   await b.tick();
   const skips = b.logs.filter((l) => l.startsWith('ERROR: Skipping'));
   assert.equal(skips.length, 1, b.logs.join('\n'));
-  assert.ok(skips[0].startsWith('ERROR: Skipping bad.mp4 in halloween/kid'), skips[0]);
+  assert.ok(skips[0].startsWith('ERROR: Skipping bad.mp4 in Halloween kid'), skips[0]);
   assert.equal(b.mpv.playing(), ROOT + '/halloween/good.mp4');
 });
 
@@ -218,7 +218,7 @@ test('the box decodes HEVC in hardware and H.264 in software', () => {
 // The box playing Photos, with its website wired to it as on the box.
 async function photosPlaying() {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
-  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'photos', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: 'All uploads', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   b.files[ROOT + '/upload-pin'] = '4321\n';
   await b.tick();
   const { createWebsite } = require('../website.js');
@@ -266,80 +266,84 @@ test('removing a queued upload takes it out of the queue', async () => {
   assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
 });
 
-// ---- Changing the picks while they play ----
+// ---- Tags or filters changing while a filter plays ----
 
-// The box playing My picks: dusk on screen, then a.jpg and fuzzy queued.
-async function picksPlaying() {
-  const b = box({
-    halloween: ['fuzzy.mp4', 'grownup'], 'halloween/grownup': ['jump.mp4'],
-    thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'],
-  });
-  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'picks', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
-  b.files[ROOT + '/picks.json'] = JSON.stringify({ picks: ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4'] });
+// The box playing Favorites: a on screen; b, c, d tagged as given.
+async function favoritesPlaying(tagged) {
+  const b = box({ halloween: ['a.mp4', 'b.mp4', 'c.mp4'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: 'Favorites', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.tag = (paths) => {
+    const tags = {};
+    for (const p of paths) tags['halloween/' + p] = ['favorites'];
+    b.files[ROOT + '/tags.json'] = JSON.stringify({ tags });
+  };
+  b.tag(tagged);
   await b.tick();
-  assert.deepEqual(b.rel(), ['thanksgiving/dusk.mp4', 'photos/00001-a.jpg', 'halloween/fuzzy.mp4']);
-  b.repick = async (...picks) => {
-    b.files[ROOT + '/picks.json'] = JSON.stringify({ picks });
-    assert.equal(typeof b.player.repick, 'function', 'the player has repick');
-    await b.player.repick();
+  b.refilter = async () => {
+    assert.equal(typeof b.player.refilter, 'function', 'the player has refilter');
+    await b.player.refilter();
   };
   return b;
 }
 
-test('changing the picks while they play replaces what is queued', async () => {
-  const b = await picksPlaying();
-  await b.repick('thanksgiving/dusk.mp4', 'halloween/grownup/jump.mp4');
-  assert.equal(b.mpv.playing(), ROOT + '/thanksgiving/dusk.mp4');
-  assert.deepEqual(b.rel(), ['thanksgiving/dusk.mp4', 'halloween/grownup/jump.mp4', 'thanksgiving/dusk.mp4']);
+test('tagging an item while its filter plays queues it in its place', async () => {
+  const b = await favoritesPlaying(['a.mp4', 'c.mp4']);
+  assert.deepEqual(b.rel(), ['halloween/a.mp4', 'halloween/c.mp4', 'halloween/a.mp4']);
+  b.tag(['a.mp4', 'b.mp4', 'c.mp4']);
+  await b.refilter();
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/a.mp4');
+  assert.deepEqual(b.rel(), ['halloween/a.mp4', 'halloween/b.mp4', 'halloween/c.mp4']);
 });
 
-test('unpicking the item on screen moves on to the next pick', async () => {
-  const b = await picksPlaying();
+test('untagging the item on screen moves on to the next item', async () => {
+  const b = await favoritesPlaying(['a.mp4', 'b.mp4', 'c.mp4']);
   const stops = () => b.mpv.commands.filter((c) => c[0] === 'stop').length;
   const before = stops();
-  await b.repick('halloween/fuzzy.mp4', 'photos/00001-a.jpg');
-  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
-  assert.deepEqual(b.rel(), ['photos/00001-a.jpg', 'halloween/fuzzy.mp4', 'photos/00001-a.jpg']);
+  b.tag(['b.mp4', 'c.mp4']);
+  await b.refilter();
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
+  assert.deepEqual(b.rel(), ['halloween/b.mp4', 'halloween/c.mp4', 'halloween/b.mp4']);
   assert.equal(stops(), before, 'mpv was never stopped (no black gap)');
   await b.tick();
   assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
 });
 
-test('unpicking the last pick on screen goes round to the first', async () => {
-  const b = await picksPlaying();
-  b.mpv.finish(); b.mpv.finish(); // fuzzy, the last pick, on screen
+test('untagging the last item on screen goes round to the first', async () => {
+  const b = await favoritesPlaying(['a.mp4', 'b.mp4', 'c.mp4']);
+  b.mpv.finish(); b.mpv.finish(); // c, the last, on screen
   await b.tick();
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/fuzzy.mp4');
-  await b.repick('thanksgiving/dusk.mp4', 'photos/00001-a.jpg');
-  assert.equal(b.mpv.playing(), ROOT + '/thanksgiving/dusk.mp4');
-  assert.ok(!b.rel().includes('halloween/fuzzy.mp4'), b.rel().join(' '));
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/c.mp4');
+  b.tag(['a.mp4', 'b.mp4']);
+  await b.refilter();
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/a.mp4');
+  assert.ok(!b.rel().includes('halloween/c.mp4'), b.rel().join(' '));
 });
 
-test('unpicking everything while the picks play shows black and says so once', async () => {
-  const b = await picksPlaying();
-  await b.repick();
+test('untagging everything while a filter plays shows black and says so once', async () => {
+  const b = await favoritesPlaying(['a.mp4', 'b.mp4']);
+  b.tag([]);
+  await b.refilter();
   await b.tick();
   await b.tick();
   assert.equal(b.mpv.playing(), null);
-  const none = 'Nothing picked yet. Showing black until something is ticked in My picks.';
+  const none = 'Nothing in Favorites yet (any of favorites). Showing black until something is tagged.';
   assert.equal(b.logs.filter((l) => l === none).length, 1, b.logs.join('\n'));
 });
 
-test('picking while My picks shows black starts the picks at once', async () => {
-  const b = await picksPlaying();
-  await b.repick();
+test('tagging while a filter shows black starts it at once', async () => {
+  const b = await favoritesPlaying([]);
   assert.equal(b.mpv.playing(), null);
-  await b.repick('halloween/grownup/jump.mp4');
-  assert.equal(b.mpv.playing(), ROOT + '/halloween/grownup/jump.mp4');
+  b.tag(['b.mp4']);
+  await b.refilter();
+  assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
 });
 
-test('changing the picks while something else plays leaves mpv alone', async () => {
+test("changing tags that don't touch the playing filter leaves its queue as it was", async () => {
   const b = box({ halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'] });
-  b.files[ROOT + '/override.json'] = JSON.stringify({ playlist: 'halloween', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
-  await b.tick();
+  await b.tick(); // Halloween kid, scheduled
   const before = b.rel();
-  b.files[ROOT + '/picks.json'] = JSON.stringify({ picks: ['thanksgiving/dusk.mp4'] });
-  await b.player.repick();
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'thanksgiving/dusk.mp4': ['favorites'] } });
+  await b.player.refilter();
   assert.deepEqual(b.rel(), before);
 });
 

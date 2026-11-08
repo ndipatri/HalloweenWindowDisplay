@@ -1,59 +1,23 @@
-// What plays when, and the box's settings. This is the file to edit for
-// seasons and times. After changing it, rerun setup on the box:
+// The box's settings. After changing them, rerun setup on the box:
 //   cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
 'use strict';
 
 module.exports = {
-  // Which season folder plays on which days. On a day no season covers, the
-  // screen stays black. If seasons overlap, the first one listed wins. With
-  // an empty list, playlist folders sit directly in the video folder
-  // (e.g. ~/video-scheduler/kid) and play all year.
-  //   from, to   first and last day, both inclusive. A season can wrap the
-  //              new year (from: '12-15', to: '01-06').
-  //   days       optional: only these weekdays between from and to,
-  //              e.g. ['fri', 'sat'].
-  //   alsoOn     optional: extra days that play whatever the weekday, even
-  //              outside from..to.
-  // A day is written 'MM-DD' ('11-25'), or as the nth weekday of a month so
-  // it's right every year: '11-4thu' is the 4th Thursday in November
-  // (Thanksgiving), '05-lastmon' the last Monday in May. Add or subtract
-  // days with +N or -N: '11-4thu-1' is the day before Thanksgiving. In
-  // alsoOn, a one-off day can be given with its year: '2026-11-14'.
-  seasons: [
-    { name: 'halloween', from: '10-01', to: '10-31' },
-    // Friday and Saturday until Thanksgiving, then the day before and the day itself.
-    {
-      name: 'thanksgiving',
-      from: '11-01',
-      to: '11-4thu',
-      days: ['fri', 'sat'],
-      alsoOn: ['11-4thu-1', '11-4thu'],
-    },
-    { name: 'christmas', from: '12-01', to: '12-31' },
-  ],
-
-  // When the screen is on each day: 24-hour HH:MM times. During a period,
-  // the videos directly in today's season folder play, plus any in its
-  // subfolder named after `playlist` (e.g. halloween/grownup/). The subfolder
-  // is optional. Periods can cross midnight. If periods overlap, the first
-  // one listed wins. A period can be limited to some weekdays with
-  // days: ['sat', 'sun'] (a period that crosses midnight belongs to the day
-  // it starts on).
-  schedule: [
-    { start: '05:00', stop: '07:00', playlist: 'kid' },
-    { start: '17:00', stop: '19:30', playlist: 'kid' },
-    { start: '19:30', stop: '23:00', playlist: 'grownup' },
-  ],
+  // What plays when is no longer set here: each box keeps its own filters
+  // (tags to play, and days and times) in ~/video-scheduler/filters.json,
+  // edited under Filters on its website. A new box starts with
+  // scheduler/filters.default.json. Videos get a tag from their folder in
+  // playlists/ (halloween/kid -> halloween-kid).
 
   videoExtensions: ['mp4', 'm4v', 'mov'],
   checkSeconds: 1,
 
   // Photos and videos added from a phone on the website. They live in
-  // ~/video-scheduler/photos on the box (never in the repo) and play only
-  // when Photos is chosen on the website, so no season or schedule entry
-  // may be called 'photos'.
+  // ~/video-scheduler/photos on the box (never in the repo), are all tagged
+  // `upload`, and play in any filter with one of their tags (All uploads, to
+  // start with). A repo folder called photos is left alone by sync.
   photoSeconds: 10, // how long each photo stays on screen
-  photoExtensions: ['jpg', 'jpeg', 'png'], // photo files, which play only in Photos
+  photoExtensions: ['jpg', 'jpeg', 'png'], // photo files, which only uploads can be
   uploads: {
     maxBytes: 1024 ** 3, // at most 1 GB a file
     keepFreeBytes: 2 * 1024 ** 3, // refuse an upload that would leave under 2 GB free

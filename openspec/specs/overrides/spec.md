@@ -5,46 +5,38 @@ Lets the person change what is on screen for a while from the box's website, for
 
 ## Requirements
 
-### Requirement: Override with a playlist name
-An override naming a plain playlist (such as `grownup`) SHALL play that playlist within today's season, and the status SHALL say it is an override and how long it lasts.
-
-#### Scenario: override with a plain playlist uses today's season
-- **GIVEN** an override for `grownup` until cleared, on Oct 20, 2026
-- **WHEN** the scheduler decides what to show at 6 PM
-- **THEN** `halloween/grownup` plays
-- **AND** the status is `halloween/grownup (override until cleared)`
-
-### Requirement: Override previewing another season
-An override naming a season, or a season and playlist, SHALL play exactly that, whatever today's season is.
-
-#### Scenario: override can preview another season, with or without a playlist
-- **GIVEN** an override until cleared on Oct 20, 2026
-- **WHEN** the override is `christmas`, and then `christmas/grownup`
-- **THEN** `christmas` plays, and then `christmas/grownup`
-
-### Requirement: Override on a day with no season
-An override naming a plain playlist on a day no season covers SHALL show black, and the status SHALL explain that there is no season today.
-
-#### Scenario: override of a plain playlist on a day with no season explains the black
-- **GIVEN** an override for `kid` until cleared, set on Jan 15, 2026
-- **WHEN** the scheduler decides what to show at 6 PM
-- **THEN** nothing plays
-- **AND** the status is `black (override until cleared; asked for kid but no season today)`
-
 ### Requirement: Override until the schedule changes
 An override with no time limit SHALL end when the schedule next changes, after which the schedule SHALL apply again.
 
 #### Scenario: an override "until the schedule changes" ends at the next period
-- **GIVEN** an override to black with no time limit, set on Oct 20, 2026 at 5 PM
+- **GIVEN** the starting filters, and an override to black with no time limit, set on Oct 20, 2026 at 5 PM
 - **WHEN** the scheduler decides what to show at 7:29 PM and at 7:30 PM
 - **THEN** at 7:29 PM the status is `black (override until the schedule changes at 7:30 PM)`
-- **AND** at 7:30 PM `halloween/grownup` plays
+- **AND** at 7:30 PM Halloween grownup plays
 
-### Requirement: Override file checks
-An override SHALL name a playlist as `name` or `season/name`, or no playlist for black. Anything else, including empty names, hidden names and paths leaving the video folder, SHALL be rejected.
+### Requirement: Override with a filter
+An override SHALL play the filter it names, whatever that filter's schedule, or black, and the status SHALL name the filter and how long the override lasts.
 
-#### Scenario: override file validation
-- **GIVEN** override files naming a playlist
+#### Scenario: an override plays the chosen filter whatever its schedule
+- **GIVEN** the starting filters, and an override for Thanksgiving until cleared
+- **WHEN** the scheduler decides what to show at 6 PM on Oct 20, 2026, and at 6 PM on Jan 15, 2026
+- **THEN** Thanksgiving plays both times
+- **AND** the status is `Thanksgiving (override until cleared)`
+
+### Requirement: An override for a filter that's gone ends
+When the override names a filter the box no longer has, the box SHALL end the override, removing the override file, follow the schedule, and log why once.
+
+#### Scenario: an override for a filter that's gone is ended and logged
+- **GIVEN** the starting filters, and an override for Easter until cleared
+- **WHEN** the scheduler decides what to show at 6 PM on Oct 20, 2026
+- **THEN** the override file is gone and Halloween kid plays
+- **AND** `Ending the override: there is no filter called Easter any more.` is logged
+
+### Requirement: Override file checks for filters
+An override SHALL name a filter as `filter`, or no filter for black. A file that names a playlist the old way SHALL be removed and logged; any other file that isn't a filter name SHALL be ignored and logged once.
+
+#### Scenario: override file validation for filters
+- **GIVEN** override files
 - **WHEN** the scheduler reads them
-- **THEN** `kid`, `christmas/kid` and no playlist are accepted
-- **AND** `../x`, `a/b/c`, `.hidden`, `a/.b` and an empty name are rejected
+- **THEN** `{"filter":"Halloween kid",...}` and `{"filter":null,...}` are accepted
+- **AND** `{"playlist":"halloween/grownup",...}`, a filter name that is empty, longer than 30 characters or has `(`, and a filter that is a number are rejected

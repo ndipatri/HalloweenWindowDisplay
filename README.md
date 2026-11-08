@@ -2,7 +2,7 @@
 
 A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat, between views of an autumn sunset that fades into a moonlit night and a calmer one where the sun hangs still over the hills while the leaves keep falling.
 
-It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry Pi box that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, Christmas.
+It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry Pi box that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, and more to come.
 
 <table align="center">
   <tr>
@@ -28,31 +28,26 @@ It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry 
 
 ![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Raspberry Pi box](docs/images/physical-setup.svg)
 
-A Raspberry Pi box, plugged into the TV's HDMI, plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. Two things decide what's on screen:
+A Raspberry Pi box, plugged into the TV's HDMI, plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. What's on screen is decided by **filters**:
 
-- **The season**, from the date: Halloween videos in October, Thanksgiving in November, Christmas in December.
-- **The time of day**: gentler "kid" videos in the early morning and early evening, scarier "grownup" ones later, and a black screen the rest of the time.
+- **Tags:** every video has a tag from its folder (`halloween`, `halloween-grownup`, …), and you can add your own, like `favorites`.
+- **Filters:** a filter plays everything with its tags, on the days and at the times you give it: gentler "kid" Halloween videos in the early morning and early evening, scarier "grownup" ones later, and a black screen the rest of the time.
 
-The videos are kept in this repo, and the box picks up the latest by itself every hour. A page on your phone shows what's playing and lets you change it for a while.
+The videos are kept in this repo, and the box picks up the latest by itself every hour. A page on your phone shows what's playing, lets you change it for a while, and is where you tag things and set the filters.
 
 ## What's playing
 
-| Season | When | Videos |
+Each box chooses what plays with **filters**, set on its own website (see "Change what plays when" below). A new box starts with these:
+
+| Filter | Plays | When |
 |---|---|---|
-| Halloween | Every day in October | Kid hours: the fuzzy creatures and Mochi the ghost-dog. Grownup hours: those two plus the monster, the jump scare and the woman |
-| Thanksgiving | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself | The fall sunset, Mochi the pilgrim and the steady fall sun, all evening |
-| Christmas | December | None yet, so the window stays black |
+| Halloween kid | The fuzzy creatures and Mochi the ghost-dog | Every day in October, 5–7 am and 5–7:30 pm |
+| Halloween grownup | Those two plus the monster, the jump scare and the woman | Every day in October, 7:30–11 pm |
+| Thanksgiving | The fall sunset, Mochi the pilgrim and the steady fall sun | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm |
+| Favorites | Whatever you've starred | Only when you choose it |
+| All uploads | Your own photos and videos | Only when you choose it |
 
-Each day:
-
-| Time | Playing |
-|---|---|
-| 5–7 am | Kid videos |
-| 5–7:30 pm | Kid videos |
-| 7:30–11 pm | Grownup videos |
-| Any other time | Black |
-
-On a day outside every season, the window stays black. The dates and times can be changed; they're set in `scheduler/config.js`.
+At any other time the window stays black. There's no Christmas filter yet, as there are no Christmas videos.
 
 ## The videos
 
@@ -164,23 +159,38 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-- play the **Kid** or **Grownup** videos, **My picks**, **All uploads** (your own photos and videos), or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
-- play a **season** (under **Seasons**, below the other Play buttons): another season's videos, even on other days;
+- play any **filter** (Halloween kid, Thanksgiving, Favorites, All uploads, …) or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back, whatever day it is;
 - go **Back to schedule**;
-- **Check for new videos now**, to get new videos from GitHub straight away instead of within the hour. It only brings videos: a change to the dates or times still needs "Get the latest version" below.
+- **Check for new videos now**, to get new videos from GitHub straight away instead of within the hour. It only brings videos; your filters and tags stay as they are.
 
 At the bottom, **Recent activity** shows the last things the box did: each video as it starts, changes, and syncs.
 
 Changes show on the TV within a couple of seconds. **For how long** starts on "Until switched back", so whatever you choose stays on until you press **Back to schedule**, even overnight. To have it end by itself, pick "Until the schedule changes" or a number of minutes first.
 
-### Pick the videos you want: My picks
+### Favorites and tags
 
-Under **My picks** on the page are all the videos on the box, by season, and the photos and videos you've added (under **Uploads**).
+Under **Tags** on the page is everything on the box, by folder, and the photos and videos you've added (under **Uploads**).
 
-1. Tick the ones you want. Each gets a number: that's the order they'll play in. Untick one to take it out.
-2. Tap **My picks** under Play, for as long as you choose.
+- Tap **☆** to add something to **Favorites** (it turns to ★). Tap **Favorites** under Play to show them all, in name order, round and round.
+- Every video has a tag from its folder in GitHub, like `halloween` or `halloween-grownup`, and every photo or video you add has `upload`. Those can't be taken off.
+- You can add your own tags too, like `family`, by typing one and tapping **Add**, then make a filter for it. Tap × on a tag to take it off.
+- Tags you add are kept on this box only.
+- Changes show on the window straight away if that filter is playing.
 
-They play in that order, round and round; if you pick just one, it plays over and over. The box remembers your picks, on every phone, so next time you only need to tap **My picks**. A photo or video you add joins the end of your picks by itself. Changing the ticks while My picks is on changes what plays straight away. To move one to the end, untick it and tick it again.
+### Change what plays when: filters
+
+Under **Filters** are the box's filters, highest first. Each one plays everything with **any of** its tags, leaving out anything with one of its **except** tags.
+
+- **Edit** a filter to change its name, its tags, or its days and times:
+  - days are written like `10-01` (October 1) or `11-4thu` (the 4th Thursday in November);
+  - **Only on** picks weekdays;
+  - **Extra days** can be things like `11-4thu-1` (the day before Thanksgiving);
+  - times look like `17:00-23:00`; leave times empty for all day.
+- **↑** and **↓** change the order: where two filters' times overlap, the higher one plays.
+- **New filter** adds one, and **Delete** removes one. A filter with no days and times only plays when you choose it.
+- Nothing changes until you type the upload PIN and tap **Save filters**. If something can't be used, it says which filter and why.
+
+Filters are kept on this box only, and aren't backed up. A new box starts with the ones above.
 
 ### Put your own photos and videos on the window
 
@@ -188,14 +198,14 @@ They play in that order, round and round; if you pick just one, it plays over an
 2. Under **Add photos or videos**, type the box's upload PIN. The phone remembers it after the first time.
 3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
-5. Tap **All uploads** under Play to show them all, for as long as you choose. They're also added to **My picks**.
+5. Tap **All uploads** under Play to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
 
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. Photos are shown whole, with black around them, so nothing gets cut off.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
 Good to know:
-- The schedule never shows your photos or your picks by itself: they only show when you choose All uploads or My picks.
+- The starting filters never show your photos by themselves: they show when you choose All uploads or Favorites, or in any filter you give a schedule.
 - They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
 - Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
@@ -207,9 +217,10 @@ Good to know:
 |---|---|
 | See what's on screen | Open http://tvbox.local/ |
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
-| Get the latest version after a change to the dates or times | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
+| Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
-| Play just the videos you choose | On the page: tick them under **My picks**, then tap **My picks** (see above) |
+| Play just the videos you choose | On the page: star them under **Tags**, then tap **Favorites** (see above) |
+| Change the dates or times | On the page, under **Filters**: **Edit**, then **Save filters** with the PIN (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
 | See what it did last week | `ssh tvbox.local`, then `less ~/video-scheduler/scheduler.log.1` (the box keeps about a month of logs) |
@@ -229,8 +240,8 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The page doesn't open | The box is off or not on the Wi‑Fi. Unplug it and plug it back in, wait two minutes, and try again |
 | A new box's page never opens | The first setup takes up to 20 minutes, and needs the Wi‑Fi you typed for the card. If it's longer: `ssh tvbox.local` (your box's name), then `cat /var/log/tvbox-firstboot.log` shows how far it got |
 | It says `waiting for the clock to be set` | The box can't reach the internet to get the time. Check the Wi‑Fi |
-| The wrong season is playing | The box has an old version: see "Get the latest version" above |
-| It says `no season today` | Nothing is scheduled for today, so black is expected |
+| The wrong thing is playing | Check the filters' days and times, and their order, under **Filters** |
+| It says `nothing scheduled` | No filter is scheduled right now, so black is expected |
 | It's not following the schedule | Someone changed it on the page: press **Back to schedule** |
 | A new video doesn't play | Press **Check for new videos now** on the page, and watch Recent activity for `Copied` |
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
@@ -242,6 +253,8 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
 | A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
 | Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
-| My picks shows black | Nothing is ticked under My picks, or what you ticked is no longer on the box: tick something |
+| Favorites shows black, or won't start | Nothing is starred yet: star something under **Tags** |
+| A filter won't start: `Nothing in … yet` | Nothing has its tags yet: add the tag to something under **Tags**, or edit the filter |
+| Saving filters says `Editing filters is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |
 
 For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

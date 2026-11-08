@@ -1,15 +1,15 @@
 ---
 name: "window-display-video"
-description: "Make a new video for the HalloweenWindowDisplay portrait window TV with the Higgsfield MCP: prompt, generate, finish with ffmpeg, add to a season playlist, update the README."
+description: "Make a new video for the HalloweenWindowDisplay portrait window TV with the Higgsfield MCP: prompt, generate, finish with ffmpeg, add to a season's folder (its tag), update the README."
 ---
 
 # Window display video
 
-Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) in an upstairs window, seen from the street at night. A Raspberry Pi box ("the box") plugged into the TV plays season folders (`playlists/<season>/`, optional `<season>/<playlist>/` subfolders such as `grownup/`) on a schedule through mpv; it syncs videos from the repo a minute after boot and then hourly. For changing seasons or the schedule, use the window-display-schedule skill.
+Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) in an upstairs window, seen from the street at night. A Raspberry Pi box ("the box") plugged into the TV plays videos through mpv, chosen by the box's filters: each video's folder gives it a tag (`playlists/halloween/` → `halloween`, `playlists/halloween/grownup/` → `halloween-grownup`), and filters with schedules play the tags they name. It syncs videos from the repo a minute after boot and then hourly. For seasons, tags, filters or schedules, use the window-display-schedule skill.
 
 ## 1. Agree the idea and the cost
 
-- Pin down: subject, mood (kid-friendly vs grownup/scary), season, which playlist (season folder = every period; `grownup/` = grownup only), length.
+- Pin down: subject, mood (kid-friendly vs grownup/scary), season, which folder (the season folder is in both starting Halloween filters; `grownup/` only in Halloween grownup; check the box's filters for anything else), length.
 - Check the balance (`balance`) and quote the cost before generating: Seedance 2.5 at 1080p is **16 credits per second** (20 s = 320, 15 s = 240, 10 s extension = 160). Give it in credits and in USD from how the credits were bought (rates below). If credits are short, say so and wait for the person to buy more; `transactions` shows what was bought.
 
 Credit rates paid so far (USD):
@@ -103,11 +103,11 @@ Settings each current video was finished with:
 
 ## 7. Add it to the repo
 
-- Branch from `origin/main`; copy to `playlists/<season>/` or `playlists/<season>/<playlist>/` with a snake_case name. Under 100 MB (GitHub limit). Files play in name order.
+- Branch from `origin/main`; copy to `playlists/<season>/` (tag `<season>`) or a subfolder like `playlists/<season>/grownup/` (tag `<season>-grownup`) with a snake_case name. Under 100 MB (GitHub limit). Files play in name order.
 - Update `README.md`. It is a plain, non-technical guide for the person: no costs, model names, settings, credits, ffmpeg, file paths of videos or anything else in this skill. Only:
-  - "What's playing": the season's Videos column (by name, e.g. "the fall sunset");
+  - "What's playing": the filter's Plays column (by name, e.g. "the fall sunset");
   - "The videos": a row in the season's table: **Name:** one plain sentence of what you see | Kid and grownup hours / Grownup hours / All evening | m:ss;
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
-- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, tap the season's button under **Seasons** (or its season / playlist button), with a duration.
+- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, tap a filter that has its folder's tag (e.g. Halloween grownup), with a duration, or star it under **Tags** and play **Favorites**. A video in a new folder needs a filter that names its tag (on the website's Filters, and in `scheduler/filters.default.json` for new boxes).

@@ -12,10 +12,8 @@ const CLOCK_NOT_SET = 'black (waiting for the clock to be set)';
 // `options`: { config, videoRoot, mpv, now() -> Date, clockIsSet() -> bool,
 //              readText, writeText, removeFile, listFolder, log }
 function createPlayer(options) {
-  const { config, mpv, now, clockIsSet, writeText, log } = options;
+  const { mpv, now, clockIsSet, writeText, log } = options;
   const logic = createScheduler(options);
-  const schedule = logic.validSchedule(config.schedule);
-  const seasons = logic.validSeasons(config.seasons);
 
   const playlists = {};
   const overrideState = { warnedText: null };
@@ -40,8 +38,8 @@ function createPlayer(options) {
 
   async function tickNow() {
     const choice = clockIsSet()
-      ? logic.whatToShow(schedule, seasons, now(), overrideState)
-      : { playlist: null, status: CLOCK_NOT_SET };
+      ? logic.whatToShow(logic.readFilters(), now(), overrideState)
+      : { filter: null, status: CLOCK_NOT_SET };
 
     if (choice.status !== status) {
       status = choice.status;
@@ -49,14 +47,14 @@ function createPlayer(options) {
       writeText(logic.STATUS_PATH, status + '\n');
     }
 
-    const name = choice.playlist;
+    const name = choice.filter;
     if (name !== activeName) {
       if (active) logic.setAside(active);
       idle = false;
       await blank();
       activeName = name;
       if (name) {
-        if (!playlists[name]) playlists[name] = logic.createPlaylist(name, seasons);
+        if (!playlists[name]) playlists[name] = logic.createPlaylist(name);
         active = playlists[name];
       } else {
         active = null;
@@ -80,12 +78,16 @@ function createPlayer(options) {
     }
   }
 
-  // The picks were saved on the website. While My picks plays, the queue
-  // behind the item on screen is rebuilt from them at once; an item on
-  // screen that is no longer picked gives way to the pick that followed it,
-  // queued first so mpv moves straight on to it rather than going black.
-  async function repickNow() {
-    if (!active || !active.ordered) return; // read afresh when picks next plays
+  // Tags or filters were saved on the website (or an upload removed). While
+  // a filter plays, the queue behind the item on screen is rebuilt from its
+  // items as they are now; an item on screen that no longer belongs gives
+  // way to the next one after it, queued first so mpv moves straight on to
+  // it rather than going black.
+  let refilterWaiting = null;
+  async function refilterNow() {
+    if (!active) return;
+    // Its filter is gone (renamed or deleted): the next tick sorts it out.
+    if (!logic.findFilter(logic.readFilters(), active.name)) return;
     const entries = (await mpv.getProperty('playlist')) || [];
     const current = entries.findIndex((e) => e.current);
     if (current === -1) {
@@ -94,23 +96,24 @@ function createPlayer(options) {
     }
     // mpv may move on meanwhile, so each removal reads the playlist afresh
     // and never takes out the entry that is on screen by then.
+    let onScreen = entries[current].filename;
     for (;;) {
       const now = (await mpv.getProperty('playlist')) || [];
       const at = now.findIndex((e) => e.current);
-      if (at === -1 || at >= now.length - 1) break;
+      if (at === -1) return; // mpv went idle meanwhile: the next tick starts afresh
+      onScreen = now[at].filename; // what is on screen by now
+      if (at >= now.length - 1) break;
       await mpv.command('playlist-remove', now.length - 1);
     }
-    const onScreen = entries[current].filename;
-    const picked = logic.readPicks().filter(logic.pickable).map((rel) => logic.videoRoot + '/' + rel);
-    if (picked.includes(onScreen)) {
-      active.lastQueued = { name: onScreen.split('/').pop(), path: onScreen };
+    const item = { name: onScreen.split('/').pop(), path: onScreen };
+    const items = logic.playlistItems(active).items;
+    if (items.some((v) => v.path === onScreen)) {
+      active.lastQueued = item;
       idle = !(await logic.keepPlaying(active, mpv));
       return;
     }
-    const old = active.order.map((v) => v.path);
-    const after = old.slice(old.indexOf(onScreen) + 1);
-    const next = after.find((p) => picked.includes(p));
-    active.resumeAt = next ? { name: next.split('/').pop(), path: next } : null;
+    // The next item after it in name order (or the first).
+    active.resumeAt = items.find((v) => logic.compareVideos(v, item) > 0) || null;
     active.lastQueued = null;
     await logic.keepPlaying(active, mpv); // queues behind the item on screen
     const now = (await mpv.getProperty('playlist')) || [];
@@ -122,10 +125,14 @@ function createPlayer(options) {
   return {
     tick: () => serially(tickNow),
     dropFile: (file) => serially(() => dropFileNow(file)),
-    repick: () => serially(repickNow),
+    // Several saves in a row (tagging one item after another) need one
+    // rebuild, not one each: a rebuild still waiting to start covers them all.
+    refilter: () => {
+      if (refilterWaiting) return refilterWaiting;
+      refilterWaiting = serially(() => { refilterWaiting = null; return refilterNow(); });
+      return refilterWaiting;
+    },
     logic,
-    schedule,
-    seasons,
   };
 }
 
@@ -204,18 +211,15 @@ async function main() {
     clockIsSet: () => fs.existsSync(box.clockFile),
   }));
   io.log('Started. Videos: ' + videoRoot);
-  io.log(
-    player.seasons.length
-      ? 'Seasons: ' + player.seasons.map(player.logic.describeSeason).join('; ')
-      : 'No seasons: playlists play all year.',
-  );
+  const filters = player.logic.readFilters();
+  if (filters.length) io.log('Filters: ' + filters.map((f) => f.name).join(', '));
 
   startWebsite(Object.assign({}, io, {
     config,
     videoRoot,
     now: () => new Date(),
     beforeRemove: player.dropFile,
-    picksChanged: player.repick,
+    filtersChanged: player.refilter,
   }), box.webPort);
 
   for (;;) {
