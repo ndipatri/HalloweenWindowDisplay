@@ -51,7 +51,7 @@ Box tags on an item that is no longer on the box, or on a video from GitHub, SHA
 #### Scenario: box tags on a video from GitHub are ignored and dropped
 - **GIVEN** `halloween/fuzzy.mp4`, `photos/00001-a.jpg`, and `tags.json` giving both the tag `favorites`
 - **WHEN** the box reads the items, and then the website is asked to tag `photos/00001-a.jpg` with `family`
-- **THEN** `halloween/fuzzy.mp4` has no box tags and the filter Favorites plays only `photos/00001-a.jpg`
+- **THEN** `halloween/fuzzy.mp4` has no box tags and the tag `favorites` plays only `photos/00001-a.jpg`
 - **AND** `tags.json` no longer mentions `halloween/fuzzy.mp4`
 
 ### Requirement: My picks become favorites

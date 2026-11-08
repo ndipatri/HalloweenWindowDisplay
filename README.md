@@ -44,10 +44,8 @@ What plays is chosen by **filters**. These come from GitHub, so every box has th
 | Halloween kid | The fuzzy creatures and Mochi the ghost-dog | Every day in October, 5–7 am and 5–7:30 pm |
 | Halloween grownup | Those two plus the monster, the jump scare and the woman | Every day in October, 7:30–11 pm |
 | Thanksgiving | The fall sunset, Mochi the pilgrim and the steady fall sun | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm |
-| Favorites | Your photos and videos you've starred | Only when you choose it |
-| All uploads | Your own photos and videos | Only when you choose it |
 
-At any other time the window stays black. There's no Christmas filter yet, as there are no Christmas videos.
+At any other time the window stays black. You can also play any **tag** whenever you like (see "Using it"): `favorites` for the photos you've starred, `upload` for all your own photos and videos, or a folder's tag such as `halloween-grownup`. There's no Christmas filter yet, as there are no Christmas videos.
 
 ## The videos
 
@@ -159,7 +157,9 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-- play any **filter** (Halloween kid, Thanksgiving, Favorites, All uploads, …) or **Black**, until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back, whatever day it is;
+- play any **tags** (Favorites, Uploads, Halloween grownup, …) and **filters** (Halloween kid, Thanksgiving, …), whatever day it is: tap one or more to pick them (tap again to unpick), then tap **Play**. Several picked play together as one mix, everything once, round and round. What's playing is outlined;
+- show **Black**;
+- choose **For how long**: until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
 - go **Back to schedule**;
 - **Check for new videos now**, to get new videos from GitHub straight away instead of within the hour. It only brings videos; your filters and tags stay as they are.
 
@@ -171,14 +171,14 @@ Changes show on the TV within a couple of seconds. **For how long** starts on "U
 
 Under **Tags** on the page are the photos and videos you've added from your phone.
 
-- Tap **☆** to add one to **Favorites** (it turns to ★). Tap **Favorites** under Play to show them all, in name order, round and round.
-- Each one is tagged `upload`. You can add your own tags too, like `family`, by typing one and tapping **Add**, then make a filter for it. Tap × on a tag to take it off.
+- Tap **☆** to add one to **Favorites** (it turns to ★). Pick **Favorites** under Play and tap **Play** to show them all, in name order, round and round.
+- Each one is tagged `upload`. You can add your own tags too, like `family`, by typing one and tapping **Add**. Every tag in use shows under Play; make a filter for it only if it should play on a schedule. Tap × on a tag to take it off.
 - The videos from GitHub aren't listed here: each one's tag comes from its folder there (`halloween`, `halloween-grownup`, …), and filters use those tags. To play a GitHub video in a different filter, it goes in a different folder in GitHub.
 - Tags you add are kept on this box only, and changes show on the window straight away if that filter is playing.
 
 ### Change what plays when: filters
 
-Under **Filters** are two lists. Each filter plays everything with **any of** its tags, leaving out anything with one of its **except** tags.
+Under **Filters** are two lists. A filter puts tags on a schedule: it plays everything with **any of** its tags, leaving out anything with one of its **except** tags, on its days and times. Every filter needs days and times; to play tags whenever you like, pick them under Play instead.
 
 - **From GitHub:** the filters every box shares (the ones in the table above). They're shown with their days and times but can't be changed on the website: they're changed in GitHub, and every box picks the change up within the hour.
 - **Yours:** filters you make on this box. They come first among the Play buttons, and where their times overlap a GitHub filter's, yours wins, which is handy for a special evening. They can't have the same name as a GitHub filter.
@@ -191,7 +191,7 @@ For your own filters:
   - **Extra days** can be things like `11-4thu-1` (the day before Thanksgiving);
   - times look like `17:00-23:00`; leave times empty for all day.
 - **↑** and **↓** change the order: where two filters' times overlap, the higher one plays.
-- **New filter** adds one, and **Delete** removes one. A filter with no days and times only plays when you choose it.
+- **New filter** adds one, and **Delete** removes one.
 - Nothing changes until you type the upload PIN and tap **Save filters**. If something can't be used, it says which filter and why.
 
 Your own filters are kept on this box only, and aren't backed up. A new box starts with just the GitHub ones.
@@ -202,14 +202,14 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 2. Under **Add photos or videos**, type the box's upload PIN. The phone remembers it after the first time.
 3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
-5. Tap **All uploads** under Play to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
+5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
 
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. Photos are shown whole, with black around them, so nothing gets cut off.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
 Good to know:
-- The GitHub filters never show your photos by themselves: they show when you choose All uploads or Favorites, or in any filter you give a schedule.
+- The GitHub filters never show your photos by themselves: they show when you play Uploads or Favorites, or in a filter of your own that names their tags.
 - They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
 - Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
@@ -222,8 +222,8 @@ Good to know:
 | See what's on screen | Open http://tvbox.local/ |
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
 | Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
-| Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
-| Play just the photos and videos you choose | On the page: star them under **Tags**, then tap **Favorites** (see above) |
+| Show your own photos and videos | On the page: **Add photos or videos**, then pick **Uploads** and tap **Play** (see above) |
+| Play just the photos and videos you choose | On the page: star them under **Tags**, then pick **Favorites** and tap **Play** (see above) |
 | Change the dates or times | For every box: in `playlists/filters.json` in GitHub. For one box only: add your own filter under **Filters** on its page (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |

@@ -8,7 +8,7 @@ halloween/            tag: halloween
 filters.json          the filters every box shares: which tags play on which days and at which times
 ```
 
-`filters.json` holds the shared filters (Halloween kid, Halloween grownup, Thanksgiving, Favorites, All uploads). Each one names the tags it plays (`anyOf`, and optionally `except`) and its days and times; see the window-display-schedule skill for the format. A change here reaches every box with its next sync. Each box can also have its own custom filters, made on its website, which win over these.
+`filters.json` holds the shared filters (Halloween kid, Halloween grownup, Thanksgiving). Each one names the tags it plays (`anyOf`, and optionally `except`) and its days and times, which every filter needs (any tag can be played any time from the website's Play section); see the window-display-schedule skill for the format. A change here reaches every box with its next sync. Each box can also have its own custom filters, made on its website, which win over these.
 
 The box copies these into `~/video-scheduler/` a minute after it starts and then every hour. This folder is the master copy: once a season folder exists here, videos in that season on the box that aren't in it are moved to `~/video-scheduler/.removed/`.
 

@@ -14,8 +14,8 @@ module.exports = {
 
   // Photos and videos added from a phone on the website. They live in
   // ~/video-scheduler/photos on the box (never in the repo), are all tagged
-  // `upload`, and play in any filter with one of their tags (All uploads, to
-  // start with). A repo folder called photos is left alone by sync.
+  // `upload`, and play from that tag under Play on the website, or in any
+  // filter with one of their tags. A repo folder called photos is left alone by sync.
   photoSeconds: 10, // how long each photo stays on screen
   photoExtensions: ['jpg', 'jpeg', 'png'], // photo files, which only uploads can be
   uploads: {

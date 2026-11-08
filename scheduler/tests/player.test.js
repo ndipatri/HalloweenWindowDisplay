@@ -80,7 +80,7 @@ test('a filter that comes back resumes at the item it was on', async () => {
   await b.tick();
   assert.equal(b.mpv.playing(), ROOT + '/halloween/b.mp4');
   const override = ROOT + '/override.json';
-  b.files[override] = JSON.stringify({ filter: null, setAt: +b.now, expires: null, untilCleared: true });
+  b.files[override] = JSON.stringify({ tags: null, setAt: +b.now, expires: null, untilCleared: true });
   await b.tick();
   assert.deepEqual(b.rel(), []);
   delete b.files[override];
@@ -128,7 +128,7 @@ test('the box shows black while an override chooses black', async () => {
   const b = box({ halloween: ['fuzzy.mp4'] });
   await b.tick();
   assert.ok(b.mpv.playing());
-  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: null, setAt: +b.now, expires: null, untilCleared: true });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: null, setAt: +b.now, expires: null, untilCleared: true });
   await b.tick();
   assert.equal(b.mpv.playing(), null);
   assert.deepEqual(b.rel(), []);
@@ -218,7 +218,7 @@ test('the box decodes HEVC in hardware and H.264 in software', () => {
 // The box playing Photos, with its website wired to it as on the box.
 async function photosPlaying() {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
-  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: 'All uploads', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   b.files[ROOT + '/upload-pin'] = '4321\n';
   await b.tick();
   const { createWebsite } = require('../website.js');
@@ -268,10 +268,10 @@ test('removing a queued upload takes it out of the queue', async () => {
 
 // ---- Tags or filters changing while a filter plays ----
 
-// The box playing Favorites: uploads a, b, c, tagged favorites as given.
+// The box playing the tag favorites: uploads a, b, c, tagged favorites as given.
 async function favoritesPlaying(tagged) {
   const b = box({ photos: ['00001-a.jpg', '00002-b.jpg', '00003-c.jpg'] });
-  b.files[ROOT + '/override.json'] = JSON.stringify({ filter: 'Favorites', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['favorites'], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   b.tag = (paths) => {
     const tags = {};
     for (const p of paths) tags['photos/' + p] = ['favorites'];
@@ -326,7 +326,7 @@ test('untagging everything while a filter plays shows black and says so once', a
   await b.tick();
   await b.tick();
   assert.equal(b.mpv.playing(), null);
-  const none = 'Nothing in Favorites yet (any of favorites). Showing black until something is tagged.';
+  const none = 'Nothing tagged favorites yet. Showing black until something is.';
   assert.equal(b.logs.filter((l) => l === none).length, 1, b.logs.join('\n'));
 });
 

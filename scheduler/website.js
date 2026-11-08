@@ -50,8 +50,9 @@ function createWebsite(options) {
     }
   } catch (e) { /* no photos folder yet */ }
 
+  // What can be picked under Play: every tag in use, and every filter.
   function choices() {
-    return { filters: logic.readFilters().map((f) => f.name) };
+    return { tags: logic.tagsInUse(logic.items()), filters: logic.readFilters().map((f) => f.name) };
   }
 
   // Lets the player rebuild its queue for what is on screen. The change is
@@ -179,6 +180,22 @@ function createWebsite(options) {
       writeText(logic.FILTERS_PATH, JSON.stringify({ filters: kept }, null, 2) + '\n');
     } catch (e) {
       log("ERROR: Couldn't drop the custom copies of the GitHub filters: " + e.message);
+    }
+  })();
+
+  // Custom filters saved without days and times (allowed before tags could be
+  // played) are dropped when the website starts: their tags play from Play now.
+  (function dropUnscheduled() {
+    try {
+      const { custom } = logic.readRawFilters();
+      const kept = custom.filter((f) => !(f && typeof f.name === 'string' && (!Array.isArray(f.schedule) || !f.schedule.length)));
+      if (kept.length === custom.length) return;
+      for (const f of custom) {
+        if (!kept.includes(f)) log('Dropping the custom filter ' + f.name + ': a filter needs days and times now; pick its tags under Play instead.');
+      }
+      writeText(logic.FILTERS_PATH, JSON.stringify({ filters: kept }, null, 2) + '\n');
+    } catch (e) {
+      log("ERROR: Couldn't drop the custom filters without days and times: " + e.message);
     }
   })();
 
@@ -451,13 +468,25 @@ function createWebsite(options) {
     };
   }
 
+  // POST /api/show: { tags: [...], filters: [...], until } plays everything
+  // with any of the tags plus everything the filters pick; { target: 'black' }.
   function show(body) {
-    const target = typeof body.target === 'string' ? body.target.trim() : '';
-    const black = target === 'black';
-    const filter = black ? null : logic.findFilter(logic.readFilters(), target);
-    if (!black && !filter) return fail('No filter called ' + (target || '(none)') + ' on the box.');
-    if (filter && logic.filterItems(filter).length === 0) {
-      return fail('Nothing in ' + filter.name + ' yet. Tag something ' + filter.anyOf.join(' or ') + ' first.');
+    const black = body.target === 'black';
+    let tags = [];
+    let picked = [];
+    if (!black) {
+      tags = body.tags === undefined ? [] : body.tags;
+      picked = body.filters === undefined ? [] : body.filters;
+      if (!Array.isArray(tags) || !Array.isArray(picked)) return fail('Bad request.');
+      tags = Array.from(new Set(tags));
+      picked = Array.from(new Set(picked));
+      if (!tags.length && !picked.length) return fail('Pick one or more tags or filters to play.');
+      const inUse = logic.tagsInUse(logic.items());
+      const unknownTag = tags.find((t) => !inUse.includes(t));
+      if (unknownTag !== undefined) return fail('No tag called ' + String(unknownTag) + ' on the box.');
+      const filters = logic.readFilters();
+      const unknownFilter = picked.find((n) => !logic.findFilter(filters, n));
+      if (unknownFilter !== undefined) return fail('No filter called ' + String(unknownFilter) + ' on the box.');
     }
 
     const until = body.until === undefined ? 'schedule' : body.until;
@@ -468,16 +497,17 @@ function createWebsite(options) {
 
     const at = now();
     const override = {
-      filter: black ? null : filter.name,
+      tags: black ? null : tags,
+      filters: black ? [] : picked,
       setAt: at.getTime(),
       expires: until === 'schedule' || until === 'cleared' ? null : at.getTime() + minutes * 60 * 1000,
       untilCleared: until === 'cleared',
     };
     const text = JSON.stringify(override) + '\n';
-    if (!logic.parseOverride(text).ok) return fail('No filter called ' + target + ' on the box.');
+    if (!logic.parseOverride(text).ok) return fail('Bad request.');
     writeText(logic.OVERRIDE_PATH, text);
 
-    const label = black ? 'black' : target;
+    const label = black ? 'black' : logic.pickName(tags, picked);
     if (until === 'schedule') return ok('Showing ' + label + ' until the schedule next changes.');
     if (until === 'cleared') return ok('Showing ' + label + ' until you choose Back to schedule.');
     return ok('Showing ' + label + ' until ' + logic.formatTime(new Date(override.expires), at) +
@@ -661,6 +691,9 @@ const PAGE = `<!DOCTYPE html>
   .now { margin-bottom: 12px; }
   #status { font-weight: 600; }
   button.current { border-color: var(--accent); outline: 3px solid var(--accent); outline-offset: 2px; }
+  button.picked { background: #4a3317; border-color: var(--accent); }
+  .playrow { margin-top: 12px; }
+  .picks:empty { display: none; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   button, select { font: inherit; color: var(--text); background: #2c2c2c; border: 1px solid #3a3a3a; border-radius: 10px; padding: 12px; width: 100%; }
   button { cursor: pointer; }
@@ -717,7 +750,12 @@ const PAGE = `<!DOCTYPE html>
   <h2>Play</h2>
   <div class="card">
     <div class="now" role="status">Now: <span id="status">Checking…</span></div>
-    <div class="grid" id="playlists"><button id="black" data-choice="black">Black</button></div>
+    <div class="hint">Pick one or more, then tap Play.</div>
+    <div class="group">Tags</div>
+    <div class="grid picks" id="tagpicks"></div>
+    <div class="group">Filters</div>
+    <div class="grid picks" id="filterpicks"></div>
+    <div class="grid playrow"><button class="primary" id="play-picked" disabled>Play</button><button id="black" data-choice="black">Black</button></div>
   </div>
   <div id="message"></div>
 
@@ -813,7 +851,7 @@ const PAGE = `<!DOCTYPE html>
   // Outlines the Play button for what is on the window (none for null).
   function outline(on) {
     for (const b of document.querySelectorAll('button[data-choice]')) {
-      const yes = b.dataset.choice === on;
+      const yes = on.includes(b.dataset.choice);
       b.classList.toggle('current', yes);
       if (yes) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
     }
@@ -823,30 +861,58 @@ const PAGE = `<!DOCTYPE html>
     try {
       const r = await (await fetch('/api/status')).json();
       setText($('status'), r.status || 'The box has not started yet.');
-      // playingFilter is in the second script block, loaded by the time this runs (after an await).
-      outline(playingFilter(r.status, filterNames));
-    } catch (e) { setText($('status'), "Couldn't reach the box."); outline(null); }
+      // playingChoices is in the second script block, loaded by the time this runs (after an await).
+      outline(playingChoices(r.status, filterNames));
+    } catch (e) { setText($('status'), "Couldn't reach the box."); outline([]); }
     try {
       const l = await (await fetch('/api/log')).json();
       $('log').textContent = l.lines.length ? l.lines.join('\\n') : 'Nothing yet.';
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
-  let filterNames = []; // the box's filters, for outlining the playing one
+  let filterNames = []; // the box's filters, for outlining the playing ones
+  const picked = new Set(); // what is selected under Play: '#tag' or a filter's name
 
-  // The Play buttons: one per filter, in the box's order, then Black.
+  // A button that selects or unselects the choice without showing anything.
+  function pickButton(text, choice) {
+    const b = button(text, () => {
+      if (picked.has(choice)) picked.delete(choice); else picked.add(choice);
+      b.classList.toggle('picked', picked.has(choice));
+      b.setAttribute('aria-pressed', String(picked.has(choice)));
+      $('play-picked').disabled = !picked.size;
+    });
+    b.dataset.choice = choice;
+    b.classList.toggle('picked', picked.has(choice));
+    b.setAttribute('aria-pressed', String(picked.has(choice)));
+    return b;
+  }
+
+  // The Play section: a button per tag and per filter (custom first), to pick
+  // several and play them together.
   async function load() {
     const c = await (await fetch('/api/choices')).json();
-    const grid = $('playlists');
-    for (const b of Array.from(grid.querySelectorAll('button'))) if (b.id !== 'black') b.remove();
+    const offered = c.tags.map((t) => '#' + t).concat(c.filters);
+    for (const x of Array.from(picked)) if (!offered.includes(x)) picked.delete(x); // keep picks still offered
+    $('play-picked').disabled = !picked.size;
+    $('tagpicks').textContent = '';
+    $('filterpicks').textContent = '';
     filterNames = c.filters;
-    for (const name of c.filters) {
-      const b = button(name, () => show(name));
-      b.dataset.choice = name;
-      grid.insertBefore(b, $('black'));
-    }
+    for (const tag of c.tags) $('tagpicks').appendChild(pickButton(tagLabel(tag), '#' + tag));
+    for (const name of c.filters) $('filterpicks').appendChild(pickButton(name, name));
     refresh();
   }
+
+  $('play-picked').onclick = async () => {
+    const choice = Array.from(picked);
+    const tags = choice.filter((x) => x.startsWith('#')).map((x) => x.slice(1));
+    const filters = choice.filter((x) => !x.startsWith('#'));
+    const r = await post('/api/show', { tags, filters, until: $('until').value });
+    if (r.ok) {
+      picked.clear();
+      for (const b of document.querySelectorAll('.picks button')) { b.classList.remove('picked'); b.setAttribute('aria-pressed', 'false'); }
+      $('play-picked').disabled = !picked.size;
+    }
+  };
 
   // ---- Adding and removing photos ----
 
@@ -999,6 +1065,7 @@ const PAGE = `<!DOCTYPE html>
     try {
       const d = await (await fetch('/api/items')).json();
       tagNames = d.tags;
+      load().catch(() => {}); // the tags in use may have changed: offer them under Play
       $('tagnames').textContent = '';
       for (const t of d.tags) {
         const o = document.createElement('option');
@@ -1270,13 +1337,22 @@ const PAGE = `<!DOCTYPE html>
     return true;
   }
 
-  // The Play button for what is on the window, from the status line: the
-  // filter it names ('Halloween kid (scheduled until 7:30 PM)'), 'black', or
-  // null for anything else. Filter names can't contain '('.
-  function playingFilter(status, names) {
+  // What is playing, from the status line, as Play's choices: '#tag' for
+  // each tag picked, the name of each filter (picked, or on its schedule),
+  // or 'black'. '#favorites + Halloween kid (override until cleared)' ->
+  // ['#favorites', 'Halloween kid']. Filter names can't contain '(' or '+'.
+  function playingChoices(status, filters) {
     const key = String(status || '').split(' (')[0];
-    if (key === 'black') return 'black';
-    return names.includes(key) ? key : null;
+    if (key === 'black') return ['black'];
+    if (!key || key === 'null') return [];
+    return key.split(' + ').filter((p) => p.startsWith('#') || filters.includes(p));
+  }
+
+  // A tag as words: 'halloween-grownup' -> 'Halloween grownup', 'upload' -> 'Uploads'.
+  function tagLabel(tag) {
+    if (tag === 'upload') return 'Uploads';
+    const words = tag.replace(/-/g, ' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
   }
 
   // The list with item i moved by step (-1 up, 1 down), staying in bounds.

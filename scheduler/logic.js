@@ -149,6 +149,9 @@ function createScheduler(io) {
       if (bad !== undefined) return 'not a tag name: ' + JSON.stringify(bad);
     }
     if (f.schedule !== undefined && !Array.isArray(f.schedule)) return 'its schedule should be a list';
+    if (!f.schedule || f.schedule.length === 0) {
+      return 'a filter needs days and times; to play tags any time, pick them under Play';
+    }
     for (const [i, e] of (f.schedule || []).entries()) {
       const error = entryError(e);
       if (error) return 'schedule entry ' + (i + 1) + ': ' + error;
@@ -502,7 +505,7 @@ function createScheduler(io) {
 
     const parsed = parseOverride(text);
     if (!parsed.ok) {
-      if (parsed.old) return end('Ending an override from before filters (' + parsed.old + ').');
+      if (parsed.old) return end('Ending an override from before tags could be played (' + parsed.old + ').');
       if (state.warnedText !== text) {
         state.warnedText = text;
         log('ERROR: Ignoring ' + OVERRIDE_PATH + ': ' + parsed.error);
@@ -511,17 +514,19 @@ function createScheduler(io) {
     }
     const o = parsed.value;
     // A filter missing from a file with mistakes in it may come back when
-    // they are fixed, so its override is only ended when the file is clean.
-    if (o.filter !== null && !findFilter(filters, o.filter) && filtersCache.clean) {
-      return end('Ending the override: there is no filter called ' + o.filter + ' any more.');
+    // they are fixed, so its override is only ended when the files are clean.
+    const gone = o.tags === null ? undefined : o.filters.find((name) => !findFilter(filters, name));
+    if (gone !== undefined && filtersCache.clean) {
+      return end('Ending the override: there is no filter called ' + gone + ' any more.');
     }
+    const name = o.tags === null ? null : pickName(o.tags, o.filters);
 
     const decision = decideOverride(o, filters, now);
     if (!decision.active) {
-      return end('Override of ' + (o.filter === null ? 'black' : o.filter) + ' ended: ' + decision.reason + '.');
+      return end('Override of ' + (name === null ? 'black' : name) + ' ended: ' + decision.reason + '.');
     }
     return {
-      filter: o.filter,
+      filter: name,
       until: decision.endsAt
         ? (decision.atScheduleChange ? 'until the schedule changes at ' : 'until ') + formatTime(decision.endsAt, now)
         : 'until cleared',
@@ -529,11 +534,13 @@ function createScheduler(io) {
   }
 
   // Override file, as written by the website:
-  //   { "filter": "Halloween kid" | null, "setAt": <ms>,
+  //   { "tags": ["favorites"] | null, "filters": ["Halloween kid"], "setAt": <ms>,
   //     "expires": <ms> | null, "untilCleared": true | false }
-  // filter null means black. With no `expires` and untilCleared false, the
-  // override lasts until the schedule next changes after `setAt`. A file from
-  // before filters ({ "playlist": ... }) is { ok: false, old: <playlist> }.
+  // tags null means black. Otherwise it plays everything with any of the tags,
+  // plus everything each filter picks. With no `expires` and untilCleared
+  // false, it lasts until the schedule next changes after `setAt`. A file
+  // from before tags could be played ({ "filter": ... } or { "playlist": ... })
+  // is { ok: false, old: <what it named> }.
   function parseOverride(text) {
     let o;
     try {
@@ -542,10 +549,21 @@ function createScheduler(io) {
       return { ok: false, error: 'not valid JSON' };
     }
     if (o === null || typeof o !== 'object') return { ok: false, error: 'not an object' };
-    if (!('filter' in o) && 'playlist' in o) {
-      return { ok: false, old: o.playlist === null ? 'black' : String(o.playlist), error: 'from before filters' };
+    if (!('tags' in o) && ('filter' in o || 'playlist' in o)) {
+      const old = 'filter' in o ? o.filter : o.playlist;
+      return { ok: false, old: old === null ? 'black' : String(old), error: 'from before tags could be played' };
     }
-    if (!(o.filter === null || isFilterName(o.filter))) return { ok: false, error: 'bad "filter"' };
+    let tags = null;
+    let filters = [];
+    if (o.tags !== null) {
+      if (!Array.isArray(o.tags) || !o.tags.every(isTagName)) return { ok: false, error: 'bad "tags"' };
+      if (o.filters !== undefined && (!Array.isArray(o.filters) || !o.filters.every(isFilterName))) {
+        return { ok: false, error: 'bad "filters"' };
+      }
+      tags = o.tags;
+      filters = o.filters || [];
+      if (tags.length + filters.length === 0) return { ok: false, error: 'no tags or filters' };
+    }
     if (typeof o.setAt !== 'number') return { ok: false, error: 'bad "setAt"' };
     if (o.expires !== null && o.expires !== undefined && typeof o.expires !== 'number') {
       return { ok: false, error: 'bad "expires"' };
@@ -553,12 +571,19 @@ function createScheduler(io) {
     return {
       ok: true,
       value: {
-        filter: o.filter,
+        tags,
+        filters,
         setAt: o.setAt,
         expires: typeof o.expires === 'number' ? o.expires : null,
         untilCleared: o.untilCleared === true,
       },
     };
+  }
+
+  // What a pick of tags and filters is called on screen and in the log:
+  // '#favorites + Halloween kid'. Also the key of its playlist.
+  function pickName(tags, filters) {
+    return tags.map((t) => '#' + t).concat(filters).join(' + ');
   }
 
   // { active: true, endsAt: Date | null, atScheduleChange } or
@@ -599,11 +624,34 @@ function createScheduler(io) {
     };
   }
 
-  // The filter's items as mpv plays them: { name, path (absolute) }.
+  // What a playlist plays, from its name: a filter's name (on its schedule),
+  // or a pick from the Play section ('#favorites + Halloween kid': tags with
+  // '#', and filters). { known, items: [{ name, path (absolute) }], none }:
+  // known is false when it names nothing playable (a filter that's gone);
+  // none is what to say when nothing has those tags yet.
   function playlistItems(playlist) {
-    const filter = findFilter(readFilters(), playlist.name);
-    if (!filter) return { filter: null, items: [] };
-    return { filter, items: filterItems(filter).map((i) => ({ name: i.name, path: i.file })) };
+    const filters = readFilters();
+    const parts = playlist.name.split(' + ');
+    const tags = parts.filter((p) => p.startsWith('#')).map((p) => p.slice(1));
+    const names = parts.filter((p) => !p.startsWith('#'));
+    const picked = names.map((n) => findFilter(filters, n)).filter(Boolean);
+    if (!tags.length && !picked.length) return { known: false, items: [], none: '' };
+    const all = items();
+    const chosen = new Set();
+    for (const i of all) {
+      const has = i.folderTags.concat(i.boxTags);
+      if (tags.some((t) => has.includes(t))) chosen.add(i);
+    }
+    for (const f of picked) filterItems(f, all).forEach((i) => chosen.add(i));
+    const list = Array.from(chosen)
+      .sort((a, b) => compareNames(a.name, b.name) || compareNames(a.path, b.path))
+      .map((i) => ({ name: i.name, path: i.file }));
+    let none;
+    if (!names.length) none = 'Nothing tagged ' + tags.join(', ') + ' yet. Showing black until something is.';
+    else if (!tags.length && names.length === 1 && picked.length === 1) {
+      none = 'Nothing in ' + picked[0].name + ' yet (any of ' + picked[0].anyOf.join(', ') + '). Showing black until something is tagged.';
+    } else none = 'Nothing in ' + playlist.name + ' yet. Showing black until something is tagged.';
+    return { known: true, items: list, none };
   }
 
   // Keeps mpv's queue topped up with the filter's items, in name order,
@@ -646,11 +694,10 @@ function createScheduler(io) {
     let queued = entries.length;
     if (queued >= QUEUE_AHEAD) return true;
 
-    const { filter, items: videos } = playlistItems(playlist);
-    if (!filter) return queued > 0;
+    const { known, items: videos, none } = playlistItems(playlist);
+    if (!known) return queued > 0;
     if (videos.length === 0) {
-      warnOnce(playlist, 'none', 'Nothing in ' + playlist.name + ' yet (any of ' + filter.anyOf.join(', ') +
-        '). Showing black until something is tagged.');
+      warnOnce(playlist, 'none', none);
       return queued > 0;
     }
     clearWarning(playlist, 'none');
@@ -723,7 +770,7 @@ function createScheduler(io) {
     CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
-    scheduledFilter, nextScheduleChange, whatToShow, parseOverride, parseDay, parseWeekdays, formatTime,
+    scheduledFilter, nextScheduleChange, whatToShow, parseOverride, pickName, parseDay, parseWeekdays, formatTime,
     createPlaylist, playlistItems, keepPlaying, setAside, compareNames, compareVideos, isVideoFile,
   };
 }

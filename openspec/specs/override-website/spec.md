@@ -70,87 +70,6 @@ The website SHALL show the box's current status line, and say when the box has n
 - **THEN** it answers with no status line
 - **AND** its page shows `The box has not started yet.` when there is no status line
 
-### Requirement: Shows a filter for a while
-The website SHALL write an override for one of the box's filters, or black, lasting until the schedule changes, for a number of minutes, or until switched back, and SHALL say in plain words what it did.
-
-#### Scenario: the website shows a filter until the schedule changes
-- **GIVEN** the starting filters, at 6:00 PM on Oct 20, 2026
-- **WHEN** the website is asked to show Halloween grownup until the schedule changes
-- **THEN** the override file asks for Halloween grownup, set at 6:00 PM, with no end time and not until cleared
-- **AND** the website answers `Showing Halloween grownup until the schedule next changes.`
-
-#### Scenario: the website shows a filter for a number of minutes
-- **GIVEN** the starting filters, at 6:00 PM on Oct 20, 2026
-- **WHEN** the website is asked to show Favorites for 30 minutes
-- **THEN** the override file asks for Favorites ending at 6:30 PM
-- **AND** the website answers `Showing Favorites until 6:30 PM, then back to the schedule.`
-
-#### Scenario: the website shows a filter until switched back
-- **GIVEN** the starting filters, at 6:00 PM on Oct 20, 2026
-- **WHEN** the website is asked to show Thanksgiving until switched back
-- **THEN** the override file asks for Thanksgiving until cleared
-- **AND** the website answers `Showing Thanksgiving until you choose Back to schedule.`
-
-#### Scenario: the website turns the screen black
-- **GIVEN** it is 6:00 PM on Oct 20, 2026
-- **WHEN** the website is asked to show black until the schedule changes
-- **THEN** the override file asks for no filter
-- **AND** the website answers `Showing black until the schedule next changes.`
-
-### Requirement: Refuses bad choices of filter
-The website SHALL refuse, without writing an override, a filter the box doesn't have, a filter with nothing in it, and a number of minutes that is not a whole number above zero.
-
-#### Scenario: the website refuses a filter it doesn't have
-- **GIVEN** the starting filters and no override file
-- **WHEN** the website is asked to show Easter, then `../x`
-- **THEN** each request is refused with `No filter called` and the name
-- **AND** no override file is written
-
-#### Scenario: the website refuses a filter with nothing in it
-- **GIVEN** the starting filters, no item tagged `favorites`, and no override file
-- **WHEN** the website is asked to show Favorites
-- **THEN** it is refused with `Nothing in Favorites yet. Tag something favorites first.` (for a filter with several "any of" tags: `Tag something` followed by them joined with `or`)
-- **AND** no override file is written
-
-#### Scenario: the website refuses minutes that aren't a whole number above zero
-- **GIVEN** the starting filters and no override file
-- **WHEN** the website is asked to show Halloween kid for 0, then -5, then 2.5, then `soon` minutes
-- **THEN** each request is refused with `Not a number of minutes`
-- **AND** no override file is written
-
-### Requirement: Offers the filters as Play buttons
-The website SHALL list the box's filters, in order, as its choices, and its page SHALL offer a Play button for each, Black, the durations, and Back to schedule.
-
-#### Scenario: the website lists its filters as choices
-- **GIVEN** the starting filters
-- **WHEN** the website is asked for its choices
-- **THEN** the filters are Halloween kid, Halloween grownup, Thanksgiving, Favorites and All uploads, in that order
-
-#### Scenario: the website page offers each choice
-- **GIVEN** the website running
-- **WHEN** the page is opened
-- **THEN** it has a button for black and for Back to schedule, and a choice of until the schedule changes, 15, 30 or 60 minutes, or until switched back
-
-#### Scenario: the page offers each filter as a Play button
-- **GIVEN** the website running
-- **WHEN** the page is opened
-- **THEN** its Play section makes a button for each of the website's filters, in order and named as the filter, that shows that filter for the chosen duration
-- **AND** it has no Seasons row, Kid, Grownup, My picks or All uploads buttons of its own, and no My picks section
-
-### Requirement: The page outlines the playing filter
-The page SHALL show the status line inside the Play section, above its buttons, and SHALL outline, and mark as current, the button of the filter the status names, or Black when the status is black, and none otherwise or when the box can't be reached, following the status as it changes.
-
-#### Scenario: the page shows the status under Play and outlines what is playing
-- **GIVEN** the website running
-- **WHEN** the page is opened
-- **THEN** the status line is inside the Play section, before its buttons, with no separate status card above it
-- **AND** the button for what is playing is outlined and has `aria-current="true"`, and the outline is updated with the status
-
-#### Scenario: the page works out which filter is playing from the status
-- **GIVEN** the page, and the filters Halloween kid and Favorites
-- **WHEN** the status is `Halloween kid (scheduled until 7:30 PM)`, `Favorites (override until cleared)`, `black (nothing scheduled until 5:00 PM)`, `black (waiting for the clock to be set)`, `Easter (override until cleared)`, and no status
-- **THEN** the button playing is Halloween kid, Favorites, Black, Black, none, and none
-
 ### Requirement: The page tags items
 The page SHALL offer a Tags section listing every upload from the website's list, each with its box tags (each with a way to take it off), a star that adds or takes off `favorites`, and a way to add a tag, suggesting the tags in use, and SHALL say that videos from GitHub take their tags from their folders. Each change SHALL be saved straight away and confirmed next to the upload.
 
@@ -172,3 +91,102 @@ The page SHALL offer a Filters section listing the box's custom filters in order
 - **GIVEN** the page with the filters Halloween kid, Christmas and Favorites
 - **WHEN** the person moves Favorites up, then Halloween kid down
 - **THEN** the list is first Halloween kid, Favorites, Christmas, then Favorites, Halloween kid, Christmas
+
+### Requirement: Shows tags for a while
+The website SHALL write an override for one or more tags in use and filters the box has, or black, lasting until the schedule changes, for a number of minutes, or until switched back, and SHALL say in plain words what it did, naming the tags with `#`, then the filters.
+
+#### Scenario: the website shows tags until the schedule changes
+- **GIVEN** `halloween/grownup/jump.mp4`, at 6:00 PM on Oct 20, 2026
+- **WHEN** the website is asked to show the tag `halloween-grownup` until the schedule changes
+- **THEN** the override file asks for the tags `halloween-grownup`, set at 6:00 PM, with no end time and not until cleared
+- **AND** the website answers `Showing #halloween-grownup until the schedule next changes.`
+
+#### Scenario: the website shows tags for a number of minutes
+- **GIVEN** `photos/00001-a.jpg` tagged `favorites`, at 6:00 PM on Oct 20, 2026
+- **WHEN** the website is asked to show the tag `favorites` for 30 minutes
+- **THEN** the override file asks for `favorites` ending at 6:30 PM
+- **AND** the website answers `Showing #favorites until 6:30 PM, then back to the schedule.`
+
+#### Scenario: the website shows several tags until switched back
+- **GIVEN** `halloween/fuzzy.mp4` and `thanksgiving/dusk.mp4`, at 6:00 PM on Oct 20, 2026
+- **WHEN** the website is asked to show the tags `halloween` and `thanksgiving` until switched back
+- **THEN** the override file asks for `halloween` and `thanksgiving` until cleared
+- **AND** the website answers `Showing #halloween + #thanksgiving until you choose Back to schedule.`
+
+#### Scenario: the website turns the screen black
+- **GIVEN** it is 6:00 PM on Oct 20, 2026
+- **WHEN** the website is asked to show black until the schedule changes
+- **THEN** the override file asks for no tags
+- **AND** the website answers `Showing black until the schedule next changes.`
+
+#### Scenario: the website shows a tag and a filter together
+- **GIVEN** the starting filters, and `photos/00001-a.jpg` tagged `favorites`, at 6:00 PM on Oct 20, 2026
+- **WHEN** the website is asked to show the tag `favorites` and the filter Halloween kid until switched back
+- **THEN** the override file asks for the tag `favorites` and the filter Halloween kid until cleared
+- **AND** the website answers `Showing #favorites + Halloween kid until you choose Back to schedule.`
+
+### Requirement: Refuses bad choices of tags
+The website SHALL refuse, without writing an override, a tag no item has, a filter the box doesn't have, nothing picked at all, and a number of minutes that is not a whole number above zero.
+
+#### Scenario: the website refuses a tag no item has
+- **GIVEN** `halloween/fuzzy.mp4` and no override file
+- **WHEN** the website is asked to show the tags `halloween` and `easter`, then `../x`
+- **THEN** each request is refused with `No tag called` and the tag
+- **AND** no override file is written
+
+#### Scenario: the website refuses a filter it doesn't have
+- **GIVEN** the starting filters and no override file
+- **WHEN** the website is asked to show the filter Easter
+- **THEN** it is refused with `No filter called Easter on the box.`
+- **AND** no override file is written
+
+#### Scenario: the website refuses to show no tags
+- **GIVEN** no override file
+- **WHEN** the website is asked to show no tags and no filters
+- **THEN** it is refused with `Pick one or more tags or filters to play.`
+- **AND** no override file is written
+
+#### Scenario: the website refuses minutes that aren't a whole number above zero
+- **GIVEN** `halloween/fuzzy.mp4` and no override file
+- **WHEN** the website is asked to show the tag `halloween` for 0, then -5, then 2.5, then `soon` minutes
+- **THEN** each request is refused with `Not a number of minutes`
+- **AND** no override file is written
+
+### Requirement: Offers the tags under Play
+The website SHALL list every tag in use, in name order, and every filter, custom then GitHub, as its choices, and its page SHALL offer each as a button that selects it, several at a time (tags in one row, filters in another), a Play button that shows what is selected for the chosen duration, Black, the durations, and Back to schedule.
+
+#### Scenario: the website lists the tags as choices
+- **GIVEN** `halloween/fuzzy.mp4`, `halloween/grownup/jump.mp4`, `thanksgiving/dusk.mp4`, and `photos/00001-a.jpg` tagged `favorites`
+- **WHEN** the website is asked for its choices
+- **THEN** the tags are `favorites`, `halloween`, `halloween-grownup`, `thanksgiving` and `upload`
+- **AND** the filters are Halloween kid, Halloween grownup and Thanksgiving
+
+#### Scenario: the website page offers each choice
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** it has a button for black and for Back to schedule, and a choice of until the schedule changes, 15, 30 or 60 minutes, or until switched back
+
+#### Scenario: the page offers each tag under Play, to pick several and play
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** its Play section makes a button for each of the website's tags, labelled as words, and one for each of its filters, in a row of their own, each selecting or unselecting it without showing anything
+- **AND** a Play button shows what is selected for the chosen duration, and is off while nothing is selected
+
+#### Scenario: the page labels tags as words
+- **GIVEN** the page
+- **WHEN** it labels the tags `halloween-grownup`, `favorites` and `upload`
+- **THEN** they read `Halloween grownup`, `Favorites` and `Uploads`
+
+### Requirement: The page highlights the playing tags
+The page SHALL show the status line inside the Play section, above its buttons, and SHALL outline, and mark as current, the buttons of the tags and filters the status names (picked under Play, or a filter playing on its schedule), or Black when it is black, and none otherwise or when the box can't be reached, following the status as it changes.
+
+#### Scenario: the page shows the status under Play and outlines what is playing
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** the status line is inside the Play section, before its buttons, with no separate status card above it
+- **AND** the buttons for what is playing are outlined and have `aria-current="true"`, and the outline is updated with the status
+
+#### Scenario: the page works out which tags are playing from the status
+- **GIVEN** the page, and the filters Halloween kid and Thanksgiving
+- **WHEN** the status is `#halloween + #thanksgiving (override until cleared)`, `#favorites + Halloween kid (override until 6:30 PM)`, `Thanksgiving (scheduled until 11:00 PM)`, `black (nothing scheduled)`, `black (waiting for the clock to be set)`, and no status
+- **THEN** the playing choices are the tags `halloween` and `thanksgiving`; the tag `favorites` and the filter Halloween kid; the filter Thanksgiving; black; black; and none
