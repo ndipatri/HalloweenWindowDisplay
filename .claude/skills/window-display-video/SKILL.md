@@ -9,7 +9,7 @@ Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) 
 
 ## 1. Agree the idea and the cost
 
-- Pin down: subject, mood (kid-friendly vs grownup/scary), season, which folder (the season folder is in both starting Halloween filters; `grownup/` only in Halloween grownup; check the box's filters for anything else), length.
+- Pin down: subject, mood (kid-friendly vs grownup/scary), season, which folder (the season folder is in both GitHub Halloween filters; `grownup/` only in Halloween grownup; check the box's filters for anything else), length.
 - Check the balance (`balance`) and quote the cost before generating: Seedance 2.5 at 1080p is **16 credits per second** (20 s = 320, 15 s = 240, 10 s extension = 160). Give it in credits and in USD from how the credits were bought (rates below). If credits are short, say so and wait for the person to buy more; `transactions` shows what was bought.
 
 Credit rates paid so far (USD):
@@ -110,4 +110,4 @@ Settings each current video was finished with:
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
 - Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
-- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, tap a filter that has its folder's tag (e.g. Halloween grownup), with a duration, or star it under **Tags** and play **Favorites**. A video in a new folder needs a filter that names its tag (on the website's Filters, and in `scheduler/filters.default.json` for new boxes).
+- Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, tap a filter that has its folder's tag (e.g. Halloween grownup), with a duration. A video in a new folder needs a filter that names its tag (in `playlists/filters.json` in the repo, which every box picks up with its next sync).

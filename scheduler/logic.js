@@ -15,10 +15,12 @@ function createScheduler(io) {
   const OVERRIDE_PATH = videoRoot + '/override.json';
   // One line saying what's on screen and why; the website shows it.
   const STATUS_PATH = videoRoot + '/status';
-  // The box's filters, in order, with their schedules (edited on the website).
+  // The box's custom filters, in order, with their schedules (edited on the website).
   const FILTERS_PATH = videoRoot + '/filters.json';
   // The box's own tags on items, by path: { "tags": { "photos/00001-a.jpg": ["favorites"] } }.
   const TAGS_PATH = videoRoot + '/tags.json';
+  // The GitHub filters, copied by sync from the repo's playlists/filters.json.
+  const GITHUB_FILTERS_PATH = videoRoot + '/github-filters.json';
 
   // Videos queued ahead of time, so one follows the next without a gap.
   const QUEUE_AHEAD = 3;
@@ -216,47 +218,77 @@ function createScheduler(io) {
     };
   }
 
-  // The box's filters, from filters.json, reread when the file changes.
-  // Bad filters are skipped and logged once per version of the file.
-  let filtersCache = { text: undefined, filters: [], clean: true };
+  // The box's filters: its custom ones (filters.json, edited on the website,
+  // in the person's order), then the GitHub ones (github-filters.json, copied
+  // from the repo's playlists/filters.json by sync, in that file's order).
+  // A custom filter with a GitHub filter's name is left out. Reread when
+  // either file changes; what's wrong is logged once per version of them.
+  let filtersCache = { key: undefined, filters: [], clean: true };
   function readFilters() {
-    const text = readText(FILTERS_PATH);
-    if (text === filtersCache.text) return filtersCache.filters;
-    let filters = [];
+    const customText = readText(FILTERS_PATH);
+    const githubText = readText(GITHUB_FILTERS_PATH);
+    const key = JSON.stringify([customText, githubText]);
+    if (key === filtersCache.key) return filtersCache.filters;
     let clean = true;
-    if (text === null) {
-      log('No filters on this box yet, so nothing is scheduled. Add one on the website.');
-    } else {
+    // One file's usable filters (what's wrong is logged, and makes it not clean).
+    const parse = (text, path, label) => {
+      if (text === null) return [];
       let raw;
-      try {
-        raw = JSON.parse(text);
-      } catch (e) {
-        raw = null;
-      }
+      try { raw = JSON.parse(text); } catch (e) { raw = null; }
       if (!raw || !Array.isArray(raw.filters)) {
-        log('ERROR: Ignoring ' + FILTERS_PATH + ': not a list of filters, so nothing is scheduled.');
+        log('ERROR: Ignoring ' + path + ': not a list of filters.');
         clean = false;
-      } else {
-        const checked = checkFilters(raw.filters);
-        for (const e of checked.errors) {
-          log('ERROR: Ignoring filter ' + (e.index + 1) + (e.name ? ' (' + e.name + ')' : '') + ': ' + e.error + '.');
-        }
-        filters = checked.filters;
-        clean = checked.errors.length === 0;
+        return [];
       }
+      const checked = checkFilters(raw.filters);
+      for (const e of checked.errors) {
+        log('ERROR: Ignoring ' + label + ' ' + (e.index + 1) + (e.name ? ' (' + e.name + ')' : '') + ': ' + e.error + '.');
+      }
+      if (checked.errors.length) clean = false;
+      return checked.filters;
+    };
+    const github = parse(githubText, GITHUB_FILTERS_PATH, 'GitHub filter').map((f) => Object.assign(f, { source: 'github' }));
+    const githubNames = new Map(github.map((f) => [f.name.toLowerCase(), f.name]));
+    const custom = [];
+    parse(customText, FILTERS_PATH, 'filter').forEach((f) => {
+      f.source = 'custom';
+      const clash = githubNames.get(f.name.toLowerCase());
+      if (clash) {
+        const index = rawIndex(customText, f.name);
+        log('ERROR: Ignoring filter ' + index + ' (' + f.name + '): GitHub has a filter called ' + clash + '.');
+        clean = false;
+        return;
+      }
+      custom.push(f);
+    });
+    const filters = custom.concat(github);
+    if (customText === null && githubText === null) {
+      log('No filters on this box yet, so nothing is scheduled. Add one on the website.');
     }
-    filtersCache = { text, filters, clean };
+    filtersCache = { key, filters, clean };
     return filters;
   }
 
-  // The raw filters as saved (for the website), or [].
-  function readRawFilters() {
+  // The position (1-based) of the filter called `name` in a filters file.
+  function rawIndex(text, name) {
     try {
-      const o = JSON.parse(readText(FILTERS_PATH));
-      return o && Array.isArray(o.filters) ? o.filters : [];
+      return JSON.parse(text).filters.findIndex((f) => f && f.name === name) + 1;
     } catch (e) {
-      return [];
+      return 0;
     }
+  }
+
+  // The raw filters as saved (for the website): { custom, github }.
+  function readRawFilters() {
+    const raw = (path) => {
+      try {
+        const o = JSON.parse(readText(path));
+        return o && Array.isArray(o.filters) ? o.filters : [];
+      } catch (e) {
+        return [];
+      }
+    };
+    return { custom: raw(FILTERS_PATH), github: raw(GITHUB_FILTERS_PATH) };
   }
 
   function findFilter(filters, name) {
@@ -688,7 +720,7 @@ function createScheduler(io) {
   }
 
   return {
-    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, TAGS_PATH, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
+    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
     scheduledFilter, nextScheduleChange, whatToShow, parseOverride, parseDay, parseWeekdays, formatTime,

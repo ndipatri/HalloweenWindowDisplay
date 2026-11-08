@@ -8,7 +8,7 @@ const { createPlayer, watchMpv } = require('../player.js');
 const { FakeMpv, FakeChild } = require('./fake_mpv.js');
 
 const ROOT = '/home/test/video-scheduler';
-const STARTING = require('fs').readFileSync(require('path').join(__dirname, '..', 'filters.default.json'), 'utf8');
+const STARTING = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'playlists', 'filters.json'), 'utf8');
 const at = (month, day, h = 12, m = 0) => new Date(2026, month - 1, day, h, m);
 
 let passed = 0;
@@ -19,7 +19,7 @@ function test(name, fn) { tests.push([name, fn]); }
 // video folder) to the names in them. Set `box.now` and `box.clockSet`
 // before each tick.
 function box(dirs = {}) {
-  const files = { [ROOT + '/filters.json']: STARTING };
+  const files = { [ROOT + '/github-filters.json']: STARTING };
   const logs = [];
   const folders = { [ROOT]: [] };
   for (const [k, v] of Object.entries(dirs)) {

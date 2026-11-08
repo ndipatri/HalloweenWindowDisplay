@@ -154,6 +154,34 @@ function createWebsite(options) {
 
   // ---------- Filters ----------
 
+  // The usable GitHub filters' names, lowercase -> as written (the same ones
+  // the player plays, so a broken GitHub filter blocks no custom name).
+  function githubNames() {
+    return new Map(logic.readFilters().filter((f) => f.source === 'github').map((f) => [f.name.toLowerCase(), f.name]));
+  }
+
+  // Custom filters that are copies of GitHub ones (the starting filters setup
+  // used to copy onto each box) are dropped, the first time GitHub filters are
+  // here. Only once: a custom filter GitHub clashes with later is skipped, not
+  // deleted, so nothing the person made is lost.
+  const COPIES_DROPPED = videoRoot + '/.custom-copies-dropped';
+  (function dropCustomCopies() {
+    const github = githubNames();
+    if (!github.size || readText(COPIES_DROPPED) !== null) return;
+    writeText(COPIES_DROPPED, 'done\n');
+    try {
+      const { custom } = logic.readRawFilters();
+      const kept = custom.filter((f) => !(f && typeof f.name === 'string' && github.has(f.name.toLowerCase())));
+      if (kept.length === custom.length) return;
+      for (const f of custom) {
+        if (!kept.includes(f)) log('Dropping the custom filter ' + f.name + ': GitHub has a filter of that name.');
+      }
+      writeText(logic.FILTERS_PATH, JSON.stringify({ filters: kept }, null, 2) + '\n');
+    } catch (e) {
+      log("ERROR: Couldn't drop the custom copies of the GitHub filters: " + e.message);
+    }
+  })();
+
   // POST /api/filters { filters } with the upload PIN: replaces the box's
   // filters, after checking every one.
   async function saveFilters(headers, body) {
@@ -165,6 +193,12 @@ function createWebsite(options) {
     if (checked.errors.length) {
       const e = checked.errors[0];
       return fail((e.name || 'Filter ' + (e.index + 1)) + ': ' + e.error + '.');
+    }
+    // Custom filters can't take a GitHub filter's name.
+    const github = githubNames();
+    for (const f of body.filters) {
+      const clash = github.get(f.name.toLowerCase());
+      if (clash) return fail(f.name + ': GitHub has a filter called ' + clash + '; pick another name.');
     }
     const clean = body.filters.map((f) => {
       const out = { name: f.name, anyOf: f.anyOf, except: f.except || [], schedule: [] };
@@ -460,7 +494,7 @@ function createWebsite(options) {
     if (route === 'GET /api/choices') return json(200, choices());
     if (route === 'GET /api/uploads') return json(200, listUploads());
     if (route === 'GET /api/items') return json(200, listItems());
-    if (route === 'GET /api/filters') return json(200, { filters: logic.readRawFilters() });
+    if (route === 'GET /api/filters') return json(200, logic.readRawFilters());
     if (route === 'POST /api/tags' || route === 'POST /api/filters') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
@@ -705,13 +739,17 @@ const PAGE = `<!DOCTYPE html>
 
   <h2>Filters</h2>
   <div class="card">
-    <div class="hint">A filter plays everything with any of its tags, except its "except" tags. Where schedules overlap, the higher filter wins. Changes need the PIN, and Save filters.</div>
+    <div class="hint">A filter plays everything with any of its tags, except its "except" tags. Your own filters come first: where schedules overlap, the higher filter wins. Changes need the PIN, and Save filters.</div>
+    <div class="group">Yours</div>
     <div id="filterlist">Loading…</div>
     <div id="filter-editor" class="editor" hidden></div>
     <button id="filter-new">New filter</button>
     <input id="filter-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
     <button class="primary" id="filter-save">Save filters</button>
     <div id="filter-note" class="note" role="status" aria-live="polite"></div>
+    <div class="group">From GitHub</div>
+    <div class="hint">The same on every box, and changed there: they come with the videos, within the hour.</div>
+    <div id="githubfilters">Loading…</div>
   </div>
 
   <h2>Add photos or videos</h2>
@@ -1034,7 +1072,7 @@ const PAGE = `<!DOCTYPE html>
 
   function drawFilters() {
     const list = $('filterlist');
-    list.textContent = filters.length ? '' : 'No filters yet.';
+    list.textContent = filters.length ? '' : 'None yet: New filter makes one.';
     filters.forEach((f, i) => {
       const row = document.createElement('div');
       row.className = 'filterrow';
@@ -1144,10 +1182,26 @@ const PAGE = `<!DOCTYPE html>
     ed.scrollIntoView({ block: 'nearest' });
   }
 
+  // The GitHub filters, shown as they are: they're changed in GitHub.
+  function drawGithubFilters(list) {
+    const box = $('githubfilters');
+    box.textContent = list.length ? '' : 'None.';
+    for (const f of list) {
+      const row = document.createElement('div');
+      row.className = 'filterrow';
+      row.innerHTML = '<div class="top"><span class="name"></span></div><div class="what"></div>';
+      row.querySelector('.name').textContent = f.name;
+      row.querySelector('.what').textContent = describe(f);
+      box.appendChild(row);
+    }
+  }
+
   async function loadFilters() {
     try {
-      filters = (await (await fetch('/api/filters')).json()).filters;
+      const d = await (await fetch('/api/filters')).json();
+      filters = d.custom;
       drawFilters();
+      drawGithubFilters(d.github);
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 

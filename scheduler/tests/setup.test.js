@@ -108,28 +108,11 @@ test('setup makes the photos folder', () => {
   assert.equal(fs.readFileSync(path.join(m.videos, 'photos', '00001-a.jpg'), 'utf8'), 'A');
 });
 
-// ---- Setup gives a box the starting filters ----
-
-const STARTING = fs.readFileSync(path.join(__dirname, '..', 'filters.default.json'), 'utf8');
-
-test('setup copies the starting filters to a box that has none', () => {
+test('setup adds no filters of its own', () => {
   const m = machine();
   const r = m.run();
   assert.equal(r.status, 0, r.out);
-  const file = path.join(m.videos, 'filters.json');
-  assert.ok(fs.existsSync(file), 'filters.json is there');
-  assert.equal(fs.readFileSync(file, 'utf8'), STARTING);
-  assert.ok(r.out.includes('Added the starting filters (Halloween kid, Halloween grownup, Thanksgiving, Favorites, All uploads).'), r.out);
-});
-
-test("setup keeps a box's own filters", () => {
-  const m = machine();
-  fs.mkdirSync(m.videos, { recursive: true });
-  const own = JSON.stringify({ filters: [{ name: 'Favorites', anyOf: ['favorites'] }] });
-  fs.writeFileSync(path.join(m.videos, 'filters.json'), own);
-  const r = m.run();
-  assert.equal(r.status, 0, r.out);
-  assert.equal(fs.readFileSync(path.join(m.videos, 'filters.json'), 'utf8'), own);
+  assert.ok(!fs.existsSync(path.join(m.videos, 'filters.json')), 'no custom filters are made');
   assert.ok(!r.out.includes('Added the starting filters'), r.out);
 });
 

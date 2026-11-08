@@ -37,7 +37,7 @@ The videos are kept in this repo, and the box picks up the latest by itself ever
 
 ## What's playing
 
-Each box chooses what plays with **filters**, set on its own website (see "Change what plays when" below). A new box starts with these:
+What plays is chosen by **filters**. These come from GitHub, so every box has them; a box can add its own on its website (see "Change what plays when" below):
 
 | Filter | Plays | When |
 |---|---|---|
@@ -178,7 +178,12 @@ Under **Tags** on the page are the photos and videos you've added from your phon
 
 ### Change what plays when: filters
 
-Under **Filters** are the box's filters, highest first. Each one plays everything with **any of** its tags, leaving out anything with one of its **except** tags.
+Under **Filters** are two lists. Each filter plays everything with **any of** its tags, leaving out anything with one of its **except** tags.
+
+- **From GitHub:** the filters every box shares (the ones in the table above). They're shown with their days and times but can't be changed on the website: they're changed in GitHub, and every box picks the change up within the hour.
+- **Yours:** filters you make on this box. They come first among the Play buttons, and where their times overlap a GitHub filter's, yours wins, which is handy for a special evening. They can't have the same name as a GitHub filter.
+
+For your own filters:
 
 - **Edit** a filter to change its name, its tags, or its days and times:
   - days are written like `10-01` (October 1) or `11-4thu` (the 4th Thursday in November);
@@ -189,7 +194,7 @@ Under **Filters** are the box's filters, highest first. Each one plays everythin
 - **New filter** adds one, and **Delete** removes one. A filter with no days and times only plays when you choose it.
 - Nothing changes until you type the upload PIN and tap **Save filters**. If something can't be used, it says which filter and why.
 
-Filters are kept on this box only, and aren't backed up. A new box starts with the ones above.
+Your own filters are kept on this box only, and aren't backed up. A new box starts with just the GitHub ones.
 
 ### Put your own photos and videos on the window
 
@@ -204,7 +209,7 @@ They play in the order you added them, round and round: each photo for 10 second
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
 Good to know:
-- The starting filters never show your photos by themselves: they show when you choose All uploads or Favorites, or in any filter you give a schedule.
+- The GitHub filters never show your photos by themselves: they show when you choose All uploads or Favorites, or in any filter you give a schedule.
 - They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
 - Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
@@ -219,7 +224,7 @@ Good to know:
 | Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then **All uploads** (see above) |
 | Play just the photos and videos you choose | On the page: star them under **Tags**, then tap **Favorites** (see above) |
-| Change the dates or times | On the page, under **Filters**: **Edit**, then **Save filters** with the PIN (see above) |
+| Change the dates or times | For every box: in `playlists/filters.json` in GitHub. For one box only: add your own filter under **Filters** on its page (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
 | See what it did last week | `ssh tvbox.local`, then `less ~/video-scheduler/scheduler.log.1` (the box keeps about a month of logs) |

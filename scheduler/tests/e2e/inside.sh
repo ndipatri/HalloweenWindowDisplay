@@ -106,8 +106,8 @@ check "setup's first sync pulls the latest from the repo" logged "Pulled the lat
 check "setup installs the log rule, and logrotate accepts it" \
   bash -c "test -f /etc/logrotate.d/tvbox && ! logrotate -d /etc/logrotate.d/tvbox 2>&1 | grep -qi 'error'"
 
-check "setup adds the starting filters, owned by pi" \
-  bash -c "test \"\$(stat -c %U '$VIDEOS/filters.json')\" = pi && grep -q 'Halloween grownup' '$VIDEOS/filters.json'"
+check "setup's first sync brings the GitHub filters, owned by pi, and no custom ones" \
+  bash -c "test \"\$(stat -c %U '$VIDEOS/github-filters.json')\" = pi && grep -q 'Halloween grownup' '$VIDEOS/github-filters.json' && test ! -e '$VIDEOS/filters.json' && logged 'Updated the GitHub filters.'"
 
 echo "== Adding photos: first boot sets no PIN; setup run again with one"
 check "first boot, with no one to ask, leaves adding photos off and says so" \
@@ -293,13 +293,15 @@ check "untagging the item on screen moves on to the next favorite" \
 check "Favorites logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
 echo "   $(post /api/schedule '{}')"
 saved="$(curl -sS -X POST -H 'X-Upload-Pin: 4321' -H 'Content-Type: application/json' \
-  -d '{"filters":[{"name":"Favorites","anyOf":["favorites"]},{"name":"Rehearsal","anyOf":["halloween"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' \
+  -d '{"filters":[{"name":"Rehearsal","anyOf":["halloween"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' \
   "$SITE/api/filters")"
 echo "   $saved"
-check "saving filters with the PIN changes the choices" bash -c "
+check "a saved custom filter comes first among the choices" bash -c "
   curl -fsS $SITE/api/choices | node -e '
     const d = JSON.parse(require(\"fs\").readFileSync(0));
-    process.exit(d.filters.join() === \"Favorites,Rehearsal\" ? 0 : 1);'"
+    process.exit(d.filters.join() === \"Rehearsal,Halloween kid,Halloween grownup,Thanksgiving,Favorites,All uploads\" ? 0 : 1);'"
+clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Upload-Pin: 4321' -d '{"filters":[{"name":"Favorites","anyOf":["favorites"]}]}' "$SITE/api/filters")"
+check "a custom filter can't take a GitHub filter's name" test "$clash_code" = 400
 check "a filter scheduled all year plays" within 20 bash -c '[ "$(status)" = "Rehearsal (scheduled all day)" ]'
 
 echo "== Check for new videos now, and the recent activity"
