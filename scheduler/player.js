@@ -86,8 +86,8 @@ function createPlayer(options) {
   let refilterWaiting = null;
   async function refilterNow() {
     if (!active) return;
-    // Its filter is gone (renamed or deleted): the next tick sorts it out.
-    if (!logic.findFilter(logic.readFilters(), active.name)) return;
+    // What it plays is gone (a filter renamed or deleted): the next tick sorts it out.
+    if (!logic.playlistItems(active).known) return;
     const entries = (await mpv.getProperty('playlist')) || [];
     const current = entries.findIndex((e) => e.current);
     if (current === -1) {

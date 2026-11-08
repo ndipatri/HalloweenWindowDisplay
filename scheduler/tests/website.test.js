@@ -95,42 +95,50 @@ test('the website says when the box has not started yet', async () => {
   assert.ok((await s.call('GET', '/')).body.includes("r.status || 'The box has not started yet.'"));
 });
 
-// ---- Shows a filter for a while ----
+// ---- Shows tags for a while ----
 
-// A box with something in each starting filter.
+// A box with something for each tag and starting filter.
 const FULL = { halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'] };
 const fullSite = (extra) => site(FULL, Object.assign({ tags: { 'photos/00001-a.jpg': ['favorites'] } }, extra));
 
-test('the website shows a filter until the schedule changes', async () => {
+test('the website shows tags until the schedule changes', async () => {
   const s = fullSite();
-  const r = await show(s, { target: 'Halloween grownup', until: 'schedule' });
+  const r = await show(s, { tags: ['halloween-grownup'], until: 'schedule' });
   assert.equal(r.status, 200, r.body);
-  assert.deepEqual(s.override(), { filter: 'Halloween grownup', setAt: +SIX_PM, expires: null, untilCleared: false });
-  assert.equal(r.json.message, 'Showing Halloween grownup until the schedule next changes.');
+  assert.deepEqual(s.override(), { tags: ['halloween-grownup'], filters: [], setAt: +SIX_PM, expires: null, untilCleared: false });
+  assert.equal(r.json.message, 'Showing #halloween-grownup until the schedule next changes.');
 });
 
-test('the website shows a filter for a number of minutes', async () => {
+test('the website shows tags for a number of minutes', async () => {
   const s = fullSite();
-  const r = await show(s, { target: 'Favorites', until: 30 });
+  const r = await show(s, { tags: ['favorites'], until: 30 });
   assert.equal(r.status, 200, r.body);
-  assert.equal(s.override().filter, 'Favorites');
+  assert.deepEqual(s.override().tags, ['favorites']);
   assert.equal(s.override().expires, +SIX_PM + 30 * 60 * 1000);
-  assert.equal(r.json.message, 'Showing Favorites until 6:30 PM, then back to the schedule.');
+  assert.equal(r.json.message, 'Showing #favorites until 6:30 PM, then back to the schedule.');
 });
 
-test('the website shows a filter until switched back', async () => {
+test('the website shows several tags until switched back', async () => {
   const s = fullSite();
-  const r = await show(s, { target: 'Thanksgiving', until: 'cleared' });
+  const r = await show(s, { tags: ['halloween', 'thanksgiving'], until: 'cleared' });
   assert.equal(r.status, 200, r.body);
-  assert.equal(s.override().filter, 'Thanksgiving');
+  assert.deepEqual(s.override().tags, ['halloween', 'thanksgiving']);
   assert.equal(s.override().untilCleared, true);
-  assert.equal(r.json.message, 'Showing Thanksgiving until you choose Back to schedule.');
+  assert.equal(r.json.message, 'Showing #halloween + #thanksgiving until you choose Back to schedule.');
+});
+
+test('the website shows a tag and a filter together', async () => {
+  const s = fullSite();
+  const r = await show(s, { tags: ['favorites', 'favorites'], filters: ['Halloween kid', 'Halloween kid'], until: 'cleared' });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual([s.override().tags, s.override().filters, s.override().untilCleared], [['favorites'], ['Halloween kid'], true]);
+  assert.equal(r.json.message, 'Showing #favorites + Halloween kid until you choose Back to schedule.');
 });
 
 test('the website turns the screen black', async () => {
   const s = fullSite();
   const r = await show(s, { target: 'black', until: 'schedule' });
-  assert.equal(s.override().filter, null);
+  assert.equal(s.override().tags, null);
   assert.equal(r.json.message, 'Showing black until the schedule next changes.');
 });
 
@@ -138,74 +146,92 @@ test('the website turns the screen black', async () => {
 
 test('the website goes back to the schedule', async () => {
   const s = fullSite();
-  s.files[OVERRIDE] = JSON.stringify({ filter: 'Favorites', setAt: +SIX_PM, expires: null, untilCleared: true });
+  s.files[OVERRIDE] = JSON.stringify({ tags: ['favorites'], filters: [], setAt: +SIX_PM, expires: null, untilCleared: true });
   const r = await s.call('POST', '/api/schedule');
   assert.equal(s.override(), null);
   assert.equal(r.json.message, 'Override cancelled. Following the schedule.');
 });
 
-// ---- Refuses bad choices of filter ----
+// ---- Refuses bad choices of tags ----
 
-test("the website refuses a filter it doesn't have", async () => {
+test('the website refuses a tag no item has', async () => {
   const s = fullSite();
-  for (const name of ['Easter', '../x']) {
-    const r = await show(s, { target: name });
+  for (const tags of [['halloween', 'easter'], ['../x']]) {
+    const r = await show(s, { tags });
     assert.equal(r.status, 400, r.body);
-    assert.ok(r.json.error.startsWith('No filter called') && r.json.error.includes(name), r.json.error);
+    const bad = tags[tags.length - 1];
+    assert.ok(r.json.error.startsWith('No tag called') && r.json.error.includes(bad), r.json.error);
   }
   assert.equal(s.override(), null);
 });
 
-test('the website refuses a filter with nothing in it', async () => {
-  const s = site(FULL);
-  const r = await show(s, { target: 'Favorites' });
+test("the website refuses a filter it doesn't have", async () => {
+  const s = fullSite();
+  const r = await show(s, { filters: ['Easter'] });
   assert.equal(r.status, 400, r.body);
-  assert.equal(r.json.error, 'Nothing in Favorites yet. Tag something favorites first.');
+  assert.equal(r.json.error, 'No filter called Easter on the box.');
+  assert.equal(s.override(), null);
+});
+
+test('the website refuses to show no tags', async () => {
+  const s = fullSite();
+  const r = await show(s, { tags: [], filters: [] });
+  assert.equal(r.status, 400, r.body);
+  assert.equal(r.json.error, 'Pick one or more tags or filters to play.');
   assert.equal(s.override(), null);
 });
 
 test("the website refuses minutes that aren't a whole number above zero", async () => {
   const s = fullSite();
   for (const until of [0, -5, 2.5, 'soon']) {
-    const r = await show(s, { target: 'Halloween kid', until });
+    const r = await show(s, { tags: ['halloween'], until });
     assert.equal(r.status, 400, String(until));
     assert.ok(r.json.error.startsWith('Not a number of minutes'), r.json.error);
   }
   assert.equal(s.override(), null);
 });
 
-// ---- Offers the filters as Play buttons ----
+// ---- Offers the tags under Play ----
 
-test('the website lists its filters as choices', async () => {
-  const r = await site().call('GET', '/api/choices');
-  assert.deepEqual(r.json.filters, ['Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+test('the website lists the tags as choices', async () => {
+  const s = site({ halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], thanksgiving: ['dusk.mp4'], christmas: ['tree.mp4'], photos: ['00001-a.jpg'] },
+    { tags: { 'photos/00001-a.jpg': ['favorites'] }, github: JSON.parse(STARTING).filters });
+  const r = await s.call('GET', '/api/choices');
+  assert.deepEqual(r.json.tags, ['christmas', 'favorites', 'upload']);
+  assert.deepEqual(r.json.filters, ['Halloween kid', 'Halloween grownup', 'Thanksgiving']);
 });
 
-test('the page offers each filter as a Play button', async () => {
+test('the page offers each tag under Play, to pick several and play', async () => {
   const page = (await site().call('GET', '/')).body;
-  const load = page.slice(page.indexOf('async function load()'), page.indexOf('async function load()') + 1500);
-  assert.ok(/for \(const name of c\.filters\)[\s\S]*?button\(name, \(\) => show\(name\)\)[\s\S]*?dataset\.choice = name/.test(load),
-    'a button per filter, named as the filter, showing it for the chosen duration');
-  for (const gone of ['id="seasons"', 'id="picks"', 'data-choice="photos"', '<h2>My picks</h2>', 'id="picklist"', 'togglePick', 'playingChoices']) {
-    assert.ok(!page.includes(gone), 'no ' + gone);
-  }
+  const load = page.slice(page.indexOf('async function load()'), page.indexOf('let filterNames') > 0 ? page.length : page.length);
+  assert.ok(/for \(const tag of c\.tags\)[\s\S]*?pickButton\(tagLabel\(tag\), '#' \+ tag\)/.test(load), 'a button per tag, labelled as words');
+  assert.ok(/for \(const name of c\.filters\)[\s\S]*?pickButton\(name, name\)/.test(load), 'a button per filter');
+  assert.ok(page.includes('id="tagpicks"') && page.includes('id="filterpicks"'), 'tags and filters in rows of their own');
+  assert.ok(page.includes('id="play-picked"') && page.includes(">Play<"), 'a Play button');
+  assert.ok(page.includes("$('play-picked').disabled = !picked.size"), 'Play is off while nothing is selected');
+  assert.ok(/'\/api\/show', \{ tags[\s\S]*?filters[\s\S]*?until: \$\('until'\)\.value \}/.test(page), 'Play shows what is picked for the chosen duration');
   assertScriptCompiles(page);
 });
 
-// ---- The page outlines the playing filter ----
+test('the page labels tags as words', async () => {
+  const tagLabel = await pageFunction('tagLabel');
+  assert.deepEqual(['halloween-grownup', 'favorites', 'upload'].map(tagLabel), ['Halloween grownup', 'Favorites', 'Uploads']);
+});
+
+// ---- The page highlights the playing tags ----
 
 test('the page shows the status under Play and outlines what is playing', async () => {
   const page = (await site().call('GET', '/')).body;
   const body = page.slice(page.indexOf('<main>'));
   const play = body.indexOf('<h2>Play</h2>');
-  assert.ok(play !== -1 && body.indexOf('id="status"') > play && body.indexOf('id="status"') < body.indexOf('id="playlists"'),
+  assert.ok(play !== -1 && body.indexOf('id="status"') > play && body.indexOf('id="status"') < body.indexOf('id="tagpicks"'),
     'the status line is in the Play section, before its buttons');
   assert.ok(!body.slice(0, play).includes('class="card"'), 'no separate status card above Play');
   assert.ok(page.includes('data-choice="black"'), 'Black can be outlined');
-  assert.ok(/button\.current \{[^}]*outline/.test(page), 'the playing button is outlined');
+  assert.ok(/button\.current \{[^}]*outline/.test(page), 'the playing buttons are outlined');
   assert.ok(page.includes("setAttribute('aria-current', 'true')"), 'and marked as current');
   const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let filterNames'));
-  assert.ok(refresh.includes('outline(playingFilter(r.status, filterNames))'), 'the outline follows the status');
+  assert.ok(refresh.includes('outline(playingChoices(r.status, filterNames))'), 'the outline follows the status');
   assertScriptCompiles(page);
 });
 
@@ -219,18 +245,18 @@ async function pageFunction(name) {
   return context[name];
 }
 
-test('the page works out which filter is playing from the status', async () => {
-  const playingFilter = await pageFunction('playingFilter');
-  const names = ['Halloween kid', 'Favorites'];
+test('the page works out which tags are playing from the status', async () => {
+  const playingChoices = await pageFunction('playingChoices');
+  const filters = ['Halloween kid', 'Thanksgiving'];
   const cases = [
-    ['Halloween kid (scheduled until 7:30 PM)', 'Halloween kid'],
-    ['Favorites (override until cleared)', 'Favorites'],
-    ['black (nothing scheduled until 5:00 PM)', 'black'],
-    ['black (waiting for the clock to be set)', 'black'],
-    ['Easter (override until cleared)', null],
-    [null, null],
+    ['#halloween + #thanksgiving (override until cleared)', ['#halloween', '#thanksgiving']],
+    ['#favorites + Halloween kid (override until 6:30 PM)', ['#favorites', 'Halloween kid']],
+    ['Thanksgiving (scheduled until 11:00 PM)', ['Thanksgiving']],
+    ['black (nothing scheduled)', ['black']],
+    ['black (waiting for the clock to be set)', ['black']],
+    [null, []],
   ];
-  for (const [status, choice] of cases) assert.equal(playingFilter(status, names), choice, String(status));
+  for (const [status, choices] of cases) assert.deepEqual(Array.from(playingChoices(status, filters)), choices, String(status));
 });
 
 // ---- Tags ----
@@ -321,14 +347,12 @@ test('box tags of an item no longer on the box are left out', async () => {
 
 test('box tags on a video from GitHub are ignored and dropped', async () => {
   const s = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] },
-    { filters: [{ name: 'Favorites', anyOf: ['favorites'] }],
-      tags: { 'halloween/fuzzy.mp4': ['favorites'], 'photos/00001-a.jpg': ['favorites'] } });
-  // With only the GitHub video tagged, Favorites has nothing in it.
-  const onlyRepo = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] },
-    { filters: [{ name: 'Favorites', anyOf: ['favorites'] }], tags: { 'halloween/fuzzy.mp4': ['favorites'] } });
-  const refused = await show(onlyRepo, { target: 'Favorites', until: 'cleared' });
+    { tags: { 'halloween/fuzzy.mp4': ['favorites'], 'photos/00001-a.jpg': ['favorites'] } });
+  // With only the GitHub video tagged, nothing is tagged favorites.
+  const onlyRepo = site({ halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg'] }, { tags: { 'halloween/fuzzy.mp4': ['favorites'] } });
+  const refused = await show(onlyRepo, { tags: ['favorites'], until: 'cleared' });
   assert.equal(refused.status, 400, refused.body);
-  const show1 = await show(s, { target: 'Favorites', until: 'cleared' });
+  const show1 = await show(s, { tags: ['favorites'], until: 'cleared' });
   assert.equal(show1.status, 200, show1.body);
   const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'family' });
   assert.equal(r.status, 200, r.body);
@@ -355,30 +379,32 @@ test('the box turns the old picks into favorites', async () => {
 const PIN = { 'x-upload-pin': '4321' };
 const christmas = { name: 'Christmas', anyOf: ['christmas'], except: [],
   schedule: [{ from: '12-01', to: '12-31', times: [{ start: '17:00', stop: '23:00' }] }] };
-const favorites = { name: 'Favorites', anyOf: ['favorites'], except: [], schedule: [] };
-const pinSite = (extra = {}) => site({}, Object.assign({ pin: '4321', filters: [favorites] }, extra));
+const late = { name: 'Late', anyOf: ['halloween'], except: [],
+  schedule: [{ from: '01-01', to: '12-31', weekdays: ['fri'], times: [{ start: '22:00', stop: '01:00' }] }] };
+const pinSite = (extra = {}) => site({}, Object.assign({ pin: '4321', filters: [late] }, extra));
 const saved = (s) => JSON.parse(s.files[FILTERS]).filters;
 
 test('the website lists the filters', async () => {
-  const late = { name: 'Late', anyOf: ['halloween'], except: [], schedule: [] };
-  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
+  const late = { name: 'Late', anyOf: ['halloween'], except: [], schedule: [{ from: '12-01', to: '12-31' }] };
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [{ from: '12-01', to: '12-31' }] };
   const kid = { name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'], except: [],
     schedule: [{ from: '10-01', to: '10-31', times: [{ start: '05:00', stop: '07:00' }] }] };
-  const s = site({}, { filters: [late, party], github: [kid, favorites] });
+  const thanks = { name: 'Thanksgiving', anyOf: ['thanksgiving'], except: [], schedule: [{ from: '11-01', to: '11-30' }] };
+  const s = site({}, { filters: [late, party], github: [kid, thanks] });
   const r = await s.call('GET', '/api/filters');
   assert.deepEqual(r.json.custom, [late, party]);
-  assert.deepEqual(r.json.github, [kid, favorites]);
+  assert.deepEqual(r.json.github, [kid, thanks]);
 });
 
 test('the website saves the filters with the right PIN', async () => {
   const logs = [];
   let changed = 0;
   const s = pinSite({ log: (m) => logs.push(m), filtersChanged: async () => { changed++; } });
-  const r = await s.call('POST', '/api/filters', { filters: [christmas, favorites] }, PIN);
+  const r = await s.call('POST', '/api/filters', { filters: [christmas, late] }, PIN);
   assert.equal(r.status, 200, r.body);
-  assert.deepEqual(saved(s).map((f) => f.name), ['Christmas', 'Favorites']);
+  assert.deepEqual(saved(s).map((f) => f.name), ['Christmas', 'Late']);
   assert.equal(r.json.message, 'Saved 2 filters.');
-  assert.ok(logs.includes('Filters changed (from the website): Christmas, Favorites.'), logs.join('\n'));
+  assert.ok(logs.includes('Filters changed (from the website): Christmas, Late.'), logs.join('\n'));
   assert.equal(changed, 1);
 });
 
@@ -387,7 +413,7 @@ test('the website refuses to save filters with the wrong PIN', async () => {
   const r = await s.call('POST', '/api/filters', { filters: [christmas] }, { 'x-upload-pin': '1111' });
   assert.equal(r.status, 403, r.body);
   assert.equal(r.json.error, 'Wrong PIN.');
-  assert.deepEqual(saved(s).map((f) => f.name), ['Favorites']);
+  assert.deepEqual(saved(s).map((f) => f.name), ['Late']);
 });
 
 test('the website refuses to save filters while no PIN is set', async () => {
@@ -395,11 +421,11 @@ test('the website refuses to save filters while no PIN is set', async () => {
   const r = await s.call('POST', '/api/filters', { filters: [christmas] }, PIN);
   assert.equal(r.status, 403, r.body);
   assert.equal(r.json.error, 'Editing filters is off until a PIN is set on the box.');
-  assert.deepEqual(saved(s).map((f) => f.name), ['Favorites']);
+  assert.deepEqual(saved(s).map((f) => f.name), ['Late']);
 });
 
 test("the website refuses a filter it can't use", async () => {
-  const s = pinSite({ github: [{ name: 'Halloween kid', anyOf: ['halloween'] }] });
+  const s = pinSite({ github: [{ name: 'Halloween kid', anyOf: ['halloween'], schedule: [{ from: '10-01', to: '10-31' }] }] });
   const f = (o) => Object.assign({}, christmas, o);
   const bad = [
     [[f({ name: '' })], 'Filter 1'],
@@ -408,6 +434,7 @@ test("the website refuses a filter it can't use", async () => {
     [[f({ name: 'halloween KID' })], 'halloween KID'],
     [[f({ name: 'Kid (old)' })], 'Kid (old)'],
     [[f({ anyOf: [] })], 'Christmas'],
+    [[f({ schedule: [] })], 'Christmas'],
     [[f({ anyOf: ['Fav Orites'] })], 'Christmas'],
     [[f({ schedule: [{ from: '13-01', to: '12-31' }] })], 'Christmas'],
     [[f({ schedule: [{ from: '12-01', to: '12-31', times: [{ start: '25:00', stop: '23:00' }] }] })], 'Christmas'],
@@ -417,7 +444,7 @@ test("the website refuses a filter it can't use", async () => {
     assert.equal(r.status, 400, JSON.stringify(filters) + ' ' + r.body);
     assert.ok(r.json.error.startsWith(named + ':') && r.json.error.length > named.length + 3, r.json.error);
   }
-  assert.deepEqual(saved(s).map((x) => x.name), ['Favorites']);
+  assert.deepEqual(saved(s).map((x) => x.name), ['Late']);
 });
 
 // ---- The page tags items and edits filters ----
@@ -1022,22 +1049,30 @@ test("adding upload's own tag again is refused, not stored", async () => {
 test('custom copies of the GitHub filters are dropped when the website starts', async () => {
   const logs = [];
   const raw = JSON.parse(STARTING).filters;
-  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
-  const s = site({}, { log: (m) => logs.push(m), github: raw, filters: [raw[0], party, raw[4]] });
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [{ from: '12-01', to: '12-31' }] };
+  const s = site({}, { log: (m) => logs.push(m), github: raw, filters: [raw[0], party, raw[2]] });
   assert.deepEqual(JSON.parse(s.files[FILTERS]).filters.map((f) => f.name), ['Party']);
-  for (const name of ['Halloween kid', 'All uploads']) {
+  for (const name of ['Halloween kid', 'Thanksgiving']) {
     assert.ok(logs.includes('Dropping the custom filter ' + name + ': GitHub has a filter of that name.'), logs.join('\n'));
   }
 });
 
+test('a custom filter without days and times is dropped when the website starts', async () => {
+  const logs = [];
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [{ from: '12-01', to: '12-31' }] };
+  const s = site({}, { log: (m) => logs.push(m), github: JSON.parse(STARTING).filters, filters: [{ name: 'Favorites', anyOf: ['favorites'] }, party] });
+  assert.deepEqual(JSON.parse(s.files[FILTERS]).filters.map((f) => f.name), ['Party']);
+  assert.ok(logs.includes('Dropping the custom filter Favorites: a filter needs days and times now; pick its tags under Play instead.'), logs.join('\n'));
+});
+
 test('the choices list custom filters before the GitHub ones', async () => {
-  const s = site({}, { filters: [{ name: 'Party', anyOf: ['halloween'] }], github: JSON.parse(STARTING).filters });
+  const s = site({}, { filters: [{ name: 'Party', anyOf: ['halloween'], schedule: [{ from: '01-01', to: '12-31' }] }], github: JSON.parse(STARTING).filters });
   const r = await s.call('GET', '/api/choices');
-  assert.deepEqual(r.json.filters, ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+  assert.deepEqual(r.json.filters, ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving']);
 });
 
 test('custom copies are only dropped once, so a later clash keeps the custom filter', async () => {
-  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [{ from: '12-01', to: '12-31' }] };
   const s = site({}, { github: [{ name: 'Halloween kid', anyOf: ['halloween'] }], filters: [party],
     files: { [ROOT + '/.custom-copies-dropped']: 'done\n' } });
   // GitHub now has a Party too: the custom one is kept in the file (skipped, not deleted).

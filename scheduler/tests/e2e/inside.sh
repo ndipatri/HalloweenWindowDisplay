@@ -127,12 +127,12 @@ sed -i -e "s|webPort: 80,|webPort: 8080,|" -e "s|clockFile: '/run/systemd/timesy
 sudo -u pi -H env PATH="/opt/e2e-fakes:/usr/bin:/bin" node /opt/tvbox/player.js >> "$LOG" 2>&1 &
 player=$!
 
-check "the player starts and logs its filters" within 90 logged "Filters: Halloween kid, Halloween grownup, Thanksgiving, Favorites, All uploads"
+check "the player starts and logs its filters" within 90 logged "Filters: Halloween kid, Halloween grownup, Thanksgiving"
 check "the website answers with a status" within 60 bash -c "[ -n \"\$(curl -fsS $SITE/api/status 2>/dev/null)\" ]"
 check "the website page loads" bash -c "curl -fsS $SITE/ | grep -q 'Back to schedule'"
 
 echo "== Using the website: Halloween grownup, until switched back"
-echo "   $(post /api/show '{"target":"Halloween grownup","until":"cleared"}')"
+echo "   $(post /api/show '{"filters":["Halloween grownup"],"until":"cleared"}')"
 check "the status follows the website" within 20 bash -c '[ "$(status)" = "Halloween grownup (override until cleared)" ]'
 check "mpv plays the first video" within 90 logged "Halloween grownup: playing a.mp4"
 check "mpv moves on to the next videos" within 120 logged "Halloween grownup: playing c.mp4"
@@ -211,18 +211,18 @@ check "the website lists the uploads in order" bash -c "
 check "the website sends an upload with a range" \
   test "$(code -H 'Range: bytes=0-9' "$SITE/photos/00001-red.jpg")" = 206
 
-echo "   $(post /api/show '{"target":"All uploads","until":"cleared"}')"
-check "All uploads shows in the status" within 20 bash -c '[ "$(status)" = "All uploads (override until cleared)" ]'
-check "the uploads play in order" within 60 logged "All uploads: playing 00002-sideways.jpg"
+echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
+check "the upload tag shows in the status" within 20 bash -c '[ "$(status)" = "#upload (override until cleared)" ]'
+check "the uploads play in order" within 60 logged "#upload: playing 00002-sideways.jpg"
 check "each photo stays on screen about 10 seconds" node -e '
   const log = require("fs").readFileSync(process.argv[1], "utf8").split("\n");
-  const when = (name) => { const l = log.find((x) => x.includes("All uploads: playing " + name)); return l && Date.parse(l.split("  ")[0]); };
+  const when = (name) => { const l = log.find((x) => x.includes("#upload: playing " + name)); return l && Date.parse(l.split("  ")[0]); };
   const gap = (when("00002-sideways.jpg") - when("00001-red.jpg")) / 1000;
   console.log("   red.jpg to sideways.jpg: " + gap + " s");
   process.exit(gap >= 8 && gap <= 15 ? 0 : 1);' "$LOG"
-check "the see-through PNG plays" within 30 logged "All uploads: playing 00003-half.png"
+check "the see-through PNG plays" within 30 logged "#upload: playing 00003-half.png"
 if [ $hevc_ok -eq 1 ]; then
-  check "the HEVC clip plays" within 60 logged "All uploads: playing 00004-phone.mp4"
+  check "the HEVC clip plays" within 60 logged "#upload: playing 00004-phone.mp4"
   sleep 3
   check "the HEVC clip isn't skipped" bash -c "! grep -q 'ERROR: Skipping 00004-phone.mp4' '$LOG'"
 else
@@ -249,15 +249,15 @@ fi
 
 # Remove a photo just after it comes on, so it has most of its 10 seconds
 # left: if the next one starts within 5 seconds, the removal moved mpv on.
-lines=$(grep -c 'All uploads: playing' "$LOG")
-within 15 bash -c "[ \$(grep -c 'All uploads: playing' '$LOG') -gt $lines ]"
-playing="$(grep -o 'All uploads: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f4)"
+lines=$(grep -c '#upload: playing' "$LOG")
+within 15 bash -c "[ \$(grep -c '#upload: playing' '$LOG') -gt $lines ]"
+playing="$(grep -o '#upload: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
 errors_before=$(grep -c 'ERROR' "$LOG")
 echo "   removing $playing: $(curl -sS -X POST -H 'X-Upload-Pin: 4321' -d "{\"name\":\"$playing\"}" "$SITE/api/uploads/remove")"
 check "removing the upload on screen deletes it and logs it" \
   bash -c "test ! -e '$VIDEOS/photos/$playing' && logged 'Removed photos/$playing (from the website)'"
 check "the next upload comes on at once after the removed one" within 5 bash -c "
-  tail -n +\$(grep -n 'Removed photos/$playing' '$LOG' | tail -1 | cut -d: -f1) '$LOG' | grep 'All uploads: playing' | grep -qv '$playing'"
+  tail -n +\$(grep -n 'Removed photos/$playing' '$LOG' | tail -1 | cut -d: -f1) '$LOG' | grep '#upload: playing' | grep -qv '$playing'"
 # A full round of the uploads left, so a stale queue entry would be reached.
 sleep 35
 check "removing it logs no error, even a round later" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
@@ -279,18 +279,21 @@ check "the website lists the uploads with their tags" bash -c "
 github_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"path":"halloween/grownup/c.mp4","add":"favorites"}' "$SITE/api/tags")"
 check "a video from GitHub can't be tagged" test "$github_code" = 400
 errors_before=$(grep -c 'ERROR' "$LOG")
-echo "   $(post /api/show '{"target":"Favorites","until":"cleared"}')"
-check "Favorites shows in the status" within 20 bash -c '[ "$(status)" = "Favorites (override until cleared)" ]'
-check "Favorites plays the first favorite" within 30 logged "Favorites: playing $up1"
-check "Favorites plays the next favorite" within 30 logged "Favorites: playing $up2"
+echo "   $(post /api/show '{"tags":["favorites"],"until":"cleared"}')"
+check "the favorites tag shows in the status" within 20 bash -c '[ "$(status)" = "#favorites (override until cleared)" ]'
+check "Favorites plays the first favorite" within 30 logged "#favorites: playing $up1"
+check "Favorites plays the next favorite" within 30 logged "#favorites: playing $up2"
 # Untag whatever is on screen: the other favorite comes on at once.
-on_screen="$(grep -o 'Favorites: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
+on_screen="$(grep -o '#favorites: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
 if [ "$on_screen" = "$up1" ]; then next="$up2"; else next="$up1"; fi
-lines=$(grep -c "Favorites: playing $next" "$LOG")
+lines=$(grep -c "#favorites: playing $next" "$LOG")
 echo "   $(post /api/tags "{\"path\":\"photos/$on_screen\",\"remove\":\"favorites\"}")"
 check "untagging the item on screen moves on to the next favorite" \
-  within 8 bash -c "[ \$(grep -c 'Favorites: playing $next' '$LOG') -gt $lines ]"
+  within 8 bash -c "[ \$(grep -c '#favorites: playing $next' '$LOG') -gt $lines ]"
 check "Favorites logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
+echo "   $(post /api/show '{"tags":["favorites"],"filters":["Halloween grownup"],"until":"cleared"}')"
+check "a tag and a filter play together" within 20 bash -c '[ "$(status)" = "#favorites + Halloween grownup (override until cleared)" ]'
+check "the mix plays the filter's video too" within 60 logged "#favorites + Halloween grownup: playing c.mp4"
 echo "   $(post /api/schedule '{}')"
 saved="$(curl -sS -X POST -H 'X-Upload-Pin: 4321' -H 'Content-Type: application/json' \
   -d '{"filters":[{"name":"Rehearsal","anyOf":["halloween"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' \
@@ -299,8 +302,8 @@ echo "   $saved"
 check "a saved custom filter comes first among the choices" bash -c "
   curl -fsS $SITE/api/choices | node -e '
     const d = JSON.parse(require(\"fs\").readFileSync(0));
-    process.exit(d.filters.join() === \"Rehearsal,Halloween kid,Halloween grownup,Thanksgiving,Favorites,All uploads\" ? 0 : 1);'"
-clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Upload-Pin: 4321' -d '{"filters":[{"name":"Favorites","anyOf":["favorites"]}]}' "$SITE/api/filters")"
+    process.exit(d.filters.join() === \"Rehearsal,Halloween kid,Halloween grownup,Thanksgiving\" ? 0 : 1);'"
+clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Upload-Pin: 4321' -d '{"filters":[{"name":"Thanksgiving","anyOf":["favorites"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' "$SITE/api/filters")"
 check "a custom filter can't take a GitHub filter's name" test "$clash_code" = 400
 check "a filter scheduled all year plays" within 20 bash -c '[ "$(status)" = "Rehearsal (scheduled all day)" ]'
 

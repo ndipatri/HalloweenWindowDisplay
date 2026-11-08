@@ -24,8 +24,6 @@
         { "from": "11-01", "to": "11-4thu", "weekdays": ["fri", "sat"], "also": ["11-4thu-1", "11-4thu"],
           "times": [{ "start": "17:00", "stop": "23:00" }] }
       ]
-    },
-    { "name": "Favorites", "anyOf": ["favorites"], "except": [], "schedule": [] },
-    { "name": "All uploads", "anyOf": ["upload"], "except": [], "schedule": [] }
+    }
   ]
 }

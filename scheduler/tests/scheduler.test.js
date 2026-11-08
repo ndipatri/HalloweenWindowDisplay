@@ -49,6 +49,8 @@ let passed = 0;
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 const fresh = () => ({ warnedText: null });
+// A filter has to have days and times; this one is on all year.
+const ALWAYS = [{ from: '01-01', to: '12-31' }];
 const starting = () => JSON.parse(STARTING).filters;
 const fn = (t, name) => {
   assert.equal(typeof t[name], 'function', 'the scheduler has ' + name);
@@ -114,7 +116,7 @@ test('an upload is tagged upload', () => {
 test('a filter plays the items with any of its tags', async () => {
   const { T: t } = load({
     dirs: { halloween: ['fuzzy.mp4'], 'halloween/kid': ['x.mp4'], 'halloween/grownup': ['y.mp4'], thanksgiving: ['dusk.mp4'] },
-    filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'] }],
+    filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'], schedule: ALWAYS }],
   });
   fn(t, 'readFilters');
   assert.deepEqual(await play(t, 'Halloween kid', 4),
@@ -125,7 +127,7 @@ test('a filter leaves out items with an except tag', async () => {
   const { T: t } = load({
     dirs: { christmas: ['tree.mp4'], photos: ['00001-a.jpg', '00002-b.jpg'] },
     tags: { 'photos/00001-a.jpg': ['family'], 'photos/00002-b.jpg': ['family', 'scary'] },
-    filters: [{ name: 'Christmas', anyOf: ['christmas', 'family'], except: ['scary'] }],
+    filters: [{ name: 'Christmas', anyOf: ['christmas', 'family'], except: ['scary'], schedule: ALWAYS }],
   });
   fn(t, 'readFilters');
   assert.deepEqual(await play(t, 'Christmas', 3), ['photos/00001-a.jpg', 'christmas/tree.mp4', 'photos/00001-a.jpg']);
@@ -135,17 +137,17 @@ test('a box tag puts an upload in a filter', async () => {
   const { T: t } = load({
     dirs: { halloween: ['fuzzy.mp4'], photos: ['00001-a.jpg', '00002-b.jpg', '00003-c.jpg'] },
     tags: { 'photos/00001-a.jpg': ['favorites'], 'photos/00003-c.jpg': ['favorites'], 'halloween/fuzzy.mp4': ['favorites'] },
-    filters: [{ name: 'Favorites', anyOf: ['favorites'] }],
+    filters: [{ name: 'Family', anyOf: ['favorites'], schedule: ALWAYS }],
   });
   fn(t, 'readFilters');
-  assert.deepEqual(await play(t, 'Favorites', 3), ['photos/00001-a.jpg', 'photos/00003-c.jpg', 'photos/00001-a.jpg']);
+  assert.deepEqual(await play(t, 'Family', 3), ['photos/00001-a.jpg', 'photos/00003-c.jpg', 'photos/00001-a.jpg']);
 });
 
 test('a filter plays its items in name order, round and round', async () => {
   const { T: t } = load({
     dirs: { halloween: ['2-b.mp4', 'a.mp4'], 'halloween/kid': ['10-c.mp4'], photos: ['00001-x.jpg'] },
     tags: { 'photos/00001-x.jpg': ['halloween'] },
-    filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'] }],
+    filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'], schedule: ALWAYS }],
   });
   fn(t, 'readFilters');
   const four = ['photos/00001-x.jpg', 'halloween/2-b.mp4', 'halloween/kid/10-c.mp4', 'halloween/a.mp4'];
@@ -153,7 +155,7 @@ test('a filter plays its items in name order, round and round', async () => {
 });
 
 test('a filter with nothing in it shows black and says so once', async () => {
-  const { T: t, logs } = load({ dirs: { thanksgiving: ['dusk.mp4'] }, filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'] }] });
+  const { T: t, logs } = load({ dirs: { thanksgiving: ['dusk.mp4'] }, filters: [{ name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'], schedule: ALWAYS }] });
   fn(t, 'readFilters');
   const p = t.createPlaylist('Halloween kid');
   const mpv = new FakeMpv();
@@ -166,7 +168,7 @@ test('a filter with nothing in it shows black and says so once', async () => {
 });
 
 test('a bad filter in the filters file is skipped and logged', () => {
-  const { T: t, logs } = load({ filters: [{ name: 'Empty', anyOf: [] }, { name: 'Christmas', anyOf: ['christmas'] }] });
+  const { T: t, logs } = load({ filters: [{ name: 'Empty', anyOf: [], schedule: ALWAYS }, { name: 'Christmas', anyOf: ['christmas'], schedule: ALWAYS }] });
   fn(t, 'readFilters')();
   const kept = t.readFilters();
   assert.deepEqual(kept.map((f) => f.name), ['Christmas']);
@@ -183,22 +185,19 @@ test('no filters file means no filters', () => {
   assert.equal(logs.filter((l) => l === msg).length, 1, logs.join('\n'));
 });
 
-test("the GitHub filters are today's seasons, favorites and uploads", () => {
+test("the GitHub filters are today's seasons", () => {
   const { T: t, logs } = load({ files: { 'github-filters.json': STARTING } });
   const f = fn(t, 'readFilters')();
   assert.ok(f.every((x) => x.source === 'github'), 'they come from GitHub');
   assert.ok(!logs.some((l) => /ERROR/.test(l)), logs.join('\n'));
-  assert.deepEqual(f.map((x) => x.name), ['Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+  assert.deepEqual(f.map((x) => x.name), ['Halloween kid', 'Halloween grownup', 'Thanksgiving']);
   const raw = starting();
-  assert.deepEqual(raw.map((x) => x.anyOf), [['halloween', 'halloween-kid'], ['halloween', 'halloween-grownup'],
-    ['thanksgiving'], ['favorites'], ['upload']]);
+  assert.deepEqual(raw.map((x) => x.anyOf), [['halloween', 'halloween-kid'], ['halloween', 'halloween-grownup'], ['thanksgiving']]);
   const times = (x) => (x.schedule || []).map((e) => [e.from, e.to, (e.weekdays || []).join('/'), (e.also || []).join('/'),
     (e.times || []).map((w) => w.start + '-' + w.stop).join(',')].join(' '));
   assert.deepEqual(times(raw[0]), ['10-01 10-31   05:00-07:00,17:00-19:30']);
   assert.deepEqual(times(raw[1]), ['10-01 10-31   19:30-23:00']);
   assert.deepEqual(times(raw[2]), ['11-01 11-4thu fri/sat 11-4thu-1/11-4thu 17:00-23:00']);
-  assert.deepEqual(times(raw[3]), []);
-  assert.deepEqual(times(raw[4]), []);
 });
 
 // ---- filter-schedule ----
@@ -336,36 +335,66 @@ function withOverride(o, date, extra = {}) {
 }
 
 test('an override "until the schedule changes" ends at the next period', () => {
-  assert.equal(withOverride({ filter: null }, at(10, 20, 19, 29)).r.status,
+  assert.equal(withOverride({ tags: null }, at(10, 20, 19, 29)).r.status,
     'black (override until the schedule changes at 7:30 PM)');
-  assert.equal(withOverride({ filter: null }, at(10, 20, 19, 30)).r.filter, 'Halloween grownup');
+  assert.equal(withOverride({ tags: null }, at(10, 20, 19, 30)).r.filter, 'Halloween grownup');
 });
 
-test('an override plays the chosen filter whatever its schedule', () => {
-  const oct = withOverride({ filter: 'Thanksgiving', untilCleared: true }, at(10, 20, 18)).r;
-  assert.equal(oct.filter, 'Thanksgiving');
-  assert.equal(oct.status, 'Thanksgiving (override until cleared)');
-  assert.equal(withOverride({ filter: 'Thanksgiving', untilCleared: true, setAt: +at(1, 15, 17) }, at(1, 15, 18)).r.filter, 'Thanksgiving');
+test('an override plays the chosen tags whatever the schedule', async () => {
+  const { T: t, files } = startingBox({ dirs: { halloween: ['fuzzy.mp4'], thanksgiving: ['dusk.mp4'], christmas: ['tree.mp4'] } });
+  files[t.OVERRIDE_PATH] = JSON.stringify({ tags: ['halloween', 'thanksgiving'], setAt: +at(1, 15, 17), expires: null, untilCleared: true });
+  const r = show(t, at(1, 15, 18));
+  assert.equal(r.status, '#halloween + #thanksgiving (override until cleared)');
+  assert.deepEqual(await play(t, r.filter, 4), ['thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4', 'thanksgiving/dusk.mp4', 'halloween/fuzzy.mp4']);
 });
 
-test("an override for a filter that's gone is ended and logged", () => {
-  const box = withOverride({ filter: 'Easter', untilCleared: true }, at(10, 20, 18));
+test('an override plays chosen tags and filters together', async () => {
+  const { T: t, files } = startingBox({ dirs: { halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], photos: ['00001-a.jpg'] },
+    tags: { 'photos/00001-a.jpg': ['favorites'] } });
+  files[t.OVERRIDE_PATH] = JSON.stringify({ tags: ['favorites'], filters: ['Halloween kid'], setAt: +at(1, 15, 17), expires: null, untilCleared: true });
+  const r = show(t, at(1, 15, 18));
+  assert.equal(r.status, '#favorites + Halloween kid (override until cleared)');
+  assert.deepEqual(await play(t, r.filter, 3), ['photos/00001-a.jpg', 'halloween/fuzzy.mp4', 'photos/00001-a.jpg']);
+});
+
+test('chosen tags with nothing in them show black and say so once', async () => {
+  const { T: t, logs, files } = startingBox({ dirs: { halloween: ['fuzzy.mp4'] } });
+  files[t.OVERRIDE_PATH] = JSON.stringify({ tags: ['easter'], setAt: +at(1, 15, 17), expires: null, untilCleared: true });
+  const r = show(t, at(1, 15, 18));
+  const p = t.createPlaylist(r.filter);
+  const mpv = new FakeMpv();
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(await t.keepPlaying(p, mpv), false);
+  assert.equal(mpv.playing(), null);
+  const msg = 'Nothing tagged easter yet. Showing black until something is.';
+  assert.equal(logs.filter((l) => l === msg).length, 1, logs.join('\n'));
+  assert.ok(!logs.some((l) => /ERROR/.test(l)), logs.join('\n'));
+});
+
+test("an override naming a filter that's gone is ended and logged", () => {
+  const box = withOverride({ tags: [], filters: ['Easter'], untilCleared: true }, at(10, 20, 18));
   assert.equal(box.r.filter, 'Halloween kid');
   assert.ok(!(box.T.OVERRIDE_PATH in box.files), 'the override file is gone');
   assert.ok(box.logs.includes('Ending the override: there is no filter called Easter any more.'), box.logs.join('\n'));
 });
 
-test('override file validation for filters', () => {
+test('an override from before tags is ended and logged', () => {
+  for (const [old, name] of [[{ filter: 'Thanksgiving' }, 'Thanksgiving'], [{ playlist: 'halloween/grownup' }, 'halloween/grownup']]) {
+    const box = startingBox();
+    box.files[box.T.OVERRIDE_PATH] = JSON.stringify(Object.assign({ setAt: +at(10, 20, 17), expires: null, untilCleared: true }, old));
+    const r = show(box.T, at(10, 20, 18));
+    assert.equal(r.filter, 'Halloween kid');
+    assert.ok(!(box.T.OVERRIDE_PATH in box.files));
+    assert.ok(box.logs.includes('Ending an override from before tags could be played (' + name + ').'), box.logs.join('\n'));
+  }
+});
+
+test('override file validation for tags', () => {
   const { T: t } = load();
   const ok = (o) => t.parseOverride(JSON.stringify(Object.assign({ setAt: 1 }, o))).ok;
-  assert.ok(ok({ filter: 'Halloween kid' }) && ok({ filter: null }));
-  assert.ok(!ok({ playlist: 'halloween/grownup' }), 'an old override naming a playlist');
-  assert.ok(!ok({ filter: '' }) && !ok({ filter: 'x'.repeat(31) }) && !ok({ filter: 'Kid (old)' }) && !ok({ filter: 7 }));
-  // An old one is removed rather than logged on every start.
-  const box = withOverride({ playlist: 'halloween/grownup', filter: undefined }, at(10, 20, 18));
-  assert.equal(box.r.filter, 'Halloween kid');
-  assert.ok(!(box.T.OVERRIDE_PATH in box.files));
-  assert.ok(box.logs.includes('Ending an override from before filters (halloween/grownup).'), box.logs.join('\n'));
+  assert.ok(ok({ tags: ['halloween', 'halloween-kid'] }) && ok({ tags: [], filters: ['Halloween kid'] }) && ok({ tags: null }));
+  assert.ok(!ok({ tags: [] }) && !ok({ tags: ['Fav Orites'] }) && !ok({ tags: 'halloween' }) && !ok({ tags: [7] }) &&
+    !ok({ tags: [], filters: ['Kid (old)'] }));
 });
 
 // ---- More schedule cases (from the implementation review) ----
@@ -387,11 +416,11 @@ test("a range ending on a day that moves with the year never wraps the year", ()
 
 test('an override until the schedule changes lasts until the next change, even months away', () => {
   const box = startingBox();
-  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ filter: 'Favorites', setAt: +at(1, 15, 17), expires: null, untilCleared: false });
+  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ tags: ['halloween'], setAt: +at(1, 15, 17), expires: null, untilCleared: false });
   box.files[ROOT + '/tags.json'] = JSON.stringify({ tags: {} });
   const jan = show(box.T, at(1, 15, 18));
-  assert.equal(jan.filter, 'Favorites');
-  assert.ok(jan.status.startsWith('Favorites (override until the schedule changes at'), jan.status);
+  assert.equal(jan.filter, '#halloween');
+  assert.ok(jan.status.startsWith('#halloween (override until the schedule changes at'), jan.status);
   assert.equal(show(box.T, at(10, 1, 5, 0)).filter, 'Halloween kid');
 });
 
@@ -424,7 +453,7 @@ test("an override for a missing filter isn't ended while filters.json has mistak
   const raw = JSON.parse(STARTING).filters;
   raw[2].anyOf = []; // Thanksgiving made bad by a hand edit
   box.files[ROOT + '/filters.json'] = JSON.stringify({ filters: raw });
-  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ filter: 'Thanksgiving', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ tags: [], filters: ['Thanksgiving'], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   show(box.T, at(10, 20, 18));
   assert.ok(box.T.OVERRIDE_PATH in box.files, 'the override is kept');
 });
@@ -439,20 +468,12 @@ test('custom filters come before the GitHub filters', () => {
   assert.equal(r.filter, 'Party');
   assert.equal(r.status, 'Party (scheduled until 11:00 PM)');
   const f = t.readFilters();
-  assert.deepEqual(f.map((x) => x.name), ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
-  assert.deepEqual(f.map((x) => x.source), ['custom', 'github', 'github', 'github', 'github', 'github']);
-  // The website's choices are the same, in the same order.
-  const { createWebsite } = require('../website.js');
-  const files = { [ROOT + '/github-filters.json']: STARTING, [ROOT + '/filters.json']: JSON.stringify({ filters: [party] }) };
-  const w = createWebsite({ config, videoRoot: ROOT, now: () => at(10, 20, 18), readText: (p) => (p in files ? files[p] : null),
-    writeText: (p, x) => { files[p] = x; }, removeFile: (p) => { delete files[p]; }, listFolder: () => null, readTail: () => null, startSync: () => true });
-  return w.handle({ method: 'GET', path: '/api/choices', headers: {}, body: '' }).then((r) => {
-    assert.deepEqual(JSON.parse(r.body).filters, ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
-  });
+  assert.deepEqual(f.map((x) => x.name), ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving']);
+  assert.deepEqual(f.map((x) => x.source), ['custom', 'github', 'github', 'github']);
 });
 
 test('a custom filter named like a GitHub filter is left out and logged', () => {
-  const { T: t, logs } = startingBox({ filters: [{ name: 'halloween KID', anyOf: ['x'] }, party] });
+  const { T: t, logs } = startingBox({ filters: [{ name: 'halloween KID', anyOf: ['x'], schedule: ALWAYS }, party] });
   t.readFilters();
   const custom = t.readFilters().filter((x) => x.source === 'custom');
   assert.deepEqual(custom.map((x) => x.name), ['Party']);
@@ -461,11 +482,26 @@ test('a custom filter named like a GitHub filter is left out and logged', () => 
 });
 
 test("an override for a custom filter that clashes with GitHub isn't ended", () => {
-  const box = startingBox({ filters: [{ name: 'thanksgiving', anyOf: ['x'] }] });
-  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ filter: 'Halloween grownup', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  const box = startingBox({ filters: [{ name: 'thanksgiving', anyOf: ['x'], schedule: ALWAYS }] });
+  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ tags: [], filters: ['Halloween grownup'], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   box.files[ROOT + '/github-filters.json'] = JSON.stringify({ filters: JSON.parse(STARTING).filters.filter((x) => x.name !== 'Halloween grownup') });
   show(box.T, at(10, 20, 18));
   assert.ok(box.T.OVERRIDE_PATH in box.files, 'kept while the filters have a mistake in them');
+});
+
+test('a filter without days and times is refused and skipped', async () => {
+  const late = { name: 'Late', anyOf: ['halloween'], schedule: [{ from: '01-01', to: '12-31', weekdays: ['fri'], times: [{ start: '22:00', stop: '01:00' }] }] };
+  const { T: t, logs } = load({ filters: [{ name: 'Favorites', anyOf: ['favorites'] }, late] });
+  assert.deepEqual(t.readFilters().map((f) => f.name), ['Late']);
+  assert.ok(logs.some((l) => l.startsWith('ERROR: Ignoring filter 1 (Favorites): a filter needs days and times')), logs.join('\n'));
+  // The website refuses to save one.
+  const { createWebsite } = require('../website.js');
+  const files = { [ROOT + '/upload-pin']: '4321\n', [ROOT + '/filters.json']: JSON.stringify({ filters: [late] }) };
+  const w = createWebsite({ config, videoRoot: ROOT, now: () => at(10, 20, 18), readText: (p) => (p in files ? files[p] : null),
+    writeText: (p, x) => { files[p] = x; }, removeFile: (p) => { delete files[p]; }, listFolder: () => null, readTail: () => null, startSync: () => true });
+  const r = await w.handle({ method: 'POST', path: '/api/filters', headers: { 'x-upload-pin': '4321' },
+    body: JSON.stringify({ filters: [{ name: 'Party', anyOf: ['halloween'] }] }) });
+  assert.equal(JSON.parse(r.body).error, 'Party: a filter needs days and times; to play tags any time, pick them under Play.');
 });
 
 (async () => {
