@@ -20,8 +20,9 @@ function mpvArgs(box, config) {
     // apply (Vulkan, CUDA) logs errors on every video.
     '--hwdec=drm',
     '--hwdec-codecs=hevc',
-    // Photos: on screen for a while each, fitted with black around them
-    // (and behind any transparent parts), never cropped.
+    // Fitted whole with black around (and behind any transparent parts). A
+    // photo is queued with panscan=1.0 for itself, so it fills the screen
+    // instead, its edges cropped (logic.keepPlaying); videos stay whole.
     '--image-display-duration=' + config.photoSeconds,
     '--keepaspect=yes',
     '--panscan=0',

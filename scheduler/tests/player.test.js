@@ -215,6 +215,14 @@ test('the box decodes HEVC in hardware and H.264 in software', () => {
   assert.ok(!args.includes('--hwdec=no'));
 });
 
+test('each photo fills the screen and each video is fitted whole', async () => {
+  const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
+  assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0'], ['00002-b.mp4', ''], ['00003-c.png', 'panscan=1.0']]);
+});
+
 // The box playing Photos, with its website wired to it as on the box.
 async function photosPlaying() {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });

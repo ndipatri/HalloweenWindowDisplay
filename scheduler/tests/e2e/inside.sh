@@ -214,6 +214,17 @@ check "the website sends an upload with a range" \
 echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
 check "the upload tag shows in the status" within 20 bash -c '[ "$(status)" = "#upload (override until cleared)" ]'
 check "the uploads play in order" within 60 logged "#upload: playing 00002-sideways.jpg"
+mpv_get() { # property -> its value now, from the box's mpv
+  node -e '
+    const c = require("net").connect("/run/tvbox/mpv.sock");
+    c.on("connect", () => c.write(JSON.stringify({ command: ["get_property", process.argv[1]], request_id: 7 }) + "\n"));
+    let buf = "";
+    c.on("data", (d) => { buf += d; for (const l of buf.split("\n")) { try { const m = JSON.parse(l); if (m.request_id === 7) { console.log(m.data); process.exit(0); } } catch (e) {} } });
+    setTimeout(() => process.exit(1), 3000);' "$1"
+}
+panscan_is() { [ "$(mpv_get panscan)" = "$1" ]; }
+export -f mpv_get panscan_is
+check "a photo fills the screen (mpv's panscan is 1 while it plays)" panscan_is 1
 check "each photo stays on screen about 10 seconds" node -e '
   const log = require("fs").readFileSync(process.argv[1], "utf8").split("\n");
   const when = (name) => { const l = log.find((x) => x.includes("#upload: playing " + name)); return l && Date.parse(l.split("  ")[0]); };
@@ -223,6 +234,7 @@ check "each photo stays on screen about 10 seconds" node -e '
 check "the see-through PNG plays" within 30 logged "#upload: playing 00003-half.png"
 if [ $hevc_ok -eq 1 ]; then
   check "the HEVC clip plays" within 60 logged "#upload: playing 00004-phone.mp4"
+  check "a video is fitted whole (mpv's panscan is 0 while it plays)" panscan_is 0
   sleep 3
   check "the HEVC clip isn't skipped" bash -c "! grep -q 'ERROR: Skipping 00004-phone.mp4' '$LOG'"
 else
@@ -306,6 +318,8 @@ check "a saved custom filter comes first among the choices" bash -c "
 clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Upload-Pin: 4321' -d '{"filters":[{"name":"Thanksgiving","anyOf":["favorites"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' "$SITE/api/filters")"
 check "a custom filter can't take a GitHub filter's name" test "$clash_code" = 400
 check "a filter scheduled all year plays" within 20 bash -c '[ "$(status)" = "Rehearsal (scheduled all day)" ]'
+check "a video after the photos is fitted whole again (panscan back to 0)" \
+  within 30 bash -c "logged 'Rehearsal: playing' && panscan_is 0"
 
 echo "== Check for new videos now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")
