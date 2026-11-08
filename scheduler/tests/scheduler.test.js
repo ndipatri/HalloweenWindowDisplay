@@ -10,16 +10,17 @@ const config = require('../config.js');
 const { FakeMpv } = require('./fake_mpv.js');
 
 const ROOT = '/home/test/video-scheduler';
-const STARTING = fs.readFileSync(path.join(__dirname, '..', 'filters.default.json'), 'utf8');
+const STARTING = fs.readFileSync(path.join(__dirname, '..', '..', 'playlists', 'filters.json'), 'utf8');
 
 // Loads the scheduler with fakes. `files` maps paths (relative to the video
 // folder) to contents; `dirs` maps folders (relative) to the names in them.
 // Top folders are added to the video folder's own listing.
-function load({ files = {}, dirs = {}, filters, tags } = {}) {
+function load({ files = {}, dirs = {}, filters, github, tags } = {}) {
   const logs = [];
   const fileMap = {};
   for (const [k, v] of Object.entries(files)) fileMap[ROOT + '/' + k] = v;
   if (filters !== undefined) fileMap[ROOT + '/filters.json'] = JSON.stringify({ filters });
+  if (github !== undefined) fileMap[ROOT + '/github-filters.json'] = JSON.stringify({ filters: github });
   if (tags !== undefined) fileMap[ROOT + '/tags.json'] = JSON.stringify({ tags });
   const folders = { [ROOT]: [] };
   for (const [k, v] of Object.entries(dirs)) {
@@ -182,9 +183,10 @@ test('no filters file means no filters', () => {
   assert.equal(logs.filter((l) => l === msg).length, 1, logs.join('\n'));
 });
 
-test("the starting filters are today's seasons, favorites and uploads", () => {
-  const { T: t, logs } = load({ files: { 'filters.json': STARTING } });
+test("the GitHub filters are today's seasons, favorites and uploads", () => {
+  const { T: t, logs } = load({ files: { 'github-filters.json': STARTING } });
   const f = fn(t, 'readFilters')();
+  assert.ok(f.every((x) => x.source === 'github'), 'they come from GitHub');
   assert.ok(!logs.some((l) => /ERROR/.test(l)), logs.join('\n'));
   assert.deepEqual(f.map((x) => x.name), ['Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
   const raw = starting();
@@ -201,8 +203,8 @@ test("the starting filters are today's seasons, favorites and uploads", () => {
 
 // ---- filter-schedule ----
 
-function startingBox() {
-  return load({ files: { 'filters.json': STARTING } });
+function startingBox(extra = {}) {
+  return load(Object.assign({ files: { 'github-filters.json': STARTING } }, extra));
 }
 const show = (t, date, overrideState = fresh()) => fn(t, 'whatToShow')(t.readFilters(), date, overrideState);
 const scheduled = (t, filters, date) => {
@@ -425,6 +427,45 @@ test("an override for a missing filter isn't ended while filters.json has mistak
   box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ filter: 'Thanksgiving', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   show(box.T, at(10, 20, 18));
   assert.ok(box.T.OVERRIDE_PATH in box.files, 'the override is kept');
+});
+
+// ---- GitHub filters and custom filters ----
+
+const party = { name: 'Party', anyOf: ['halloween'], schedule: [{ from: '10-01', to: '10-31', times: [{ start: '17:00', stop: '23:00' }] }] };
+
+test('custom filters come before the GitHub filters', () => {
+  const { T: t } = startingBox({ filters: [party] });
+  const r = show(t, at(10, 20, 18));
+  assert.equal(r.filter, 'Party');
+  assert.equal(r.status, 'Party (scheduled until 11:00 PM)');
+  const f = t.readFilters();
+  assert.deepEqual(f.map((x) => x.name), ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+  assert.deepEqual(f.map((x) => x.source), ['custom', 'github', 'github', 'github', 'github', 'github']);
+  // The website's choices are the same, in the same order.
+  const { createWebsite } = require('../website.js');
+  const files = { [ROOT + '/github-filters.json']: STARTING, [ROOT + '/filters.json']: JSON.stringify({ filters: [party] }) };
+  const w = createWebsite({ config, videoRoot: ROOT, now: () => at(10, 20, 18), readText: (p) => (p in files ? files[p] : null),
+    writeText: (p, x) => { files[p] = x; }, removeFile: (p) => { delete files[p]; }, listFolder: () => null, readTail: () => null, startSync: () => true });
+  return w.handle({ method: 'GET', path: '/api/choices', headers: {}, body: '' }).then((r) => {
+    assert.deepEqual(JSON.parse(r.body).filters, ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+  });
+});
+
+test('a custom filter named like a GitHub filter is left out and logged', () => {
+  const { T: t, logs } = startingBox({ filters: [{ name: 'halloween KID', anyOf: ['x'] }, party] });
+  t.readFilters();
+  const custom = t.readFilters().filter((x) => x.source === 'custom');
+  assert.deepEqual(custom.map((x) => x.name), ['Party']);
+  const msg = 'ERROR: Ignoring filter 1 (halloween KID): GitHub has a filter called Halloween kid.';
+  assert.equal(logs.filter((l) => l === msg).length, 1, logs.join('\n'));
+});
+
+test("an override for a custom filter that clashes with GitHub isn't ended", () => {
+  const box = startingBox({ filters: [{ name: 'thanksgiving', anyOf: ['x'] }] });
+  box.files[box.T.OVERRIDE_PATH] = JSON.stringify({ filter: 'Halloween grownup', setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  box.files[ROOT + '/github-filters.json'] = JSON.stringify({ filters: JSON.parse(STARTING).filters.filter((x) => x.name !== 'Halloween grownup') });
+  show(box.T, at(10, 20, 18));
+  assert.ok(box.T.OVERRIDE_PATH in box.files, 'kept while the filters have a mistake in them');
 });
 
 (async () => {

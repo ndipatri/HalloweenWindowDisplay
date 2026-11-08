@@ -16,16 +16,20 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // A website with fake files. `dirs` maps folder paths (relative to the
 // video folder) to the names in them.
-const STARTING = require('fs').readFileSync(require('path').join(__dirname, '..', 'filters.default.json'), 'utf8');
+const STARTING = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'playlists', 'filters.json'), 'utf8');
 const TAGS = ROOT + '/tags.json';
 const FILTERS = ROOT + '/filters.json';
+const GITHUB = ROOT + '/github-filters.json';
 
 // A website with fake files. `dirs` maps folder paths (relative to the
 // video folder) to the names in them. `extra`: filters (default: the starting
 // set), tags, pin, files, now, log, filtersChanged.
 function site(dirs = {}, extra = {}) {
   const files = Object.assign({}, extra.files || {});
-  files[FILTERS] = extra.filters ? JSON.stringify({ filters: extra.filters }) : STARTING;
+  // Custom filters if given; the GitHub filters (by default the repo's) unless only custom ones are given.
+  if (extra.filters) files[FILTERS] = JSON.stringify({ filters: extra.filters });
+  if (extra.github) files[GITHUB] = JSON.stringify({ filters: extra.github });
+  else if (!extra.filters) files[GITHUB] = STARTING;
   if (extra.tags) files[TAGS] = JSON.stringify({ tags: extra.tags });
   if (extra.pin) files[ROOT + '/upload-pin'] = extra.pin + '\n';
   const folders = { [ROOT]: [] };
@@ -356,11 +360,14 @@ const pinSite = (extra = {}) => site({}, Object.assign({ pin: '4321', filters: [
 const saved = (s) => JSON.parse(s.files[FILTERS]).filters;
 
 test('the website lists the filters', async () => {
+  const late = { name: 'Late', anyOf: ['halloween'], except: [], schedule: [] };
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
   const kid = { name: 'Halloween kid', anyOf: ['halloween', 'halloween-kid'], except: [],
     schedule: [{ from: '10-01', to: '10-31', times: [{ start: '05:00', stop: '07:00' }] }] };
-  const s = site({}, { filters: [kid, favorites] });
+  const s = site({}, { filters: [late, party], github: [kid, favorites] });
   const r = await s.call('GET', '/api/filters');
-  assert.deepEqual(r.json.filters, [kid, favorites]);
+  assert.deepEqual(r.json.custom, [late, party]);
+  assert.deepEqual(r.json.github, [kid, favorites]);
 });
 
 test('the website saves the filters with the right PIN', async () => {
@@ -392,12 +399,13 @@ test('the website refuses to save filters while no PIN is set', async () => {
 });
 
 test("the website refuses a filter it can't use", async () => {
-  const s = pinSite();
+  const s = pinSite({ github: [{ name: 'Halloween kid', anyOf: ['halloween'] }] });
   const f = (o) => Object.assign({}, christmas, o);
   const bad = [
     [[f({ name: '' })], 'Filter 1'],
     [[f({ name: 'Black' })], 'Black'],
     [[f({ name: 'Kid' }), f({ name: 'kid' })], 'kid'],
+    [[f({ name: 'halloween KID' })], 'halloween KID'],
     [[f({ name: 'Kid (old)' })], 'Kid (old)'],
     [[f({ anyOf: [] })], 'Christmas'],
     [[f({ anyOf: ['Fav Orites'] })], 'Christmas'],
@@ -427,7 +435,8 @@ test('the website page offers tagging items', async () => {
 test('the website page offers editing filters with the PIN', async () => {
   const page = (await site().call('GET', '/')).body;
   for (const text of ['<h2>Filters</h2>', 'id="filterlist"', "fetch('/api/filters')", "'/api/filters'", "'X-Upload-Pin'",
-    'id="filter-note"', 'New filter', 'Save filters', 'moveFilter(', '↑', '↓', 'Edit', 'Delete', 'Any of', 'Except', 'Times']) {
+    'id="filter-note"', 'New filter', 'Save filters', 'moveFilter(', '↑', '↓', 'Edit', 'Delete', 'Any of', 'Except', 'Times',
+    'id="githubfilters"', 'From GitHub', 'changed there']) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
   assertScriptCompiles(page);
@@ -1008,6 +1017,34 @@ test("adding upload's own tag again is refused, not stored", async () => {
   const s = site({ photos: ['00001-a.jpg'] });
   const r = await s.call('POST', '/api/tags', { path: 'photos/00001-a.jpg', add: 'upload' });
   assert.equal(r.status, 400);
+});
+
+test('custom copies of the GitHub filters are dropped when the website starts', async () => {
+  const logs = [];
+  const raw = JSON.parse(STARTING).filters;
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
+  const s = site({}, { log: (m) => logs.push(m), github: raw, filters: [raw[0], party, raw[4]] });
+  assert.deepEqual(JSON.parse(s.files[FILTERS]).filters.map((f) => f.name), ['Party']);
+  for (const name of ['Halloween kid', 'All uploads']) {
+    assert.ok(logs.includes('Dropping the custom filter ' + name + ': GitHub has a filter of that name.'), logs.join('\n'));
+  }
+});
+
+test('the choices list custom filters before the GitHub ones', async () => {
+  const s = site({}, { filters: [{ name: 'Party', anyOf: ['halloween'] }], github: JSON.parse(STARTING).filters });
+  const r = await s.call('GET', '/api/choices');
+  assert.deepEqual(r.json.filters, ['Party', 'Halloween kid', 'Halloween grownup', 'Thanksgiving', 'Favorites', 'All uploads']);
+});
+
+test('custom copies are only dropped once, so a later clash keeps the custom filter', async () => {
+  const party = { name: 'Party', anyOf: ['halloween'], except: [], schedule: [] };
+  const s = site({}, { github: [{ name: 'Halloween kid', anyOf: ['halloween'] }], filters: [party],
+    files: { [ROOT + '/.custom-copies-dropped']: 'done\n' } });
+  // GitHub now has a Party too: the custom one is kept in the file (skipped, not deleted).
+  const s2 = site({}, { github: [{ name: 'Party', anyOf: ['x'] }], filters: [party],
+    files: { [ROOT + '/.custom-copies-dropped']: 'done\n' } });
+  assert.deepEqual(JSON.parse(s.files[FILTERS]).filters.map((f) => f.name), ['Party']);
+  assert.deepEqual(JSON.parse(s2.files[FILTERS]).filters.map((f) => f.name), ['Party']);
 });
 
 (async () => {

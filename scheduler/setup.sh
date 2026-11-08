@@ -113,14 +113,6 @@ else
   echo "    No upload PIN set, so adding photos is off. To turn it on: sudo TVBOX_UPLOAD_PIN=<4 to 8 digits> bash scheduler/setup.sh"
 fi
 
-# The starting filters, only for a box that has none: a box's own filters
-# (edited on its website) are never changed here.
-if [ ! -e "$videos/filters.json" ]; then
-  cp "$here/filters.default.json" "$videos/filters.json"
-  chmod 644 "$videos/filters.json"
-  names="$(grep -o '"name": *"[^"]*"' "$here/filters.default.json" | sed 's/.*: *"\(.*\)"/\1/' | paste -sd, - | sed 's/,/, /g')"
-  echo "    Added the starting filters ($names)."
-fi
 owned "$videos"
 
 say "Keeping the log from growing forever"

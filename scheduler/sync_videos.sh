@@ -24,6 +24,29 @@ pull_timeout="${VIDEO_SCHEDULER_PULL_TIMEOUT:-60}"
 
 log() { echo "$(date '+%m/%d/%Y, %-I:%M:%S %p')  sync: $*"; }
 
+# The GitHub filters (playlists/filters.json) go to the box as
+# github-filters.json, written whole (a temp file renamed into place), only
+# when they changed. With none in the repo, the box's copy goes too. The
+# box's own filters (filters.json) are never touched.
+github_filters() {
+  local from="$src/filters.json" to="$root/github-filters.json"
+  if [ -f "$from" ]; then
+    cmp -s "$from" "$to" && return 0
+    if cp "$from" "$root/.github-filters.json.syncing" && mv -f "$root/.github-filters.json.syncing" "$to"; then
+      log "Updated the GitHub filters."
+    else
+      rm -f "$root/.github-filters.json.syncing"
+      log "ERROR: Couldn't copy the GitHub filters"
+    fi
+  elif [ -e "$to" ]; then
+    if rm -f "$to" && [ ! -e "$to" ]; then
+      log "Removed the GitHub filters (the repo has none)."
+    else
+      log "ERROR: Couldn't remove the GitHub filters"
+    fi
+  fi
+}
+
 is_video() {
   case "$1" in
     .*) return 1 ;;
@@ -63,6 +86,7 @@ pull() {
 copy_videos() {
   if [ ! -d "$src" ]; then
     log "No playlists/ folder in $repo yet; nothing to copy."
+    github_filters
     return
   fi
   local copied=0 set_aside=0 dir name dest file base
@@ -120,6 +144,7 @@ copy_videos() {
     done
   done < <(cd "$root" && find . -mindepth 2 -type d ! -path '*/.*' | sed 's|^\./||' | sort)
 
+  github_filters
   log "Done: $copied copied, $set_aside moved aside."
 }
 

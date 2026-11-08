@@ -278,6 +278,40 @@ test('sync skips a photos folder in the repo', () => {
   assert.equal(r.log.split('\n').filter((l) => l.includes(skip)).length, 1, r.log);
 });
 
+// ---- Brings the GitHub filters ----
+
+const GITHUB_FILTERS = JSON.stringify({ filters: [{ name: 'Favorites', anyOf: ['favorites'] }] }) + '\n';
+
+test('sync copies the GitHub filters to the box', () => {
+  const s = setup({ 'playlists/filters.json': GITHUB_FILTERS, 'playlists/halloween/a.mp4': 'A' });
+  s.put('filters.json', 'mine\n');
+  const first = s.sync();
+  assert.equal(first.status, 0, first.log);
+  assert.equal(s.read('github-filters.json'), GITHUB_FILTERS);
+  assert.equal(s.read('filters.json'), 'mine\n');
+  const second = s.sync();
+  assert.equal(second.status, 0, second.log);
+  const all = first.log + second.log;
+  assert.equal(all.split('\n').filter((l) => l.includes('Updated the GitHub filters.')).length, 1, all);
+});
+
+test('sync removes the GitHub filters when the repo has none', () => {
+  const s = setup({ 'playlists/halloween/a.mp4': 'A' });
+  s.put('github-filters.json', GITHUB_FILTERS);
+  const r = s.sync();
+  assert.equal(r.status, 0, r.log);
+  assert.ok(!s.has('github-filters.json'), 'the copy is gone');
+  assert.ok(r.log.includes('Removed the GitHub filters (the repo has none).'), r.log);
+});
+
+test('sync removes the GitHub filters when the repo has no playlists folder at all', () => {
+  const s = setup({});
+  s.put('github-filters.json', GITHUB_FILTERS);
+  const r = s.sync();
+  assert.equal(r.status, 0, r.log);
+  assert.ok(!s.has('github-filters.json'), 'the copy is gone');
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }

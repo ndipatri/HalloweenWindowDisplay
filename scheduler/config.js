@@ -3,10 +3,10 @@
 'use strict';
 
 module.exports = {
-  // What plays when is no longer set here: each box keeps its own filters
-  // (tags to play, and days and times) in ~/video-scheduler/filters.json,
-  // edited under Filters on its website. A new box starts with
-  // scheduler/filters.default.json. Videos get a tag from their folder in
+  // What plays when is no longer set here: filters (tags to play, and days
+  // and times) come from the repo's playlists/filters.json (copied to each box
+  // by sync), plus each box's own custom filters, edited under Filters on its
+  // website (~/video-scheduler/filters.json). Videos get a tag from their folder in
   // playlists/ (halloween/kid -> halloween-kid).
 
   videoExtensions: ['mp4', 'm4v', 'mov'],
