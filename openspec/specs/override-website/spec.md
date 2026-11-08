@@ -153,12 +153,12 @@ The website SHALL refuse, without writing an override, a tag no item has, a filt
 - **AND** no override file is written
 
 ### Requirement: Offers the tags under Play
-The website SHALL list every tag in use, in name order, and every filter, custom then GitHub, as its choices, and its page SHALL offer each as a button that selects it, several at a time (tags in one row, filters in another), a Play button that shows what is selected for the chosen duration, Black, the durations, and Back to schedule.
+The website SHALL list every tag in use that no GitHub filter names (in its any of or except), in name order, and every filter, custom then GitHub, as its choices, and its page SHALL offer each as a button that selects it, several at a time (tags in one row, filters in another), a Play button that shows what is selected for the chosen duration, Black, the durations, and Back to schedule.
 
 #### Scenario: the website lists the tags as choices
-- **GIVEN** `halloween/fuzzy.mp4`, `halloween/grownup/jump.mp4`, `thanksgiving/dusk.mp4`, and `photos/00001-a.jpg` tagged `favorites`
+- **GIVEN** the starting GitHub filters, `halloween/fuzzy.mp4`, `halloween/grownup/jump.mp4`, `thanksgiving/dusk.mp4`, `christmas/tree.mp4`, and `photos/00001-a.jpg` tagged `favorites`
 - **WHEN** the website is asked for its choices
-- **THEN** the tags are `favorites`, `halloween`, `halloween-grownup`, `thanksgiving` and `upload`
+- **THEN** the tags are `christmas`, `favorites` and `upload`, leaving out the tags the GitHub filters name
 - **AND** the filters are Halloween kid, Halloween grownup and Thanksgiving
 
 #### Scenario: the website page offers each choice

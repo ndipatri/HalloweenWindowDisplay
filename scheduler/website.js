@@ -51,8 +51,15 @@ function createWebsite(options) {
   } catch (e) { /* no photos folder yet */ }
 
   // What can be picked under Play: every tag in use, and every filter.
+  // What Play offers: every filter, and the tags in use that no GitHub filter
+  // names (the GitHub videos play through their filters).
   function choices() {
-    return { tags: logic.tagsInUse(logic.items()), filters: logic.readFilters().map((f) => f.name) };
+    const filters = logic.readFilters();
+    const github = new Set();
+    for (const f of filters) {
+      if (f.source === 'github') f.anyOf.concat(f.except || []).forEach((t) => github.add(t));
+    }
+    return { tags: logic.tagsInUse(logic.items()).filter((t) => !github.has(t)), filters: filters.map((f) => f.name) };
   }
 
   // Lets the player rebuild its queue for what is on screen. The change is
@@ -751,7 +758,7 @@ const PAGE = `<!DOCTYPE html>
   <div class="card">
     <div class="now" role="status">Now: <span id="status">Checking…</span></div>
     <div class="hint">Pick one or more, then tap Play.</div>
-    <div class="group">Tags</div>
+    <div class="group" id="taglabel">Tags</div>
     <div class="grid picks" id="tagpicks"></div>
     <div class="group">Filters</div>
     <div class="grid picks" id="filterpicks"></div>
@@ -897,6 +904,7 @@ const PAGE = `<!DOCTYPE html>
     $('tagpicks').textContent = '';
     $('filterpicks').textContent = '';
     filterNames = c.filters;
+    $('taglabel').hidden = !c.tags.length; // no heading over an empty row
     for (const tag of c.tags) $('tagpicks').appendChild(pickButton(tagLabel(tag), '#' + tag));
     for (const name of c.filters) $('filterpicks').appendChild(pickButton(name, name));
     refresh();

@@ -194,10 +194,10 @@ test("the website refuses minutes that aren't a whole number above zero", async 
 // ---- Offers the tags under Play ----
 
 test('the website lists the tags as choices', async () => {
-  const s = site({ halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], thanksgiving: ['dusk.mp4'], photos: ['00001-a.jpg'] },
+  const s = site({ halloween: ['fuzzy.mp4'], 'halloween/grownup': ['jump.mp4'], thanksgiving: ['dusk.mp4'], christmas: ['tree.mp4'], photos: ['00001-a.jpg'] },
     { tags: { 'photos/00001-a.jpg': ['favorites'] }, github: JSON.parse(STARTING).filters });
   const r = await s.call('GET', '/api/choices');
-  assert.deepEqual(r.json.tags, ['favorites', 'halloween', 'halloween-grownup', 'thanksgiving', 'upload']);
+  assert.deepEqual(r.json.tags, ['christmas', 'favorites', 'upload']);
   assert.deepEqual(r.json.filters, ['Halloween kid', 'Halloween grownup', 'Thanksgiving']);
 });
 

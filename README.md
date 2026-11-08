@@ -45,7 +45,7 @@ What plays is chosen by **filters**. These come from GitHub, so every box has th
 | Halloween grownup | Those two plus the monster, the jump scare and the woman | Every day in October, 7:30–11 pm |
 | Thanksgiving | The fall sunset, Mochi the pilgrim and the steady fall sun | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm |
 
-At any other time the window stays black. You can also play any **tag** whenever you like (see "Using it"): `favorites` for the photos you've starred, `upload` for all your own photos and videos, or a folder's tag such as `halloween-grownup`. There's no Christmas filter yet, as there are no Christmas videos.
+At any other time the window stays black. You can also play your own **tags** whenever you like (see "Using it"): `favorites` for the photos you've starred, `upload` for all your own photos and videos, or one you've added. The tags these filters use (`halloween`, `halloween-grownup`, `thanksgiving`, …) aren't offered as tags: play those videos with their filter. There's no Christmas filter yet, as there are no Christmas videos.
 
 ## The videos
 
@@ -157,7 +157,7 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
 
-- play any **tags** (Favorites, Uploads, Halloween grownup, …) and **filters** (Halloween kid, Thanksgiving, …), whatever day it is: tap one or more to pick them (tap again to unpick), then tap **Play**. Several picked play together as one mix, everything once, round and round. What's playing is outlined;
+- play your **tags** (Favorites, Uploads, any you've added) and any **filters** (Halloween kid, Thanksgiving, …), whatever day it is: tap one or more to pick them (tap again to unpick), then tap **Play**. Several picked play together as one mix, everything once, round and round. What's playing is outlined;
 - show **Black**;
 - choose **For how long**: until the schedule next changes, for 15, 30 or 60 minutes, or until you switch back;
 - go **Back to schedule**;
