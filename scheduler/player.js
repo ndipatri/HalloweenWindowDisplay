@@ -10,7 +10,8 @@ const { createScheduler } = require('./logic.js');
 const CLOCK_NOT_SET = 'black (waiting for the clock to be set)';
 
 // `options`: { config, videoRoot, mpv, now() -> Date, clockIsSet() -> bool,
-//              readText, writeText, removeFile, listFolder, log }
+//              readText, writeText, removeFile, listFolder, log,
+//              photoSize(path) -> { width, height } or null }
 function createPlayer(options) {
   const { mpv, now, clockIsSet, writeText, log } = options;
   const logic = createScheduler(options);
@@ -21,6 +22,7 @@ function createPlayer(options) {
   let active = null;
   let status = null;
   let idle = false; // mpv stopped with nothing queued
+  let facing; // which way the picture is turned for: undefined until the first tick
 
   async function blank() {
     if (!idle) await mpv.command('stop');
@@ -36,7 +38,30 @@ function createPlayer(options) {
     return done;
   }
 
+  // The TV was turned (saved on the website), or the box started with it
+  // landscape: turn the picture, refit the item on screen for the new
+  // shape, and queue the rest again for it. mpv starts turned for portrait.
+  async function turnFor(orientation) {
+    const starting = facing === undefined;
+    facing = orientation;
+    if (starting && orientation === 'portrait') return;
+    const degrees = logic.rotationFor(orientation);
+    await mpv.command('set_property', 'video-rotate', degrees);
+    log('Screen: ' + orientation + ' (the picture turned ' + degrees + ' degrees).');
+    if (starting) return;
+    const entries = (await mpv.getProperty('playlist')) || [];
+    const onScreen = entries.find((e) => e.current);
+    if (onScreen) {
+      const fills = logic.isPhotoFile(onScreen.filename) && logic.photoFills(onScreen.filename, orientation);
+      await mpv.command('set_property', 'panscan', fills ? 1 : 0);
+    }
+    await refilterNow();
+  }
+
   async function tickNow() {
+    const orientation = logic.readScreen();
+    if (orientation !== facing) await turnFor(orientation);
+
     const choice = clockIsSet()
       ? logic.whatToShow(logic.readFilters(), now(), overrideState)
       : { filter: null, status: CLOCK_NOT_SET };
@@ -194,6 +219,7 @@ async function main() {
   const config = require('./config.js');
   const { startMpv, connect } = require('./mpv.js');
   const { startWebsite } = require('./website.js');
+  const { readPhotoSize } = require('./photo_size.js');
   const box = config.box;
   const io = realIo();
   const videoRoot = box.videoRoot || path.join(os.homedir(), 'video-scheduler');
@@ -209,6 +235,7 @@ async function main() {
     mpv,
     now: () => new Date(),
     clockIsSet: () => fs.existsSync(box.clockFile),
+    photoSize: readPhotoSize,
   }));
   io.log('Started. Videos: ' + videoRoot);
   const filters = player.logic.readFilters();

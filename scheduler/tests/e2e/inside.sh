@@ -95,7 +95,7 @@ if [ $setup_status -ne 0 ]; then
   exit 1
 fi
 check "setup copies the player and website to /opt/tvbox" \
-  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js
+  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/photo_size.js
 check "setup installs and enables the three units" \
   grep -q "systemctl enable tvbox.service tvbox-sync.timer" "$E/calls"
 check "systemd accepts the units" \
@@ -326,6 +326,18 @@ check "a custom filter can't take a GitHub filter's name" test "$clash_code" = 4
 check "a filter scheduled all year plays" within 20 bash -c '[ "$(status)" = "Rehearsal (scheduled all day)" ]'
 check "a video after the photos is fitted whole again (panscan back to 0)" \
   within 30 bash -c "logged 'Rehearsal: playing' && panscan_is 0"
+
+echo "== Turning the TV"
+turn_from=$(($(wc -l < "$LOG") + 1))
+check "the website says the TV is portrait at first" bash -c "curl -fsS $SITE/api/screen | grep -q '\"portrait\"'"
+echo "   $(post /api/screen '{"orientation":"landscape"}')"
+check "turning the TV to landscape turns mpv's picture to 0 degrees, logged" \
+  within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 0 ] && logged 'Screen: landscape (the picture turned 0 degrees).'"
+echo "   $(post /api/screen '{"orientation":"portrait"}')"
+check "turning it back to portrait turns the picture to 90 degrees again" \
+  within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 90 ]"
+# (The rehearsal's broken.mp4 may be skipped meanwhile: that error is expected.)
+check "turning the TV logs no error" bash -c "! tail -n +$turn_from '$LOG' | grep 'ERROR' | grep -qv 'Skipping broken.mp4'"
 
 echo "== Check for new videos now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")

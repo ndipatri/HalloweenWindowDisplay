@@ -204,7 +204,7 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
 5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
 
-They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. Each photo fills the screen: the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to 9:16 before adding it. Videos are shown whole, with black around them if they aren't the screen's shape.
+They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen (a portrait photo while the TV is portrait, a landscape one while it's landscape) fills it: the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
@@ -214,6 +214,14 @@ Good to know:
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
 - Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
 - The PIN is chosen when the box is set up. To change it, or to set one on a box that says adding photos is off: `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` (with your own 4 to 8 digits).
+
+### Turn the TV for landscape photos and videos
+
+The TV hangs on its side (portrait), but its mount turns. For landscape photos and videos, turn the TV to landscape, then on the page under **TV** tap **Landscape**. The picture turns to match within a second. Tap **Portrait** when you turn it back. The box remembers which way it's facing, even after it's unplugged.
+
+What plays doesn't change by itself: pick what to show under **Play** as usual. A tag like `landscape` on those uploads makes that easy.
+
+If the picture is upside down while the TV is landscape, change `landscapeRotate: 0` to `landscapeRotate: 180` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
 ### Everyday tasks
 
@@ -250,6 +258,8 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | A new video doesn't play | Press **Check for new videos now** on the page, and watch Recent activity for `Copied` |
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
+| The picture is sideways | Under **TV** on the page, tap the way the TV faces now |
+| The picture is upside down with the TV landscape | Switch `landscapeRotate` between 0 and 180 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |
 | The page says `Adding photos is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |

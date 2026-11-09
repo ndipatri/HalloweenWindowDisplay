@@ -45,6 +45,14 @@ function box(dirs = {}) {
       if (folders[dir]) folders[dir] = folders[dir].filter((n) => dir + '/' + n !== p);
     },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
+    // Photos are portrait unless named otherwise.
+    photoSize: (p) => {
+      const n = p.split('/').pop();
+      if (n.includes('broken')) return null;
+      if (n.includes('wide')) return { width: 160, height: 96 };
+      if (n.includes('square')) return { width: 100, height: 100 };
+      return { width: 96, height: 160 };
+    },
     log: (m) => logs.push(m),
   });
   b.tick = () => b.player.tick();
@@ -221,6 +229,46 @@ test('each photo fills the screen and each video is fitted whole', async () => {
   await b.tick();
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
   assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0'], ['00002-b.mp4', ''], ['00003-c.png', 'panscan=1.0']]);
+});
+
+test('a photo that isn\'t the screen\'s shape is shown whole', async () => {
+  const b = box({ photos: ['00001-wide.jpg', '00002-square.png', '00003-broken.jpg'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
+  assert.deepEqual(queued, [['00001-wide.jpg', ''], ['00002-square.png', ''], ['00003-broken.jpg', '']]);
+});
+
+test('the box turns the picture when the TV is turned to landscape', async () => {
+  const b = box({ photos: ['00001-tall.jpg', '00002-wide.jpg'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const queued = () => b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
+  assert.deepEqual(queued(), [['00001-tall.jpg', 'panscan=1.0'], ['00002-wide.jpg', ''], ['00001-tall.jpg', 'panscan=1.0']]);
+  assert.equal(b.mpv.props['video-rotate'], undefined, 'portrait is how mpv starts');
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
+  await b.tick();
+  assert.equal(b.mpv.props['video-rotate'], 0);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-tall.jpg', 'tall stays on screen');
+  assert.equal(b.mpv.props.panscan, 0, 'tall is shown whole now');
+  assert.deepEqual(queued().slice(1), [['00002-wide.jpg', 'panscan=1.0'], ['00001-tall.jpg', '']]);
+  assert.ok(b.logs.some((l) => l.startsWith('Screen: landscape')), b.logs.join('\n'));
+  // And back.
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'portrait' });
+  await b.tick();
+  assert.equal(b.mpv.props['video-rotate'], config.box.rotate);
+  assert.equal(b.mpv.props.panscan, 1);
+});
+
+test('a box started with the TV landscape turns the picture straight away', async () => {
+  const b = box({ photos: ['00001-wide.jpg'] });
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const rotated = b.mpv.commands.findIndex((c) => c[0] === 'set_property' && c[1] === 'video-rotate' && c[2] === 0);
+  const loaded = b.mpv.commands.findIndex((c) => c[0] === 'loadfile');
+  assert.ok(rotated !== -1 && rotated < loaded, JSON.stringify(b.mpv.commands));
+  assert.equal(b.mpv.entries[0].options, 'panscan=1.0,image-display-duration=inf', 'the wide photo fills a landscape TV');
 });
 
 test('a lone photo is held on screen, not reloaded', async () => {

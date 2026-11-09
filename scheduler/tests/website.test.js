@@ -259,6 +259,40 @@ test('the page works out which tags are playing from the status', async () => {
   for (const [status, choices] of cases) assert.deepEqual(Array.from(playingChoices(status, filters)), choices, String(status));
 });
 
+// ---- Which way the TV faces ----
+
+test('the website saves which way the TV faces', async () => {
+  const logs = [];
+  const s = site({}, { log: (m) => logs.push(m) });
+  assert.equal((await s.call('GET', '/api/screen')).json.orientation, 'portrait');
+  const r = await s.call('POST', '/api/screen', { orientation: 'landscape' });
+  assert.equal(r.status, 200, r.body);
+  assert.match(r.json.message, /landscape TV/);
+  assert.equal(JSON.parse(s.files[ROOT + '/screen.json']).orientation, 'landscape');
+  assert.ok(logs.includes('Screen: landscape (from the website).'), logs.join('\n'));
+  assert.equal((await s.call('GET', '/api/screen')).json.orientation, 'landscape');
+});
+
+test('the website refuses an unknown orientation', async () => {
+  const s = site();
+  const r = await s.call('POST', '/api/screen', { orientation: 'sideways' });
+  assert.equal(r.status, 400);
+  assert.ok(!((ROOT + '/screen.json') in s.files));
+});
+
+test('the page offers Portrait and Landscape', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const body = page.slice(page.indexOf('<main>'));
+  const tv = body.indexOf('<h2>TV</h2>');
+  assert.ok(tv !== -1, 'a TV section');
+  const section = body.slice(tv, body.indexOf('<h2>', tv + 1));
+  assert.ok(section.includes('data-tv="portrait"') && section.includes('data-tv="landscape"'), section);
+  const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let filterNames'));
+  assert.ok(refresh.includes("fetch('/api/screen')") && refresh.includes('markScreen('), 'the saved way is marked');
+  assert.ok(page.includes("post('/api/screen'"), 'the buttons save it');
+  assertScriptCompiles(page);
+});
+
 // ---- Tags ----
 
 test('the website adds a box tag to an upload', async () => {
