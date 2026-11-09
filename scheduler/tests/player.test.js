@@ -18,7 +18,7 @@ function test(name, fn) { tests.push([name, fn]); }
 // A player with fake everything. `dirs` maps folder paths (relative to the
 // video folder) to the names in them. Set `box.now` and `box.clockSet`
 // before each tick.
-function box(dirs = {}) {
+function box(dirs = {}, extra = {}) {
   const files = { [ROOT + '/github-filters.json']: STARTING };
   const logs = [];
   const folders = { [ROOT]: [] };
@@ -32,7 +32,8 @@ function box(dirs = {}) {
     rel: () => mpv.files().map((f) => f.replace(ROOT + '/', '')),
   };
   b.player = createPlayer({
-    config,
+    config: extra.config || config,
+    readTilt: extra.readTilt,
     videoRoot: ROOT,
     mpv,
     now: () => b.now,
@@ -294,6 +295,84 @@ test('a held photo gives way when something else is to play', async () => {
   assert.deepEqual(b.rel(), ['photos/00002-b.jpg', 'photos/00001-a.jpg', 'photos/00002-b.jpg']);
   assert.ok(b.mpv.entries.every((e) => e.options === 'panscan=1.0'), JSON.stringify(b.mpv.entries));
   assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
+});
+
+// ---- The tilt switch ----
+
+// A box with a tilt switch on GPIO17 (closed while portrait), its reading
+// set with b.switchTo('open' | 'closed'); b.at(s) ticks at s seconds in.
+function tiltBox(start = 'closed') {
+  const withSwitch = Object.assign({}, config, { box: Object.assign({}, config.box, { tiltSwitch: { gpio: 17, closed: 'portrait' } }) });
+  let reading = start;
+  const b = box({ photos: ['00001-tall.jpg', '00002-wide.jpg'] }, {
+    config: withSwitch,
+    readTilt: async (gpio) => { assert.equal(gpio, 17); return reading; },
+  });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  const t0 = +at(10, 20, 18);
+  b.switchTo = (r) => { reading = r; };
+  b.at = (seconds) => { b.now = new Date(t0 + seconds * 1000); return b.tick(); };
+  b.screen = () => (ROOT + '/screen.json' in b.files ? JSON.parse(b.files[ROOT + '/screen.json']).orientation : 'portrait');
+  return b;
+}
+
+test('the box follows the tilt switch when the TV is turned', async () => {
+  const b = tiltBox();
+  for (let s = 0; s <= 3; s++) await b.at(s);
+  assert.equal(b.screen(), 'portrait');
+  b.switchTo('open');
+  await b.at(4);
+  await b.at(5);
+  assert.equal(b.screen(), 'portrait', 'not yet: open for 1 second');
+  await b.at(6);
+  assert.equal(b.screen(), 'landscape');
+  assert.ok(b.logs.includes('Screen: landscape (from the tilt switch).'), b.logs.join('\n'));
+  assert.equal(b.mpv.props['video-rotate'], 0, 'the picture turned in the same tick');
+  b.switchTo('closed');
+  for (let s = 7; s <= 9; s++) await b.at(s);
+  assert.equal(b.screen(), 'portrait');
+  assert.equal(b.mpv.props['video-rotate'], config.box.rotate);
+});
+
+test('a tilt switch that flickers while the TV turns is ignored until it settles', async () => {
+  const b = tiltBox();
+  for (let s = 0; s <= 3; s++) await b.at(s);
+  b.switchTo('open');
+  await b.at(4);
+  b.switchTo('closed');
+  for (let s = 5; s <= 9; s++) await b.at(s);
+  assert.ok(!((ROOT + '/screen.json') in b.files), 'nothing saved');
+  assert.equal(b.mpv.props['video-rotate'], undefined, 'not turned');
+});
+
+test('the website\'s choice stays until the tilt switch moves', async () => {
+  const b = tiltBox();
+  for (let s = 0; s <= 3; s++) await b.at(s);
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' }); // Landscape tapped
+  for (let s = 4; s <= 10; s++) await b.at(s);
+  assert.equal(b.screen(), 'landscape', 'the switch, still closed, leaves it');
+  b.switchTo('open');
+  for (let s = 11; s <= 13; s++) await b.at(s);
+  b.switchTo('closed');
+  for (let s = 14; s <= 16; s++) await b.at(s);
+  assert.equal(b.screen(), 'portrait', 'it follows the switch once it moves');
+});
+
+test('a box with no tilt switch set never reads one', async () => {
+  let reads = 0;
+  const b = box({ photos: ['00001-a.jpg'] }, { readTilt: async () => { reads++; return 'open'; } });
+  for (let s = 0; s < 5; s++) await b.tick();
+  assert.strictEqual(config.box.tiltSwitch, null, 'off as shipped');
+  assert.equal(reads, 0);
+});
+
+test('a tilt switch that can\'t be read is logged once', async () => {
+  const withSwitch = Object.assign({}, config, { box: Object.assign({}, config.box, { tiltSwitch: { gpio: 17, closed: 'portrait' } }) });
+  const b = box({ photos: ['00001-a.jpg'] }, { config: withSwitch, readTilt: async () => { throw new Error('spawn gpioget ENOENT'); } });
+  for (let s = 0; s < 5; s++) { b.now = new Date(+at(10, 20, 18) + s * 1000); await b.tick(); }
+  const warnings = b.logs.filter((l) => l.startsWith("WARNING: Couldn't read the tilt switch on GPIO17: "));
+  assert.equal(warnings.length, 1, b.logs.join('\n'));
+  assert.ok(!((ROOT + '/screen.json') in b.files));
 });
 
 // The box playing Photos, with its website wired to it as on the box.

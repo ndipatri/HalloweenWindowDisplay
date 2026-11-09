@@ -95,7 +95,7 @@ if [ $setup_status -ne 0 ]; then
   exit 1
 fi
 check "setup copies the player and website to /opt/tvbox" \
-  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/photo_size.js
+  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/photo_size.js -a -f /opt/tvbox/tilt.js
 check "setup installs and enables the three units" \
   grep -q "systemctl enable tvbox.service tvbox-sync.timer" "$E/calls"
 check "systemd accepts the units" \
@@ -328,6 +328,9 @@ check "a video after the photos is fitted whole again (panscan back to 0)" \
   within 30 bash -c "logged 'Rehearsal: playing' && panscan_is 0"
 
 echo "== Turning the TV"
+check "setup installs gpiod and lets the box's user read the pins, for a tilt switch" \
+  bash -c "command -v gpioget >/dev/null && id -nG pi | tr ' ' '\n' | grep -qx gpio"
+check "with no tilt switch set, the box never warns about one" bash -c "! logged \"Couldn't read the tilt switch\""
 turn_from=$(($(wc -l < "$LOG") + 1))
 check "the website says the TV is portrait at first" bash -c "curl -fsS $SITE/api/screen | grep -q '\"portrait\"'"
 echo "   $(post /api/screen '{"orientation":"landscape"}')"

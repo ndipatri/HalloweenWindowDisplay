@@ -11,7 +11,8 @@ const CLOCK_NOT_SET = 'black (waiting for the clock to be set)';
 
 // `options`: { config, videoRoot, mpv, now() -> Date, clockIsSet() -> bool,
 //              readText, writeText, removeFile, listFolder, log,
-//              photoSize(path) -> { width, height } or null }
+//              photoSize(path) -> { width, height } or null,
+//              readTilt(gpio) -> promise of 'closed' | 'open' (only with config.box.tiltSwitch) }
 function createPlayer(options) {
   const { mpv, now, clockIsSet, writeText, log } = options;
   const logic = createScheduler(options);
@@ -23,6 +24,35 @@ function createPlayer(options) {
   let status = null;
   let idle = false; // mpv stopped with nothing queued
   let facing; // which way the picture is turned for: undefined until the first tick
+
+  // The tilt switch, if the box has one: the way it says is saved once it
+  // has held a new position for TILT_SETTLE_MS (a switch rattles while the
+  // TV turns). A way chosen on the website stays until the switch moves.
+  const tilt = options.config.box.tiltSwitch || null;
+  const TILT_SETTLE_MS = 2000;
+  const switchState = { seen: null, since: 0, acted: null, warned: false };
+  async function followTilt() {
+    let reading;
+    try {
+      reading = await options.readTilt(tilt.gpio);
+    } catch (e) {
+      if (!switchState.warned) log("WARNING: Couldn't read the tilt switch on GPIO" + tilt.gpio + ': ' + e.message);
+      switchState.warned = true;
+      return;
+    }
+    switchState.warned = false;
+    const at = now().getTime();
+    if (reading !== switchState.seen) {
+      switchState.seen = reading;
+      switchState.since = at;
+    }
+    if (reading === switchState.acted || at - switchState.since < TILT_SETTLE_MS) return;
+    switchState.acted = reading;
+    const way = reading === 'closed' ? tilt.closed : (tilt.closed === 'portrait' ? 'landscape' : 'portrait');
+    if (logic.readScreen() === way) return;
+    writeText(logic.SCREEN_PATH, JSON.stringify({ orientation: way }) + '\n');
+    log('Screen: ' + way + ' (from the tilt switch).');
+  }
 
   async function blank() {
     if (!idle) await mpv.command('stop');
@@ -59,6 +89,7 @@ function createPlayer(options) {
   }
 
   async function tickNow() {
+    if (tilt) await followTilt();
     const orientation = logic.readScreen();
     if (orientation !== facing) await turnFor(orientation);
 
@@ -220,6 +251,7 @@ async function main() {
   const { startMpv, connect } = require('./mpv.js');
   const { startWebsite } = require('./website.js');
   const { readPhotoSize } = require('./photo_size.js');
+  const { readTiltSwitch } = require('./tilt.js');
   const box = config.box;
   const io = realIo();
   const videoRoot = box.videoRoot || path.join(os.homedir(), 'video-scheduler');
@@ -236,6 +268,7 @@ async function main() {
     now: () => new Date(),
     clockIsSet: () => fs.existsSync(box.clockFile),
     photoSize: readPhotoSize,
+    readTilt: readTiltSwitch,
   }));
   io.log('Started. Videos: ' + videoRoot);
   const filters = player.logic.readFilters();
