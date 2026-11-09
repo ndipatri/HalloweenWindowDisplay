@@ -10,6 +10,7 @@ class FakeMpv {
     this.nextId = 1;
     this.events = [];
     this.commands = [];
+    this.props = {}; // properties set with set_property
   }
 
   async command(...args) {
@@ -28,6 +29,8 @@ class FakeMpv {
       if (this.pos > i) this.pos--;
       // Like mpv: removing the playing entry plays the next one, if any.
       else if (this.pos === i && i >= this.entries.length) this.pos = -1;
+    } else if (name === 'set_property') {
+      this.props[rest[0]] = rest[1];
     } else if (name === 'stop') {
       this.entries = [];
       this.pos = -1;

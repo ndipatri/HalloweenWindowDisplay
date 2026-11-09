@@ -5,7 +5,8 @@
 
 // `io`: { config, videoRoot, readText(path) -> text or null,
 //          writeText(path, text), removeFile(path),
-//          listFolder(path) -> [names] or null, log(message) }
+//          listFolder(path) -> [names] or null, log(message),
+//          photoSize(path) -> { width, height } or null (only to play) }
 function createScheduler(io) {
   const CONFIG = io.config;
   const { readText, removeFile, listFolder, log } = io;
@@ -21,6 +22,9 @@ function createScheduler(io) {
   const TAGS_PATH = videoRoot + '/tags.json';
   // The GitHub filters, copied by sync from the repo's playlists/filters.json.
   const GITHUB_FILTERS_PATH = videoRoot + '/github-filters.json';
+  // Which way the TV faces, set on the website: { "orientation": "landscape" }.
+  const SCREEN_PATH = videoRoot + '/screen.json';
+  const ORIENTATIONS = ['portrait', 'landscape'];
 
   // Videos queued ahead of time, so one follows the next without a gap.
   const QUEUE_AHEAD = 3;
@@ -612,6 +616,36 @@ function createScheduler(io) {
 
   // ---------- Playing a filter ----------
 
+  // Which way the TV faces: 'portrait' (also when nothing is saved, or what
+  // is saved can't be read) or 'landscape'.
+  function readScreen() {
+    const text = readText(SCREEN_PATH);
+    if (text === null) return 'portrait';
+    try {
+      const o = JSON.parse(text).orientation;
+      if (ORIENTATIONS.includes(o)) return o;
+    } catch (e) { /* below */ }
+    logOnce('screen', "WARNING: Couldn't read " + SCREEN_PATH + ': taking the TV as portrait.');
+    return 'portrait';
+  }
+
+  // How far mpv turns the picture for the way the TV faces.
+  function rotationFor(orientation) {
+    return orientation === 'landscape' ? CONFIG.box.landscapeRotate : CONFIG.box.rotate;
+  }
+
+  // Photos' sizes, measured once each (an upload's name is never reused).
+  const sizes = new Map();
+  // Whether a photo fills a screen facing that way: only when it's the
+  // same shape (portrait or landscape) as the screen. A square photo, or
+  // one that can't be measured, is shown whole.
+  function photoFills(path, orientation) {
+    if (!sizes.has(path)) sizes.set(path, io.photoSize ? io.photoSize(path) : null);
+    const size = sizes.get(path);
+    if (!size || size.width === size.height) return false;
+    return (size.width > size.height) === (orientation === 'landscape');
+  }
+
   // The queue state for one filter, by name.
   function createPlaylist(name) {
     return {
@@ -728,6 +762,7 @@ function createScheduler(io) {
     }
     clearWarning(playlist, 'none');
 
+    const orientation = readScreen();
     while (queued < QUEUE_AHEAD) {
       let video;
       if (playlist.resumeAt) {
@@ -737,19 +772,21 @@ function createScheduler(io) {
       } else {
         video = nextVideo(videos, playlist.lastQueued);
       }
-      // A photo fills the screen, its edges cropped (panscan for that item
-      // only); a video stays fitted whole, with black around it.
+      // A photo the screen's shape fills it, its edges cropped (panscan for
+      // that item only); any other photo, and every video, is fitted whole,
+      // with black around it.
+      const fill = isPhotoFile(video.path) && photoFills(video.path, orientation);
       if (videos.length === 1 && isPhotoFile(video.path)) {
         // The only thing to play is one photo: queue it once and hold it on
         // screen, instead of reloading it every few seconds (which flashes
         // black each time). It goes when something else is to play (above).
-        await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0,image-display-duration=inf');
+        await mpv.command('loadfile', video.path, 'append-play', -1, (fill ? 'panscan=1.0,' : '') + 'image-display-duration=inf');
         const after = (await mpv.getProperty('playlist')) || [];
         playlist.held = after.length ? after[after.length - 1].id : null;
         playlist.lastQueued = video;
         break;
       }
-      if (isPhotoFile(video.path)) await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0');
+      if (fill) await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0');
       else await mpv.command('loadfile', video.path, 'append-play');
       playlist.lastQueued = video;
       queued++;
@@ -811,7 +848,8 @@ function createScheduler(io) {
   }
 
   return {
-    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
+    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, SCREEN_PATH, ORIENTATIONS, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
+    readScreen, rotationFor, photoFills, isPhotoFile,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
     scheduledFilter, nextScheduleChange, whatToShow, parseOverride, pickName, parseDay, parseWeekdays, formatTime,

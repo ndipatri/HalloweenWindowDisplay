@@ -521,6 +521,16 @@ function createWebsite(options) {
       ', then back to the schedule.');
   }
 
+  // POST /api/screen { orientation }: the TV was turned on its mount. No PIN,
+  // like Play. The player turns the picture within a second.
+  function turnScreen(body) {
+    const orientation = body && body.orientation;
+    if (!logic.ORIENTATIONS.includes(orientation)) return fail('The TV is portrait or landscape.');
+    writeText(logic.SCREEN_PATH, JSON.stringify({ orientation }) + '\n');
+    log('Screen: ' + orientation + ' (from the website).');
+    return ok('The picture is turned for a ' + orientation + ' TV.');
+  }
+
   async function handle({ method, path, headers, body }) {
     const route = method + ' ' + path.split('?')[0];
     if (route === 'GET /') return { status: 200, type: 'text/html', body: PAGE };
@@ -532,6 +542,12 @@ function createWebsite(options) {
     if (route === 'GET /api/uploads') return json(200, listUploads());
     if (route === 'GET /api/items') return json(200, listItems());
     if (route === 'GET /api/filters') return json(200, logic.readRawFilters());
+    if (route === 'GET /api/screen') return json(200, { orientation: logic.readScreen() });
+    if (route === 'POST /api/screen') {
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
+      return turnScreen(parsed);
+    }
     if (route === 'POST /api/tags' || route === 'POST /api/filters') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
@@ -775,6 +791,12 @@ const PAGE = `<!DOCTYPE html>
     <option value="cleared" selected>Until switched back</option>
   </select>
 
+  <h2>TV</h2>
+  <div class="card">
+    <div class="hint">Turned the TV on its mount? Tap the way it faces now, and the picture turns to match.</div>
+    <div class="grid"><button data-tv="portrait">Portrait</button><button data-tv="landscape">Landscape</button></div>
+  </div>
+
   <h2>Tags</h2>
   <div class="card">
     <div class="hint">Your photos and videos. Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Videos from GitHub take their tags from their folders there.</div>
@@ -864,7 +886,22 @@ const PAGE = `<!DOCTYPE html>
     }
   }
 
+  // Outlines the way the box has the TV facing.
+  function markScreen(orientation) {
+    for (const b of document.querySelectorAll('button[data-tv]')) {
+      const yes = b.dataset.tv === orientation;
+      b.classList.toggle('current', yes);
+      b.setAttribute('aria-pressed', yes ? 'true' : 'false');
+    }
+  }
+  for (const b of document.querySelectorAll('button[data-tv]')) {
+    b.onclick = async () => { if ((await post('/api/screen', { orientation: b.dataset.tv })).ok) markScreen(b.dataset.tv); };
+  }
+
   async function refresh() {
+    try {
+      markScreen((await (await fetch('/api/screen')).json()).orientation);
+    } catch (e) { /* the status line says when the box can't be reached */ }
     try {
       const r = await (await fetch('/api/status')).json();
       setText($('status'), r.status || 'The box has not started yet.');

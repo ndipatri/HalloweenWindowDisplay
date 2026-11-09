@@ -29,10 +29,14 @@ module.exports = {
     // Videos, the status file, the override and the log live here. Default:
     // ~/video-scheduler for the user setup.sh was run for.
     videoRoot: null,
-    // How far mpv turns the picture for a TV standing on its side: 90 or
+    // How far mpv turns the picture for a TV standing on its side (portrait,
+    // as chosen under TV on the website, and with nothing chosen): 90 or
     // 270 (0 for a TV the normal way up). If it comes out upside down,
     // switch between 90 and 270.
     rotate: 90,
+    // The same, for when the TV is turned to landscape on its mount (chosen
+    // under TV on the website): 0, or 180 if it comes out upside down.
+    landscapeRotate: 0,
     // The website: http://<the box's name>.local/ (port 80 needs no number).
     webPort: 80,
     // systemd-timesyncd creates this once the clock is set from the network.
