@@ -303,6 +303,12 @@ echo "   $(post /api/tags "{\"path\":\"photos/$on_screen\",\"remove\":\"favorite
 check "untagging the item on screen moves on to the next favorite" \
   within 8 bash -c "[ \$(grep -c '#favorites: playing $next' '$LOG') -gt $lines ]"
 check "Favorites logs no error" test "$(grep -c 'ERROR' "$LOG")" -eq "$errors_before"
+# One favorite left, a photo: it stays on screen as the same playlist entry
+# (no reload every 10 seconds, which flashed black).
+held_id="$(mpv_get playlist/0/id)"
+sleep 15
+check "a lone photo is held on screen, not reloaded (the same single mpv entry 15 s later)" \
+  bash -c "[ \"\$(mpv_get playlist-count)\" = 1 ] && [ \"\$(mpv_get playlist/0/id)\" = '$held_id' ] && [ \"\$(mpv_get path)\" = '$VIDEOS/photos/$next' ] && panscan_is 1"
 echo "   $(post /api/show '{"tags":["favorites"],"filters":["Halloween grownup"],"until":"cleared"}')"
 check "a tag and a filter play together" within 20 bash -c '[ "$(status)" = "#favorites + Halloween grownup (override until cleared)" ]'
 check "the mix plays the filter's video too" within 60 logged "#favorites + Halloween grownup: playing c.mp4"

@@ -204,7 +204,7 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
 5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
 
-They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. Each photo fills the screen: the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to 9:16 before adding it. Videos are shown whole, with black around them if they aren't the screen's shape.
+They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. Each photo fills the screen: the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to 9:16 before adding it. Videos are shown whole, with black around them if they aren't the screen's shape.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 

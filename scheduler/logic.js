@@ -620,6 +620,7 @@ function createScheduler(io) {
       resumeAt: null, // when the filter comes back: the item to start at
       nowPlaying: null, // the playing item, as { name, path }
       filesById: {}, // mpv playlist entry id -> path, to name failed items
+      held: null, // mpv playlist entry id of a lone photo held on screen
       warnings: {},
     };
   }
@@ -691,14 +692,39 @@ function createScheduler(io) {
     }
     playlist.nowPlaying = playing ? { name: playingName, path: playing } : null;
 
-    let queued = entries.length;
-    if (queued >= QUEUE_AHEAD) return true;
+    // A lone photo is held on screen (queued once, see below) for as long as
+    // it is the only thing to play. Once something else is to play, it goes:
+    // straight away if it's waiting behind, or once what comes next is queued
+    // if it's on screen, so mpv moves straight on rather than going black.
+    let releaseHeld = false;
+    if (playlist.held !== null) {
+      const at = entries.findIndex((e) => e.id === playlist.held);
+      if (at === -1) playlist.held = null;
+      else {
+        const now = playlistItems(playlist).items;
+        if (now.length === 1 && now[0].path === entries[at].filename) return true;
+        playlist.held = null;
+        if (at === 0) releaseHeld = true;
+        else {
+          await mpv.command('playlist-remove', at);
+          entries.splice(at, 1);
+        }
+      }
+    }
+    const done = async (result) => {
+      // Removing the entry on screen makes mpv play the next one (or stop).
+      if (releaseHeld) await mpv.command('playlist-remove', 0);
+      return result;
+    };
+
+    let queued = entries.length - (releaseHeld ? 1 : 0); // not counting a photo on its way out
+    if (queued >= QUEUE_AHEAD) return done(true);
 
     const { known, items: videos, none } = playlistItems(playlist);
-    if (!known) return queued > 0;
+    if (!known) return done(queued > 0);
     if (videos.length === 0) {
       warnOnce(playlist, 'none', none);
-      return queued > 0;
+      return done(queued > 0);
     }
     clearWarning(playlist, 'none');
 
@@ -713,12 +739,22 @@ function createScheduler(io) {
       }
       // A photo fills the screen, its edges cropped (panscan for that item
       // only); a video stays fitted whole, with black around it.
+      if (videos.length === 1 && isPhotoFile(video.path)) {
+        // The only thing to play is one photo: queue it once and hold it on
+        // screen, instead of reloading it every few seconds (which flashes
+        // black each time). It goes when something else is to play (above).
+        await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0,image-display-duration=inf');
+        const after = (await mpv.getProperty('playlist')) || [];
+        playlist.held = after.length ? after[after.length - 1].id : null;
+        playlist.lastQueued = video;
+        break;
+      }
       if (isPhotoFile(video.path)) await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0');
       else await mpv.command('loadfile', video.path, 'append-play');
       playlist.lastQueued = video;
       queued++;
     }
-    return true;
+    return done(true);
   }
 
   // The filter is leaving the screen: when it comes back, start again at the
@@ -728,6 +764,7 @@ function createScheduler(io) {
     playlist.lastQueued = null;
     playlist.nowPlaying = null;
     playlist.filesById = {};
+    playlist.held = null;
   }
 
   function baseName(path) {

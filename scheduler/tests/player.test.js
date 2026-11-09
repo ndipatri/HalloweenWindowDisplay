@@ -223,6 +223,31 @@ test('each photo fills the screen and each video is fitted whole', async () => {
   assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0'], ['00002-b.mp4', ''], ['00003-c.png', 'panscan=1.0']]);
 });
 
+test('a lone photo is held on screen, not reloaded', async () => {
+  const b = box({ photos: ['00001-a.jpg'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
+  assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0,image-display-duration=inf']]);
+  const loads = () => b.mpv.commands.filter((c) => c[0] === 'loadfile').length;
+  await b.tick();
+  await b.tick();
+  assert.equal(loads(), 1);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg');
+});
+
+test('a held photo gives way when something else is to play', async () => {
+  const b = box({ photos: ['00001-a.jpg'] });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  b.folders[ROOT + '/photos'].push('00002-b.jpg');
+  await b.tick();
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00002-b.jpg');
+  assert.deepEqual(b.rel(), ['photos/00002-b.jpg', 'photos/00001-a.jpg', 'photos/00002-b.jpg']);
+  assert.ok(b.mpv.entries.every((e) => e.options === 'panscan=1.0'), JSON.stringify(b.mpv.entries));
+  assert.ok(!b.logs.some((l) => l.startsWith('ERROR')), b.logs.join('\n'));
+});
+
 // The box playing Photos, with its website wired to it as on the box.
 async function photosPlaying() {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
