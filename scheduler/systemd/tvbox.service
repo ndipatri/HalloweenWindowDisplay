@@ -6,7 +6,7 @@ After=systemd-timesyncd.service
 
 [Service]
 User=__USER__
-SupplementaryGroups=video render
+SupplementaryGroups=video render gpio
 Environment=HOME=__HOME__
 WorkingDirectory=__HOME__
 ExecStart=/usr/bin/node __APP__/player.js

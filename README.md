@@ -223,6 +223,17 @@ What plays doesn't change by itself: pick what to show under **Play** as usual. 
 
 If the picture is upside down while the TV is landscape, change `landscapeRotate: 0` to `landscapeRotate: 180` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
+#### Let the box notice by itself: a tilt switch
+
+A tilt switch on the back of the TV tells the box which way the TV faces, so you don't have to tap anything. It's a tiny sealed switch with a ball inside, about a dollar (search for "SW-520D tilt switch"). You also need two jumper wires with a female end (long enough to reach from the TV to the box), and tape or a dab of glue.
+
+1. Wire one leg of the switch to **pin 11** (GPIO17) on the box's Raspberry Pi and the other leg to **pin 9** (ground). It doesn't matter which leg goes where. Pin 1 is at the end of the pin header furthest from the USB ports, on the inner row; the odd numbers run along that inner row, so pin 9 is the 5th pin and pin 11 the 6th.
+2. Fix the switch to the back of the TV so that its legs point well downward while the TV is portrait (the ball then rests on them, which closes the switch), and well upward once the TV is turned to landscape. Slanting it halfway between straight down and sideways, towards the side that goes up when you turn the TV, does both.
+3. In `scheduler/config.js`, change `tiltSwitch: null` to `tiltSwitch: { gpio: 17, closed: 'portrait' }`, then get the latest version on the box (see Everyday tasks). Or ask Claude to do it.
+4. Turn the TV. About two seconds after it stops moving, the picture turns to match, and Recent activity on the page says `Screen: landscape (from the tilt switch).`
+
+If it always gets it the wrong way round, change `closed: 'portrait'` to `closed: 'landscape'`. The Portrait and Landscape buttons still work: what you tap stays until the TV is next turned.
+
 ### Everyday tasks
 
 | To | Do this |
@@ -259,6 +270,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
 | The picture is sideways | Under **TV** on the page, tap the way the TV faces now |
+| Recent activity says `Couldn't read the tilt switch` | Check its two wires (pins 11 and 9), then run setup again |
 | The picture is upside down with the TV landscape | Switch `landscapeRotate` between 0 and 180 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |

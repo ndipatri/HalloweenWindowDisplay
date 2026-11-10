@@ -108,6 +108,15 @@ test('setup makes the photos folder', () => {
   assert.equal(fs.readFileSync(path.join(m.videos, 'photos', '00001-a.jpg'), 'utf8'), 'A');
 });
 
+test('setup lets the box read the tilt switch', () => {
+  const m = machine();
+  const r = m.run({ TVBOX_UPLOAD_PIN: '4321' });
+  assert.equal(r.status, 0, r.out);
+  const calls = fs.readFileSync(m.calls, 'utf8');
+  assert.ok(/apt-get install .*\bgpiod\b/.test(calls), calls);
+  assert.ok(/usermod -aG \S*\bgpio\b\S* tester/.test(calls), calls);
+});
+
 test('setup adds no filters of its own', () => {
   const m = machine();
   const r = m.run();

@@ -37,6 +37,12 @@ module.exports = {
     // The same, for when the TV is turned to landscape on its mount (chosen
     // under TV on the website): 0, or 180 if it comes out upside down.
     landscapeRotate: 0,
+    // A tilt switch on the back of the TV, so the box notices by itself when
+    // the TV is turned (see the README). null: none, and the TV buttons on
+    // the website are the only way. Once one is wired between GPIO17
+    // (pin 11) and ground (pin 9): { gpio: 17, closed: 'portrait' }, where
+    // `closed` is the way the TV faces while the switch is closed.
+    tiltSwitch: null,
     // The website: http://<the box's name>.local/ (port 80 needs no number).
     webPort: 80,
     // systemd-timesyncd creates this once the clock is set from the network.
