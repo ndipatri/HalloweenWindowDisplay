@@ -6,7 +6,8 @@
 // `io`: { config, videoRoot, readText(path) -> text or null,
 //          writeText(path, text), removeFile(path),
 //          listFolder(path) -> [names] or null, log(message),
-//          photoSize(path) -> { width, height } or null (only to play) }
+//          mediaSize(path) -> { width, height } or null (only to play),
+//          fileSize(path) -> bytes or null (optional) }
 function createScheduler(io) {
   const CONFIG = io.config;
   const { readText, removeFile, listFolder, log } = io;
@@ -634,16 +635,32 @@ function createScheduler(io) {
     return orientation === 'landscape' ? CONFIG.box.landscapeRotate : CONFIG.box.rotate;
   }
 
-  // Photos' sizes, measured once each (an upload's name is never reused).
-  const sizes = new Map();
+  // Items' shapes as shown, measured once each: by path and size, since sync
+  // can replace a video under the same name.
+  const shapes = new Map();
+  // 'portrait', 'landscape', 'square', or null for an item that can't be measured.
+  function shapeOf(path) {
+    const key = path + ':' + (io.fileSize ? io.fileSize(path) : '');
+    if (!shapes.has(key)) {
+      const size = io.mediaSize ? io.mediaSize(path) : null;
+      shapes.set(key, !size ? null : size.width === size.height ? 'square' : size.width > size.height ? 'landscape' : 'portrait');
+    }
+    return shapes.get(key);
+  }
+
+  // Whether an item plays on a TV facing that way: when it's the TV's
+  // shape, or square. One that can't be measured plays only when nothing
+  // else does (it may well not play at all).
+  function suitsScreen(path, orientation) {
+    const shape = shapeOf(path);
+    return shape === 'square' || shape === orientation;
+  }
+
   // Whether a photo fills a screen facing that way: only when it's the
   // same shape (portrait or landscape) as the screen. A square photo, or
   // one that can't be measured, is shown whole.
   function photoFills(path, orientation) {
-    if (!sizes.has(path)) sizes.set(path, io.photoSize ? io.photoSize(path) : null);
-    const size = sizes.get(path);
-    if (!size || size.width === size.height) return false;
-    return (size.width > size.height) === (orientation === 'landscape');
+    return shapeOf(path) === orientation;
   }
 
   // The queue state for one filter, by name.
@@ -678,9 +695,24 @@ function createScheduler(io) {
       if (tags.some((t) => has.includes(t))) chosen.add(i);
     }
     for (const f of picked) filterItems(f, all).forEach((i) => chosen.add(i));
-    const list = Array.from(chosen)
+    let list = Array.from(chosen)
       .sort((a, b) => compareNames(a.name, b.name) || compareNames(a.path, b.path))
       .map((i) => ({ name: i.name, path: i.file }));
+    // Only the items the TV's shape play; with none, all of them (shown whole).
+    const orientation = readScreen();
+    const suiting = list.filter((i) => suitsScreen(i.path, orientation));
+    for (const o of ORIENTATIONS) if (o !== orientation || suiting.length) clearWarning(playlist, 'shape:' + o);
+    if (suiting.length) {
+      for (const i of list) {
+        if (shapeOf(i.path) === null) {
+          warnOnce(playlist, 'unmeasured:' + i.path, 'WARNING: Leaving out ' + i.name + ' in ' + playlist.name +
+            ": it can't be measured, so it may not play. It plays only when nothing else does.");
+        }
+      }
+      list = suiting;
+    } else if (list.length) {
+      warnOnce(playlist, 'shape:' + orientation, 'Nothing in ' + playlist.name + ' is ' + orientation + ', so it all plays, shown whole.');
+    }
     let none;
     if (!names.length) none = 'Nothing tagged ' + tags.join(', ') + ' yet. Showing black until something is.';
     else if (!tags.length && names.length === 1 && picked.length === 1) {
@@ -849,7 +881,7 @@ function createScheduler(io) {
 
   return {
     CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, SCREEN_PATH, ORIENTATIONS, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
-    readScreen, rotationFor, photoFills, isPhotoFile,
+    readScreen, rotationFor, photoFills, suitsScreen, shapeOf, isPhotoFile,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
     scheduledFilter, nextScheduleChange, whatToShow, parseOverride, pickName, parseDay, parseWeekdays, formatTime,

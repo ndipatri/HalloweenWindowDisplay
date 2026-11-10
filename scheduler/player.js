@@ -11,7 +11,7 @@ const CLOCK_NOT_SET = 'black (waiting for the clock to be set)';
 
 // `options`: { config, videoRoot, mpv, now() -> Date, clockIsSet() -> bool,
 //              readText, writeText, removeFile, listFolder, log,
-//              photoSize(path) -> { width, height } or null,
+//              mediaSize(path) -> { width, height } or null,
 //              readTilt(gpio) -> promise of 'closed' | 'open' (only with config.box.tiltSwitch) }
 function createPlayer(options) {
   const { mpv, now, clockIsSet, writeText, log } = options;
@@ -250,7 +250,7 @@ async function main() {
   const config = require('./config.js');
   const { startMpv, connect } = require('./mpv.js');
   const { startWebsite } = require('./website.js');
-  const { readPhotoSize } = require('./photo_size.js');
+  const { readMediaSize } = require('./media_size.js');
   const { readTiltSwitch } = require('./tilt.js');
   const box = config.box;
   const io = realIo();
@@ -267,7 +267,7 @@ async function main() {
     mpv,
     now: () => new Date(),
     clockIsSet: () => fs.existsSync(box.clockFile),
-    photoSize: readPhotoSize,
+    mediaSize: readMediaSize,
     readTilt: readTiltSwitch,
   }));
   io.log('Started. Videos: ' + videoRoot);
