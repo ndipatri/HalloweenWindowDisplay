@@ -1,8 +1,8 @@
-// Tests for measuring photos (scheduler/photo_size.js), run with Node:
-//   node scheduler/tests/photo_size.test.js
+// Tests for measuring photos and videos (scheduler/media_size.js), run with Node:
+//   node scheduler/tests/media_size.test.js
 'use strict';
 const assert = require('assert');
-const { photoSize } = require('../photo_size.js');
+const { photoSize, videoSize } = require('../media_size.js');
 
 let passed = 0;
 const tests = [];
@@ -51,6 +51,41 @@ test('a photo stored on its side is measured the way it is shown', () => {
   assert.equal(photoSize(Buffer.from('not a photo at all')), null);
   assert.equal(photoSize(jpeg(160, 96, 6, false).subarray(0, 30)), null, 'cut off before its size');
   assert.equal(photoSize(Buffer.alloc(0)), null);
+});
+
+// An MP4: boxes as [type, payload]; a box's payload may be a list of boxes.
+function box(type, payload) {
+  const body = Array.isArray(payload) ? Buffer.concat(payload) : payload;
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(body.length + 8, 0);
+  head.write(type, 4, 'latin1');
+  return Buffer.concat([head, body]);
+}
+// A track header (version 0) with a width, height and turn (0 or 90).
+function tkhd(width, height, turn) {
+  const b = Buffer.alloc(84);
+  const fixed = (n) => (n * 65536) >>> 0;
+  const matrix = turn === 90 ? [0, fixed(1), 0, fixed(-1) >>> 0, 0, 0, 0, 0, 0x40000000]
+    : [fixed(1), 0, 0, 0, fixed(1), 0, 0, 0, 0x40000000];
+  matrix.forEach((v, i) => b.writeUInt32BE(v >>> 0, 40 + i * 4));
+  b.writeUInt32BE(fixed(width), 76);
+  b.writeUInt32BE(fixed(height), 80);
+  return box('tkhd', b);
+}
+function mp4(tracks, moovLast) {
+  const ftyp = box('ftyp', Buffer.from('isom\0\0\0\0isomiso2', 'latin1'));
+  const moov = box('moov', [box('mvhd', Buffer.alloc(100))].concat(tracks.map((t) => box('trak', [t, box('mdia', Buffer.alloc(8))]))));
+  const mdat = box('mdat', Buffer.alloc(64));
+  return Buffer.concat(moovLast ? [ftyp, mdat, moov] : [ftyp, moov, mdat]);
+}
+
+test("a video's shape is measured the way it is shown", () => {
+  assert.deepEqual(videoSize(mp4([tkhd(1920, 1080, 90)])), { width: 1080, height: 1920 });
+  assert.deepEqual(videoSize(mp4([tkhd(1920, 1080, 0)])), { width: 1920, height: 1080 });
+  assert.deepEqual(videoSize(mp4([tkhd(1920, 1080, 0)], true)), { width: 1920, height: 1080 }, 'moov after mdat');
+  assert.deepEqual(videoSize(mp4([tkhd(0, 0, 0), tkhd(1920, 1080, 0)])), { width: 1920, height: 1080 }, 'audio track first');
+  assert.equal(videoSize(Buffer.from('not a video at all, not even close')), null);
+  assert.equal(videoSize(Buffer.alloc(0)), null);
 });
 
 (async () => {

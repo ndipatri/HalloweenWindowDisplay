@@ -204,7 +204,7 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
 5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
 
-They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen (a portrait photo while the TV is portrait, a landscape one while it's landscape) fills it: the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
+They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen fills it (and with the TV turned, only photos and videos of its shape play; see "Turn the TV" below): the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
 
 To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
 
@@ -219,7 +219,7 @@ Good to know:
 
 The TV hangs on its side (portrait), but its mount turns. For landscape photos and videos, turn the TV to landscape, then on the page under **TV** tap **Landscape**. The picture turns to match within a second. Tap **Portrait** when you turn it back. The box remembers which way it's facing, even after it's unplugged.
 
-What plays doesn't change by itself: pick what to show under **Play** as usual. A tag like `landscape` on those uploads makes that easy.
+The box plays only what fits the way the TV faces: out of whatever is playing (the schedule, or what you picked under **Play**), portrait photos and videos while the TV is portrait, landscape ones while it's landscape. Square ones play either way. When you turn the TV, whatever is on screen moves on at once if it no longer fits. If nothing playing fits (say, the schedule's videos are all portrait and the TV is landscape), the box plays it all anyway, shown whole with black around it, and Recent activity says `Nothing in … is landscape, so it all plays, shown whole.`
 
 If the picture is upside down while the TV is landscape, change `landscapeRotate: 0` to `landscapeRotate: 180` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
@@ -270,6 +270,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
 | The picture is sideways | Under **TV** on the page, tap the way the TV faces now |
+| Recent activity says `Leaving out … it can't be measured` | That file is probably damaged: remove it and add it again |
 | Recent activity says `Couldn't read the tilt switch` | Check its two wires (pins 11 and 9), then run setup again |
 | The picture is upside down with the TV landscape | Switch `landscapeRotate` between 0 and 180 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |

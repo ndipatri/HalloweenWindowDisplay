@@ -95,7 +95,7 @@ if [ $setup_status -ne 0 ]; then
   exit 1
 fi
 check "setup copies the player and website to /opt/tvbox" \
-  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/photo_size.js -a -f /opt/tvbox/tilt.js
+  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/media_size.js -a -f /opt/tvbox/tilt.js
 check "setup installs and enables the three units" \
   grep -q "systemctl enable tvbox.service tvbox-sync.timer" "$E/calls"
 check "systemd accepts the units" \
@@ -136,8 +136,9 @@ echo "   $(post /api/show '{"filters":["Halloween grownup"],"until":"cleared"}')
 check "the status follows the website" within 20 bash -c '[ "$(status)" = "Halloween grownup (override until cleared)" ]'
 check "mpv plays the first video" within 90 logged "Halloween grownup: playing a.mp4"
 check "mpv moves on to the next videos" within 120 logged "Halloween grownup: playing c.mp4"
-check "the broken video is skipped and logged once" \
-  bash -c "[ \$(grep -c 'ERROR: Skipping broken.mp4 in Halloween grownup' '$LOG') -eq 1 ]"
+# It can't be measured, so it's left out (the other clips being the TV's shape), logged once.
+check "the broken video is left out and logged once" \
+  bash -c "[ \$(grep -c 'WARNING: Leaving out broken.mp4 in Halloween grownup' '$LOG') -eq 1 ]"
 frame="$(ls -t "$E/frames"/*.png 2>/dev/null | head -1)"
 check "mpv draws frames" test -n "$frame"
 if [ -n "$frame" ]; then
@@ -336,9 +337,23 @@ check "the website says the TV is portrait at first" bash -c "curl -fsS $SITE/ap
 echo "   $(post /api/screen '{"orientation":"landscape"}')"
 check "turning the TV to landscape turns mpv's picture to 0 degrees, logged" \
   within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 0 ] && logged 'Screen: landscape (the picture turned 0 degrees).'"
+# The Rehearsal filter's clips are all portrait (measured from their MP4
+# headers): with nothing landscape, it plays them all, and says so.
+check "with no landscape clip in the filter, it all plays, logged" \
+  within 10 logged "Nothing in Rehearsal is landscape, so it all plays, shown whole."
+ffmpeg -loglevel error -y -f lavfi -i "color=c=cyan:s=160x96" -frames:v 1 "$E/wide.jpg"
+echo "   $(upload "$E/wide.jpg" Wide.jpg 4321)"
+wide="$(ls "$VIDEOS/photos" | grep -- '-wide.jpg$')"
+uploads_before="$(ls -A "$VIDEOS/photos")" # for the sync check below, which must leave it alone
+echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
+check "with the TV landscape, only the landscape upload plays, held and filling the screen" \
+  within 20 bash -c "logged '#upload: playing $wide' && [ \"\$(mpv_get playlist-count)\" = 1 ] && [ \"\$(mpv_get path)\" = '$VIDEOS/photos/$wide' ] && panscan_is 1"
 echo "   $(post /api/screen '{"orientation":"portrait"}')"
 check "turning it back to portrait turns the picture to 90 degrees again" \
   within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 90 ]"
+check "back in portrait, the portrait uploads play again, not the landscape one" \
+  within 15 bash -c "[ \"\$(mpv_get playlist-count)\" -gt 1 ] && [ \"\$(mpv_get path)\" != '$VIDEOS/photos/$wide' ]"
+echo "   $(post /api/schedule '{}')"
 # (The rehearsal's broken.mp4 may be skipped meanwhile: that error is expected.)
 check "turning the TV logs no error" bash -c "! tail -n +$turn_from '$LOG' | grep 'ERROR' | grep -qv 'Skipping broken.mp4'"
 

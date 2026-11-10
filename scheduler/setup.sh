@@ -89,7 +89,7 @@ timedatectl set-ntp true
 
 say "Copying the player and website to /opt/tvbox"
 mkdir -p "$app"
-for f in config.js logic.js mpv.js photo_size.js player.js tilt.js website.js; do
+for f in config.js logic.js mpv.js media_size.js player.js tilt.js website.js; do
   cp "$here/$f" "$app/$f"
 done
 
