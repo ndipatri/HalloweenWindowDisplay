@@ -406,9 +406,9 @@ test('the website\'s choice stays until the tilt switch moves', async () => {
 
 test('a box with no tilt switch set never reads one', async () => {
   let reads = 0;
-  const b = box({ photos: ['00001-a.jpg'] }, { readTilt: async () => { reads++; return 'open'; } });
+  const noSwitch = Object.assign({}, config, { box: Object.assign({}, config.box, { tiltSwitch: null }) });
+  const b = box({ photos: ['00001-a.jpg'] }, { config: noSwitch, readTilt: async () => { reads++; return 'open'; } });
   for (let s = 0; s < 5; s++) await b.tick();
-  assert.strictEqual(config.box.tiltSwitch, null, 'off as shipped');
   assert.equal(reads, 0);
 });
 
