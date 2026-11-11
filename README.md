@@ -221,6 +221,8 @@ The TV hangs on its side (portrait), but its mount turns. For landscape photos a
 
 The box plays only what fits the way the TV faces: out of whatever is playing (the schedule, or what you picked under **Play**), portrait photos and videos while the TV is portrait, landscape ones while it's landscape. Square ones play either way. When you turn the TV, whatever is on screen moves on at once if it no longer fits. If nothing playing fits (say, the schedule's videos are all portrait and the TV is landscape), the box plays it all anyway, shown whole with black around it, and Recent activity says `Nothing in … is landscape, so it all plays, shown whole.`
 
+To have something play the other way, give it the tag **portrait** or **landscape** under **Tags**. The box then treats it as that shape, whatever shape it really is: a landscape video tagged portrait plays while the TV is portrait, shown whole with black above and below. A photo tagged the other way is shown whole too, not cropped. Tags can be added only to your own photos and videos, not to the videos from the repo.
+
 If the picture is upside down while the TV is landscape, change `landscapeRotate: 0` to `landscapeRotate: 180` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
 #### Let the box notice by itself: a tilt switch
