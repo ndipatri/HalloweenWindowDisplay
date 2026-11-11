@@ -193,14 +193,14 @@ With the right PIN, the website SHALL take the upload off the screen and out of 
 - **AND** the status file and `photos/.upload-123` are still there
 
 ### Requirement: The page adds and removes photos
-The page SHALL offer the phone's picker for photos and videos, several at a time, a PIN field it remembers, a progress line per file, and the uploads with a preview and Remove each. It SHALL check the whole batch before sending any file, stop at the first refusal, and on a wrong PIN or a lock forget the remembered PIN and ask for it again.
+The page SHALL offer, at the top of its Photos and videos section, the phone's picker for photos and videos, several at a time, a PIN field it remembers, and a progress line per file. Below them, in the same section, it SHALL list each upload once, with a preview, its tags and a Remove button. It SHALL check the whole batch before sending any file, stop at the first refusal, and on a wrong PIN or a lock forget the remembered PIN and ask for it again.
 
 #### Scenario: the website page offers adding and removing photos
 - **GIVEN** the website running
 - **WHEN** the page is opened
-- **THEN** it has an Add photos or videos picker that accepts photos and videos, several at a time, and a PIN field
-- **AND** it shows the uploads from the website's list, each with a preview and a Remove button
-- **AND** it shows `Adding photos is off until a PIN is set on the box.` when the list says no PIN is set
+- **THEN** its Photos and videos section has an Add photos or videos picker that accepts photos and videos, several at a time, and a PIN field
+- **AND** the same section lists the uploads from the website's items, each once, with a preview and a Remove button, and there is no separate list of uploads
+- **AND** it shows `Adding photos is off until a PIN is set on the box.` when the website says no PIN is set
 
 #### Scenario: the page sends a batch only after the box clears it
 - **GIVEN** the page with the PIN `4321` remembered, and a box that clears the batch

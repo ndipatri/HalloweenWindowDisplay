@@ -169,7 +169,7 @@ Changes show on the TV within a couple of seconds. **For how long** starts on "U
 
 ### Favorites and tags
 
-Under **Tags** on the page are the photos and videos you've added from your phone.
+Under **Photos and videos** on the page are the photos and videos you've added from your phone, each once, with its tags and a **Remove** button.
 
 - Tap **☆** to add one to **Favorites** (it turns to ★). Pick **Favorites** under Play and tap **Play** to show them all, in name order, round and round.
 - Each one is tagged `upload`. You can add your own tags too, like `family`, by typing one and tapping **Add**. Every tag in use shows under Play; make a filter for it only if it should play on a schedule. Tap × on a tag to take it off.
@@ -199,14 +199,14 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 ### Put your own photos and videos on the window
 
 1. On your phone, open **http://tvbox.local/**.
-2. Under **Add photos or videos**, type the box's upload PIN. The phone remembers it after the first time.
+2. Under **Photos and videos**, type the box's upload PIN. The phone remembers it after the first time.
 3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
-5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Tags** to add them to **Favorites** too.
+5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Photos and videos** to add them to **Favorites** too.
 
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen fills it (and with the TV turned, only photos and videos of its shape play; see "Turn the TV" below): the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
 
-To take one off, tap **Remove** under it in **Photos and videos added** (it needs the PIN too). It goes for good.
+To take one off, tap **Remove** next to it under **Photos and videos** (it needs the PIN too). It goes for good.
 
 Good to know:
 - The GitHub filters never show your photos by themselves: they show when you play Uploads or Favorites, or in a filter of your own that names their tags.
@@ -221,7 +221,7 @@ The TV hangs on its side (portrait), but its mount turns. For landscape photos a
 
 The box plays only what fits the way the TV faces: out of whatever is playing (the schedule, or what you picked under **Play**), portrait photos and videos while the TV is portrait, landscape ones while it's landscape. Square ones play either way. When you turn the TV, whatever is on screen moves on at once if it no longer fits. If nothing playing fits (say, the schedule's videos are all portrait and the TV is landscape), the box plays it all anyway, shown whole with black around it, and Recent activity says `Nothing in … is landscape, so it all plays, shown whole.`
 
-To have something play the other way, give it the tag **portrait** or **landscape** under **Tags**. The box then treats it as that shape, whatever shape it really is: a landscape video tagged portrait plays while the TV is portrait, shown whole with black above and below. A photo tagged the other way is shown whole too, not cropped. Tags can be added only to your own photos and videos, not to the videos from the repo.
+To have something play the other way, give it the tag **portrait** or **landscape** under **Photos and videos**. The box then treats it as that shape, whatever shape it really is: a landscape video tagged portrait plays while the TV is portrait, shown whole with black above and below. A photo tagged the other way is shown whole too, not cropped. Tags can be added only to your own photos and videos, not to the videos from the repo.
 
 If the picture is upside down while the TV is landscape, change `landscapeRotate: 0` to `landscapeRotate: 180` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
@@ -244,7 +244,7 @@ If it always gets it the wrong way round, change `closed: 'portrait'` to `closed
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
 | Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then pick **Uploads** and tap **Play** (see above) |
-| Play just the photos and videos you choose | On the page: star them under **Tags**, then pick **Favorites** and tap **Play** (see above) |
+| Play just the photos and videos you choose | On the page: star them under **Photos and videos**, then pick **Favorites** and tap **Play** (see above) |
 | Change the dates or times | For every box: in `playlists/filters.json` in GitHub. For one box only: add your own filter under **Filters** on its page (see above) |
 | Turn it off | Unplug the box. It starts again when plugged back in |
 | See what it's been doing | **Recent activity** on the page. For more: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log` |
@@ -282,8 +282,8 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
 | A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
 | Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
-| Favorites shows black, or won't start | Nothing is starred yet: star something under **Tags** |
-| A filter won't start: `Nothing in … yet` | Nothing has its tags yet: add the tag to something under **Tags**, or edit the filter |
+| Favorites shows black, or won't start | Nothing is starred yet: star something under **Photos and videos** |
+| A filter won't start: `Nothing in … yet` | Nothing has its tags yet: add the tag to something under **Photos and videos**, or edit the filter |
 | Saving filters says `Editing filters is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |
 
 For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

@@ -485,7 +485,7 @@ test("the website refuses a filter it can't use", async () => {
 
 test('the website page offers tagging items', async () => {
   const page = (await site().call('GET', '/')).body;
-  for (const text of ['<h2>Tags</h2>', 'id="taglist"', "fetch('/api/items')", "'/api/tags'", '<datalist id="tagnames">',
+  for (const text of ['<h2>Photos and videos</h2>', 'id="taglist"', "fetch('/api/items')", "'/api/tags'", '<datalist id="tagnames">',
     'Videos from GitHub take their tags from their folders',
     "c.className = 'chip'", "{ add: 'favorites' }", "{ remove: 'favorites' }", '☆', '★', '×']) {
     assert.ok(page.includes(text), 'page has ' + text);
@@ -992,8 +992,14 @@ test('the website page offers adding and removing photos', async () => {
   const s = site();
   const page = (await s.call('GET', '/')).body;
   for (const text of ['Add photos or videos', 'type="file"', 'accept="image/*,video/*"', 'multiple', 'id="pin"',
-    'id="uploads"', "fetch('/api/uploads')", '>Remove<', 'Adding photos is off until a PIN is set on the box.', 'preload="metadata"']) {
+    "fetch('/api/uploads')", '>Remove<', 'Adding photos is off until a PIN is set on the box.', 'preload="metadata"']) {
     assert.ok(page.includes(text), 'page has ' + text);
+  }
+  // One section: the picker, then each upload once with its tags and Remove.
+  const section = page.slice(page.indexOf('<h2>Photos and videos</h2>'), page.indexOf('<h2>Filters</h2>'));
+  for (const text of ['id="files"', 'id="pin"', 'id="taglist"']) assert.ok(section.includes(text), 'section has ' + text);
+  for (const text of ['<h2>Tags</h2>', '<h2>Add photos or videos</h2>', '<h2>Photos and videos added</h2>', 'id="uploads"']) {
+    assert.ok(!page.includes(text), 'page no longer has ' + text);
   }
   assertScriptCompiles(page);
 });
