@@ -217,6 +217,12 @@ test('the box shows each photo for 10 seconds', () => {
   }
 });
 
+test('the box sends each picture to the TV as soon as it is drawn', () => {
+  // A still photo is drawn once or twice; with frames queued behind each
+  // other it could wait unseen until later frames pushed it out.
+  assert.ok(mpvArgs(config.box, config).includes('--swapchain-depth=1'));
+});
+
 test('the box decodes HEVC in hardware and H.264 in software', () => {
   const args = mpvArgs(config.box, config);
   assert.ok(args.includes('--hwdec=drm'), args.join(' '));
