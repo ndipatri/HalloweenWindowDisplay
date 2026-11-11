@@ -20,12 +20,16 @@ function mpvArgs(box, config) {
     // apply (Vulkan, CUDA) logs errors on every video.
     '--hwdec=drm',
     '--hwdec-codecs=hevc',
-    // Fitted whole with black around (and behind any transparent parts). A
-    // photo is queued with panscan=1.0 for itself, so it fills the screen
-    // instead, its edges cropped (logic.keepPlaying); videos stay whole.
+    // Every item is queued with its own panscan (logic.keepPlaying): 1.0 for
+    // a photo that fills the screen, its edges cropped; 0 for videos and any
+    // other photo, fitted whole with black around (and behind any
+    // transparent parts). mpv puts the global value back for a moment
+    // between items, redrawing the last picture at that size, so the global
+    // value is the one for photos: going from one filling photo to the next
+    // then changes nothing on screen instead of flickering.
     '--image-display-duration=' + config.photoSeconds,
     '--keepaspect=yes',
-    '--panscan=0',
+    '--panscan=1',
     '--background=color',
     '--background-color=#000000',
     '--video-rotate=' + box.rotate,
