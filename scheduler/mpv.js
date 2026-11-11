@@ -14,6 +14,11 @@ function mpvArgs(box, config) {
     '--fullscreen',
     '--vo=gpu',
     '--gpu-context=drm',
+    // At most one drawn frame waiting to be shown. A photo is drawn only once
+    // or twice; with the default 3, its frame could wait unseen until later
+    // frames pushed it out (a photo after a turn stayed ~20 s, the next one
+    // never showed).
+    '--swapchain-depth=1',
     // HEVC (what phones record) in hardware, through the Pi 5's decoder.
     // Every other codec, H.264 included, in software without trying hardware
     // first: the Pi 5 has no H.264 decoder, and trying the ones that don't
