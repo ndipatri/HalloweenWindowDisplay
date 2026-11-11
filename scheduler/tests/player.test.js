@@ -275,6 +275,36 @@ test('only items the TV\'s shape play', async () => {
   assert.deepEqual(b.rel(), ['photos/00003-wide.jpg', 'photos/00004-wide.mp4', 'photos/00003-wide.jpg']);
 });
 
+test('a shape tag decides which way an item plays', async () => {
+  const b = box({ photos: ['00001-tall.jpg', '00002-wide.mp4', '00003-wide.jpg'] });
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00002-wide.mp4': ['portrait'] } });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  assert.deepEqual(b.rel(), ['photos/00001-tall.jpg', 'photos/00002-wide.mp4', 'photos/00001-tall.jpg'], 'the wide video, tagged portrait, plays portrait');
+  const video = b.mpv.entries.find((e) => e.filename.endsWith('00002-wide.mp4'));
+  assert.equal(video.options, 'panscan=0', 'shown whole');
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
+  await b.tick();
+  assert.deepEqual(b.rel(), ['photos/00003-wide.jpg'], 'and not landscape');
+});
+
+test('a photo tagged with the other shape is shown whole', async () => {
+  const b = box({ photos: ['00001-wide.jpg', '00002-tall.jpg'] });
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-wide.jpg': ['portrait'] } });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
+  assert.deepEqual(queued, [['00001-wide.jpg', 'panscan=0'], ['00002-tall.jpg', 'panscan=1.0'], ['00001-wide.jpg', 'panscan=0']]);
+});
+
+test('an item tagged both portrait and landscape keeps its measured shape', async () => {
+  const b = box({ photos: ['00001-tall.jpg', '00002-wide.jpg'] });
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00002-wide.jpg': ['portrait', 'landscape'] } });
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  await b.tick();
+  assert.deepEqual(b.rel(), ['photos/00001-tall.jpg'], 'the wide photo stays landscape');
+});
+
 test('with nothing the TV\'s shape, everything plays, shown whole', async () => {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4'] });
   b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });

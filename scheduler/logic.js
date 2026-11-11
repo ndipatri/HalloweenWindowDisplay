@@ -648,11 +648,19 @@ function createScheduler(io) {
     return shapes.get(key);
   }
 
+  // An item's shape for choosing what plays: the tag `portrait` or
+  // `landscape` when it has exactly one of them (set on the website, to
+  // override what's measured), otherwise its measured shape.
+  function itemShape(path, tags) {
+    const said = ORIENTATIONS.filter((o) => (tags || []).includes(o));
+    return said.length === 1 ? said[0] : shapeOf(path);
+  }
+
   // Whether an item plays on a TV facing that way: when it's the TV's
-  // shape, or square. One that can't be measured plays only when nothing
-  // else does (it may well not play at all).
-  function suitsScreen(path, orientation) {
-    const shape = shapeOf(path);
+  // shape, or square. One that can't be measured (and has no shape tag)
+  // plays only when nothing else does (it may well not play at all).
+  function suitsScreen(path, orientation, tags) {
+    const shape = itemShape(path, tags);
     return shape === 'square' || shape === orientation;
   }
 
@@ -697,14 +705,14 @@ function createScheduler(io) {
     for (const f of picked) filterItems(f, all).forEach((i) => chosen.add(i));
     let list = Array.from(chosen)
       .sort((a, b) => compareNames(a.name, b.name) || compareNames(a.path, b.path))
-      .map((i) => ({ name: i.name, path: i.file }));
+      .map((i) => ({ name: i.name, path: i.file, tags: i.folderTags.concat(i.boxTags) }));
     // Only the items the TV's shape play; with none, all of them (shown whole).
     const orientation = readScreen();
-    const suiting = list.filter((i) => suitsScreen(i.path, orientation));
+    const suiting = list.filter((i) => suitsScreen(i.path, orientation, i.tags));
     for (const o of ORIENTATIONS) if (o !== orientation || suiting.length) clearWarning(playlist, 'shape:' + o);
     if (suiting.length) {
       for (const i of list) {
-        if (shapeOf(i.path) === null) {
+        if (itemShape(i.path, i.tags) === null) {
           warnOnce(playlist, 'unmeasured:' + i.path, 'WARNING: Leaving out ' + i.name + ' in ' + playlist.name +
             ": it can't be measured, so it may not play. It plays only when nothing else does.");
         }
@@ -881,7 +889,7 @@ function createScheduler(io) {
 
   return {
     CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, SCREEN_PATH, ORIENTATIONS, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
-    readScreen, rotationFor, photoFills, suitsScreen, shapeOf, isPhotoFile,
+    readScreen, rotationFor, photoFills, suitsScreen, shapeOf, itemShape, isPhotoFile,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
     scheduledFilter, nextScheduleChange, whatToShow, parseOverride, pickName, parseDay, parseWeekdays, formatTime,
