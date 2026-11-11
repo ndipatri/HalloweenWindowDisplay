@@ -804,22 +804,22 @@ function createScheduler(io) {
       } else {
         video = nextVideo(videos, playlist.lastQueued);
       }
-      // A photo the screen's shape fills it, its edges cropped (panscan for
-      // that item only); any other photo, and every video, is fitted whole,
-      // with black around it.
+      // A photo the screen's shape fills it, its edges cropped; any other
+      // photo, and every video, is fitted whole, with black around it. Each
+      // item says which for itself (see mpv.js for why).
       const fill = isPhotoFile(video.path) && photoFills(video.path, orientation);
+      const panscan = fill ? 'panscan=1.0' : 'panscan=0';
       if (videos.length === 1 && isPhotoFile(video.path)) {
         // The only thing to play is one photo: queue it once and hold it on
         // screen, instead of reloading it every few seconds (which flashes
         // black each time). It goes when something else is to play (above).
-        await mpv.command('loadfile', video.path, 'append-play', -1, (fill ? 'panscan=1.0,' : '') + 'image-display-duration=inf');
+        await mpv.command('loadfile', video.path, 'append-play', -1, panscan + ',image-display-duration=inf');
         const after = (await mpv.getProperty('playlist')) || [];
         playlist.held = after.length ? after[after.length - 1].id : null;
         playlist.lastQueued = video;
         break;
       }
-      if (fill) await mpv.command('loadfile', video.path, 'append-play', -1, 'panscan=1.0');
-      else await mpv.command('loadfile', video.path, 'append-play');
+      await mpv.command('loadfile', video.path, 'append-play', -1, panscan);
       playlist.lastQueued = video;
       queued++;
     }

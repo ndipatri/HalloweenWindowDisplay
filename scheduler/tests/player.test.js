@@ -212,7 +212,7 @@ const { mpvArgs } = require('../mpv.js');
 test('the box shows each photo for 10 seconds', () => {
   const args = mpvArgs(config.box, config);
   assert.ok(args.includes('--image-display-duration=10'), args.join(' '));
-  for (const a of ['--keepaspect=yes', '--panscan=0', '--background=color', '--background-color=#000000']) {
+  for (const a of ['--keepaspect=yes', '--panscan=1', '--background=color', '--background-color=#000000']) {
     assert.ok(args.includes(a), 'mpv gets ' + a);
   }
 });
@@ -229,7 +229,7 @@ test('each photo fills the screen and each video is fitted whole', async () => {
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   await b.tick();
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
-  assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0'], ['00002-b.mp4', ''], ['00003-c.png', 'panscan=1.0']]);
+  assert.deepEqual(queued, [['00001-a.jpg', 'panscan=1.0'], ['00002-b.mp4', 'panscan=0'], ['00003-c.png', 'panscan=1.0']]);
 });
 
 test('a photo that isn\'t the screen\'s shape is shown whole', async () => {
@@ -237,7 +237,7 @@ test('a photo that isn\'t the screen\'s shape is shown whole', async () => {
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   await b.tick();
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
-  assert.deepEqual(queued, [['00001-wide.jpg', ''], ['00002-wide.png', ''], ['00001-wide.jpg', '']]);
+  assert.deepEqual(queued, [['00001-wide.jpg', 'panscan=0'], ['00002-wide.png', 'panscan=0'], ['00001-wide.jpg', 'panscan=0']]);
 });
 
 test('a square photo plays either way, shown whole', async () => {
@@ -245,7 +245,7 @@ test('a square photo plays either way, shown whole', async () => {
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   await b.tick();
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
-  assert.deepEqual(queued, [['00001-square.png', ''], ['00004-tall.jpg', 'panscan=1.0'], ['00001-square.png', '']],
+  assert.deepEqual(queued, [['00001-square.png', 'panscan=0'], ['00004-tall.jpg', 'panscan=1.0'], ['00001-square.png', 'panscan=0']],
     'square plays, shown whole; broken (unmeasurable) and wide do not');
   await b.tick();
   const left = b.logs.filter((l) => l.startsWith('WARNING: Leaving out 00002-broken.jpg in #upload: it can\'t be measured'));
@@ -282,7 +282,7 @@ test('with nothing the TV\'s shape, everything plays, shown whole', async () => 
   for (let i = 0; i < 4; i++) { await b.tick(); b.mpv.finish(); }
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
   assert.ok(queued.some((q) => q[0] === '00001-a.jpg') && queued.some((q) => q[0] === '00002-b.mp4'), JSON.stringify(queued));
-  assert.ok(queued.filter((q) => q[0] === '00001-a.jpg').every((q) => q[1] === ''), 'the photo is shown whole');
+  assert.ok(queued.filter((q) => q[0] === '00001-a.jpg').every((q) => q[1] === 'panscan=0'), 'the photo is shown whole');
   const said = b.logs.filter((l) => l === 'Nothing in #upload is landscape, so it all plays, shown whole.');
   assert.equal(said.length, 1, b.logs.join('\n'));
 });
