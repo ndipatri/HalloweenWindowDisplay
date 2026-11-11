@@ -33,7 +33,7 @@ module.exports = {
     // as chosen under TV on the website, and with nothing chosen): 90 or
     // 270 (0 for a TV the normal way up). If it comes out upside down,
     // switch between 90 and 270.
-    rotate: 90,
+    rotate: 270,
     // The same, for when the TV is turned to landscape on its mount (chosen
     // under TV on the website): 0, or 180 if it comes out upside down.
     landscapeRotate: 0,
