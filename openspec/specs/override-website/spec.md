@@ -71,12 +71,12 @@ The website SHALL show the box's current status line, and say when the box has n
 - **AND** its page shows `The box has not started yet.` when there is no status line
 
 ### Requirement: The page tags items
-The page SHALL offer a Tags section listing every upload from the website's list, each with its box tags (each with a way to take it off), a star that adds or takes off `favorites`, and a way to add a tag, suggesting the tags in use, and SHALL say that videos from GitHub take their tags from their folders. Each change SHALL be saved straight away and confirmed next to the upload.
+The page SHALL tag items in its Photos and videos section, listing every upload from the website's list, each with its box tags (each with a way to take it off), a star that adds or takes off `favorites`, and a way to add a tag, suggesting the tags in use, and SHALL say that videos from GitHub take their tags from their folders. Each change SHALL be saved straight away and confirmed next to the upload.
 
 #### Scenario: the website page offers tagging items
 - **GIVEN** the website running
 - **WHEN** the page is opened
-- **THEN** it has a Tags section filled from the website's items (the uploads), saying videos from GitHub take their tags from their folders, with box tags with a way to take each off, a favorites star, and an add-a-tag field suggesting the tags in use, each change posted to the website straight away
+- **THEN** its Photos and videos section is filled from the website's items (the uploads), saying videos from GitHub take their tags from their folders, with box tags with a way to take each off, a favorites star, and an add-a-tag field suggesting the tags in use, each change posted to the website straight away
 
 ### Requirement: The page edits filters
 The page SHALL offer a Filters section listing the box's custom filters in order, with ways to move each up or down, edit, delete and add one, and, apart from them, the GitHub filters in order with their tags and schedules but no way to change them, saying they come from GitHub. Editing SHALL cover the name, "any of" and "except" tags chosen from the tags in use, and schedule entries (first and last day, weekdays, extra days, and times). Saving SHALL send the custom filters with the upload PIN, and show the website's answer there.

@@ -730,11 +730,8 @@ const PAGE = `<!DOCTYPE html>
   .pick { display: block; position: relative; text-align: center; background: var(--accent); color: #1a1a1a; font-weight: 600; border-radius: 10px; padding: 12px; cursor: pointer; }
   .pick input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
   #progress { font-size: 14px; color: var(--dim); margin-top: 8px; }
-  .uploads { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .upload { background: var(--card); border-radius: 10px; padding: 6px; font-size: 12px; color: var(--dim); overflow: hidden; }
-  .upload img, .upload video { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: #000; }
-  .upload .name { display: block; margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .upload button { padding: 6px; font-size: 13px; }
+  .tagrow .thumb { width: 44px; height: 44px; flex: none; object-fit: cover; border-radius: 6px; background: #000; }
+  .tagrow .remove { width: auto; padding: 4px 10px; font-size: 13px; }
   .group { font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
   .group:first-child { margin-top: 0; }
   .hint { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
@@ -797,9 +794,15 @@ const PAGE = `<!DOCTYPE html>
     <div class="grid"><button data-tv="portrait">Portrait</button><button data-tv="landscape">Landscape</button></div>
   </div>
 
-  <h2>Tags</h2>
+  <h2>Photos and videos</h2>
   <div class="card">
-    <div class="hint">Your photos and videos. Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Videos from GitHub take their tags from their folders there.</div>
+    <div id="add-off" hidden>Adding photos is off until a PIN is set on the box.</div>
+    <div id="add-on">
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
+      <label class="pick">Add photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
+      <div id="progress"></div>
+    </div>
+    <div class="hint">Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Adding and removing need the PIN. Videos from GitHub take their tags from their folders there.</div>
     <div id="taglist">Loading…</div>
     <datalist id="tagnames"></datalist>
   </div>
@@ -818,19 +821,6 @@ const PAGE = `<!DOCTYPE html>
     <div class="hint">The same on every box, and changed there: they come with the videos, within the hour.</div>
     <div id="githubfilters">Loading…</div>
   </div>
-
-  <h2>Add photos or videos</h2>
-  <div class="card">
-    <div id="add-off" hidden>Adding photos is off until a PIN is set on the box.</div>
-    <div id="add-on">
-      <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
-      <label class="pick">Add photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
-      <div id="progress"></div>
-    </div>
-  </div>
-
-  <h2>Photos and videos added</h2>
-  <div id="uploads" class="uploads"></div>
 
   <h2>Schedule</h2>
   <button class="primary" id="schedule">Back to schedule</button>
@@ -1049,19 +1039,6 @@ const PAGE = `<!DOCTYPE html>
       const d = await (await fetch('/api/uploads')).json();
       $('add-off').hidden = d.pinSet;
       $('add-on').hidden = !d.pinSet;
-      const list = $('uploads');
-      list.textContent = d.uploads.length ? '' : 'Nothing added yet.';
-      for (const u of d.uploads) {
-        const item = document.createElement('div');
-        item.className = 'upload';
-        item.innerHTML = (u.kind === 'photo' ? '<img loading="lazy" alt="">' : '<video preload="metadata" muted playsinline></video>') +
-          '<span class="name"></span><button class="remove">Remove</button>';
-        const src = '/photos/' + encodeURIComponent(u.name);
-        item.firstChild.src = u.kind === 'photo' ? src : src + '#t=0.1';
-        item.querySelector('.name').textContent = u.name;
-        item.querySelector('.remove').onclick = () => removeUpload(u.name);
-        list.appendChild(item);
-      }
     } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
@@ -1118,7 +1095,7 @@ const PAGE = `<!DOCTYPE html>
         $('tagnames').appendChild(o);
       }
       const list = $('taglist');
-      list.textContent = d.items.length ? '' : 'Nothing added yet: add photos or videos below.';
+      list.textContent = d.items.length ? '' : 'Nothing added yet.';
       let group = null;
       for (const item of d.items) {
         if (item.group !== group) {
@@ -1131,7 +1108,11 @@ const PAGE = `<!DOCTYPE html>
         const row = document.createElement('div');
         row.className = 'tagrow';
         row.dataset.path = item.path;
-        row.innerHTML = '<div class="top"><button class="star"></button><span class="name"></span></div>' +
+        const name = item.path.split('/').pop();
+        const src = '/photos/' + encodeURIComponent(name);
+        row.innerHTML = '<div class="top">' +
+          (item.kind === 'photo' ? '<img class="thumb" loading="lazy" alt="">' : '<video class="thumb" preload="metadata" muted playsinline></video>') +
+          '<button class="star"></button><span class="name"></span><button class="remove">Remove</button></div>' +
           '<div class="chips"></div><div class="add"><input list="tagnames" placeholder="add a tag"><button>Add</button></div>' +
           '<div class="note" role="status"></div>';
         const note = row.querySelector('.note');
@@ -1144,7 +1125,9 @@ const PAGE = `<!DOCTYPE html>
         star.textContent = fav ? '★' : '☆';
         star.setAttribute('aria-label', fav ? 'Take out of Favorites' : 'Add to Favorites');
         star.onclick = () => changeTag(item.path, fav ? { remove: 'favorites' } : { add: 'favorites' });
-        row.querySelector('.name').textContent = item.path.split('/').pop();
+        row.querySelector('.thumb').src = item.kind === 'photo' ? src : src + '#t=0.1';
+        row.querySelector('.name').textContent = name;
+        row.querySelector('.remove').onclick = () => removeUpload(name);
         const chips = row.querySelector('.chips');
         for (const t of item.folderTags) chips.appendChild(chip(t));
         for (const t of item.boxTags) chips.appendChild(chip(t, () => changeTag(item.path, { remove: t })));
