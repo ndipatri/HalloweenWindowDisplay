@@ -277,6 +277,7 @@ async function main() {
   startWebsite(Object.assign({}, io, {
     config,
     videoRoot,
+    mediaSize: readMediaSize, // to say each upload's measured shape
     now: () => new Date(),
     beforeRemove: player.dropFile,
     filtersChanged: player.refilter,

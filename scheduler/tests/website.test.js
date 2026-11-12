@@ -59,6 +59,14 @@ function site(dirs = {}, extra = {}) {
     writeText: (p, text) => { files[p] = text; },
     removeFile: (p) => { delete files[p]; },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
+    // Uploads are portrait unless named otherwise, as in player.test.js.
+    mediaSize: (p) => {
+      const n = p.split('/').pop();
+      if (n.includes('broken')) return null;
+      if (n.includes('wide')) return { width: 160, height: 96 };
+      if (n.includes('square')) return { width: 100, height: 100 };
+      return { width: 96, height: 160 };
+    },
     log: extra.log,
     filtersChanged: extra.filtersChanged,
   });
@@ -370,6 +378,21 @@ test('the website lists the uploads and their tags', async () => {
     ['photos/00002-b.mov', 'upload', ''],
   ]);
   assert.deepEqual(r.json.tags, ['family', 'halloween', 'halloween-kid', 'upload']);
+});
+
+test('the website says each upload\'s measured shape', async () => {
+  const s = site({ photos: ['00001-tall.jpg', '00002-wide.mp4', '00003-square.png', '00004-broken.jpg'] },
+    { tags: { 'photos/00002-wide.mp4': ['portrait'] } });
+  const r = await s.call('GET', '/api/items');
+  assert.deepEqual(r.json.items.map((i) => i.shape), ['portrait', 'landscape', 'square', null]);
+});
+
+test('the website page marks each untagged upload\'s thumbnail with its measured shape', async () => {
+  const page = (await site().call('GET', '/')).body;
+  for (const text of ['class="shape"', 'item.shape', "'?'", "includes('portrait')", "includes('landscape')"]) {
+    assert.ok(page.includes(text), 'page has ' + text);
+  }
+  assertScriptCompiles(page);
 });
 
 test('box tags of an item no longer on the box are left out', async () => {
