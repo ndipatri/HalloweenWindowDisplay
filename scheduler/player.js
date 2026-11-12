@@ -6,13 +6,17 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { createScheduler } = require('./logic.js');
+const { addressUrl, codeCorner } = require('./address_code.js');
 
 const CLOCK_NOT_SET = 'black (waiting for the clock to be set)';
 
 // `options`: { config, videoRoot, mpv, now() -> Date, clockIsSet() -> bool,
 //              readText, writeText, removeFile, listFolder, log,
 //              mediaSize(path) -> { width, height } or null,
-//              readTilt(gpio) -> promise of 'closed' | 'open' (only with config.box.tiltSwitch) }
+//              readTilt(gpio) -> promise of 'closed' | 'open' (only with config.box.tiltSwitch),
+//              readAddress() -> the box's IPv4 address or null, and
+//              makeAddressCode(url, maxSize) -> promise of { size, stride, pixels }
+//              (both for the address code; without them it isn't shown) }
 function createPlayer(options) {
   const { mpv, now, clockIsSet, writeText, log } = options;
   const logic = createScheduler(options);
@@ -54,6 +58,79 @@ function createPlayer(options) {
     log('Screen: ' + way + ' (from the tilt switch).');
   }
 
+  // ---------- The address code ----------
+
+  // A QR code of the website's address, drawn by mpv on top of the picture
+  // (overlay-add, from raw pixels in a file) for the first few seconds of
+  // each item, in the corner that is bottom-right for someone looking at the
+  // TV. Its place is also written to address-code.json beside the file, for
+  // the emulator's picture of the TV (its mpv draws nothing).
+  const codeSettings = options.config.addressCode;
+  const codeUsed = Boolean(codeSettings && options.readAddress && options.makeAddressCode);
+  const RUN_DIR = path.dirname(options.config.box.mpvSocket);
+  const CODE_FILE = RUN_DIR + '/address-code.bgra';
+  const CODE_STATE = RUN_DIR + '/address-code.json';
+  const CODE_OVERLAY = 1;
+  // The TV's panel, when mpv can't say (it says 0 with no picture output).
+  const PANEL = { width: 1920, height: 1080 };
+  const code = { entry: null, shownAt: null, url: null, made: null, warned: null };
+
+  function warnCode(message) {
+    if (code.warned !== message) log('WARNING: ' + message);
+    code.warned = message;
+  }
+
+  async function hideCode() {
+    if (code.shownAt === null) return;
+    code.shownAt = null;
+    writeText(CODE_STATE, JSON.stringify({ showing: false }) + '\n');
+    await mpv.command('overlay-remove', CODE_OVERLAY);
+  }
+
+  async function showCode() {
+    if (!logic.addressCodeOn()) return;
+    const url = addressUrl(options.readAddress(), options.config.box.webPort);
+    if (!url) return;
+    if (url !== code.url) {
+      try {
+        code.made = await options.makeAddressCode(url, codeSettings.size);
+      } catch (e) {
+        warnCode("Couldn't make the address code: " + e.message);
+        return;
+      }
+      writeText(CODE_FILE, code.made.pixels);
+      code.url = url;
+      log('Address code: ' + url);
+    }
+    const width = (await mpv.getProperty('osd-width')) || PANEL.width;
+    const height = (await mpv.getProperty('osd-height')) || PANEL.height;
+    const { size, stride } = code.made;
+    const { x, y } = codeCorner(logic.rotationFor(facing), width, height, size, codeSettings.margin);
+    await mpv.command('overlay-add', CODE_OVERLAY, x, y, CODE_FILE, 0, 'bgra', size, size, stride);
+    code.shownAt = now().getTime();
+    writeText(CODE_STATE, JSON.stringify({ showing: true, x, y, size, width, height, url }) + '\n');
+  }
+
+  // Each tick: up when a new item comes on screen, down after
+  // addressCode.seconds, when switched off, or when the screen goes black.
+  async function followCode() {
+    const entries = active ? ((await mpv.getProperty('playlist')) || []) : [];
+    const at = entries.findIndex((e) => e.current);
+    if (at === -1) {
+      code.entry = null;
+      return hideCode();
+    }
+    const entry = entries[at].id !== undefined ? entries[at].id : entries[at].filename + '#' + at;
+    if (entry !== code.entry) {
+      code.entry = entry;
+      return showCode();
+    }
+    if (code.shownAt !== null &&
+        (now().getTime() - code.shownAt >= codeSettings.seconds * 1000 || !logic.addressCodeOn())) {
+      await hideCode();
+    }
+  }
+
   async function blank() {
     if (!idle) await mpv.command('stop');
     idle = true;
@@ -76,6 +153,7 @@ function createPlayer(options) {
     facing = orientation;
     if (starting && orientation === 'portrait') return;
     const degrees = logic.rotationFor(orientation);
+    await hideCode(); // its corner is somewhere else now
     await mpv.command('set_property', 'video-rotate', degrees);
     log('Screen: ' + orientation + ' (the picture turned ' + degrees + ' degrees).');
     if (starting) return;
@@ -123,6 +201,7 @@ function createPlayer(options) {
     } else {
       mpv.takeEvents(); // nothing to report while black
     }
+    if (codeUsed) await followCode();
   }
 
   // An upload is about to be deleted: take it out of mpv's playlist first,
@@ -252,6 +331,7 @@ async function main() {
   const { startWebsite } = require('./website.js');
   const { readMediaSize } = require('./media_size.js');
   const { readTiltSwitch } = require('./tilt.js');
+  const { boxAddress, makeAddressCode } = require('./address_code.js');
   const box = config.box;
   const io = realIo();
   const videoRoot = box.videoRoot || path.join(os.homedir(), 'video-scheduler');
@@ -269,6 +349,8 @@ async function main() {
     clockIsSet: () => fs.existsSync(box.clockFile),
     mediaSize: readMediaSize,
     readTilt: readTiltSwitch,
+    readAddress: () => boxAddress(),
+    makeAddressCode,
   }));
   io.log('Started. Videos: ' + videoRoot);
   const filters = player.logic.readFilters();
@@ -278,6 +360,7 @@ async function main() {
     config,
     videoRoot,
     mediaSize: readMediaSize, // to say each upload's measured shape
+    readAddress: () => boxAddress(), // for the address code switch
     now: () => new Date(),
     beforeRemove: player.dropFile,
     filtersChanged: player.refilter,

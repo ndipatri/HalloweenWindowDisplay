@@ -22,7 +22,7 @@ RUN apt-get update -qq \
 # cloud-init and netplan (Raspberry Pi OS has both; cloud-init checks Wi-Fi
 # config with netplan) to check the card files cards/ makes.
 RUN apt-get update -qq \
- && apt-get install -y -qq --no-install-recommends mpv nodejs git logrotate cloud-init netplan.io python3-yaml ffmpeg systemd procps >/dev/null \
+ && apt-get install -y -qq --no-install-recommends mpv nodejs git logrotate gpiod qrencode cloud-init netplan.io python3-yaml ffmpeg systemd procps >/dev/null \
  && rm -rf /var/lib/apt/lists/*
 
 # The person's user, as Raspberry Pi Imager creates it (sudo asks for no

@@ -5,7 +5,8 @@
 #   cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
 #
 # Safe to run again. It:
-#   - installs mpv, Node.js, git, logrotate and gpiod (for a tilt switch)
+#   - installs mpv, Node.js, git, logrotate, gpiod (for a tilt switch) and
+#     qrencode (for the address code on the TV)
 #   - lets your user use the screen (video and render groups)
 #   - sets the time zone and turns on network time
 #   - copies the player and website to /opt/tvbox
@@ -65,9 +66,9 @@ if [ -z "$pin" ] && [ ! -f "$pin_file" ] && [ -t 0 ]; then
   done
 fi
 
-say "Installing mpv, Node.js, git, logrotate and gpiod"
+say "Installing mpv, Node.js, git, logrotate, gpiod and qrencode"
 apt-get update -qq
-apt-get install -y -qq mpv nodejs git logrotate gpiod >/dev/null
+apt-get install -y -qq mpv nodejs git logrotate gpiod qrencode >/dev/null
 major="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$major" -lt 18 ]; then
   echo "Node.js $major is too old; the box needs 18 or later." >&2
@@ -89,7 +90,7 @@ timedatectl set-ntp true
 
 say "Copying the player and website to /opt/tvbox"
 mkdir -p "$app"
-for f in config.js logic.js mpv.js media_size.js player.js tilt.js website.js; do
+for f in config.js logic.js mpv.js media_size.js player.js tilt.js address_code.js website.js; do
   cp "$here/$f" "$app/$f"
 done
 

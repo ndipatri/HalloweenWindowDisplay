@@ -4,7 +4,10 @@
 // landscape as chosen under TV on the box's website (screen.json, next to the
 // status file). mpv's frames are what goes to the TV's panel, turned by
 // config.js's `rotate` (or `landscapeRotate`); the real TV, turned on its
-// mount, turns them back, so the page turns them back too.
+// mount, turns them back, so the page turns them back too. mpv here draws
+// nothing, so the address code the player puts on top of the picture is
+// drawn by the page, from the player's address-code.json and .bgra (next to
+// mpv's socket), at the same place on the panel.
 //   node tv.js <status file> <config.js>
 'use strict';
 const fs = require('fs');
@@ -14,6 +17,15 @@ const FRAMES = '/tmp/tv';
 const statusFile = process.argv[2];
 const box = require(process.argv[3]).box;
 const screenFile = require('path').dirname(statusFile) + '/screen.json';
+const codeDir = require('path').dirname(box.mpvSocket);
+
+// The address code, while the player has it up: { x, y, size, width, height, url }.
+function addressCode() {
+  try {
+    const c = JSON.parse(fs.readFileSync(codeDir + '/address-code.json', 'utf8'));
+    return c.showing ? c : null;
+  } catch (e) { return null; }
+}
 
 // Which way the TV faces, and how far mpv turns the picture for it.
 function screen() {
@@ -45,13 +57,15 @@ const PAGE = `<!DOCTYPE html>
   .tv { position: relative; overflow: hidden; background: #000; border: 12px solid #111; border-radius: 6px; }
   .tv.portrait { height: var(--long); width: var(--short); }
   .tv.landscape { width: min(90vw, 80vh * 16 / 9); height: calc(min(90vw, 80vh * 16 / 9) * 9 / 16); }
-  .tv img { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: contain; }
-  .tv img.side { width: var(--tvh); height: var(--tvw); }
+  .panel { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; }
+  .panel.side { width: var(--tvh); height: var(--tvw); }
+  .panel img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .panel canvas { position: absolute; image-rendering: pixelated; }
   #status { min-height: 1.3em; text-align: center; }
   a { color: #ffb066; }
 </style></head>
 <body>
-  <div class="tv portrait" id="tv"><img id="frame" alt=""></div>
+  <div class="tv portrait" id="tv"><div class="panel" id="panel"><img id="frame" alt=""><canvas id="code" hidden></canvas></div></div>
   <div id="status"></div>
   <div><a href="http://localhost:8080/" id="site">The box's website</a> · a frame about twice a second, no sound</div>
 <script>
@@ -59,15 +73,32 @@ const PAGE = `<!DOCTYPE html>
   const img = document.getElementById('frame');
   img.onerror = () => { img.removeAttribute('src'); };
   const tv = document.getElementById('tv');
+  const panel = document.getElementById('panel');
+  const canvas = document.getElementById('code');
+  let codeUrl = null;
+  // The address code where the player put it on the panel, drawn from its pixels (BGRA).
+  async function drawCode(c) {
+    if (!c) { canvas.hidden = true; return; }
+    if (c.url !== codeUrl) {
+      const bytes = new Uint8ClampedArray(await (await fetch('/code.bgra?' + Date.now())).arrayBuffer());
+      for (let i = 0; i < bytes.length; i += 4) { const b = bytes[i]; bytes[i] = bytes[i + 2]; bytes[i + 2] = b; }
+      canvas.width = c.size; canvas.height = c.size;
+      canvas.getContext('2d').putImageData(new ImageData(bytes, c.size, c.size), 0, 0);
+      codeUrl = c.url;
+    }
+    Object.assign(canvas.style, { left: 100 * c.x / c.width + '%', top: 100 * c.y / c.height + '%',
+      width: 100 * c.size / c.width + '%', height: 100 * c.size / c.height + '%' });
+    canvas.hidden = false;
+  }
   // Shapes the TV for the way it faces, and turns the frame back by mpv's
   // turn (a quarter turn swaps the frame's sides).
   function shape(s) {
     tv.className = 'tv ' + s.orientation;
     const side = s.rotate % 180 !== 0;
-    img.className = side ? 'side' : '';
+    panel.className = side ? 'panel side' : 'panel';
     tv.style.setProperty('--tvw', tv.clientWidth + 'px');
     tv.style.setProperty('--tvh', tv.clientHeight + 'px');
-    img.style.transform = 'translate(-50%, -50%) rotate(' + (-s.rotate) + 'deg)';
+    panel.style.transform = 'translate(-50%, -50%) rotate(' + (-s.rotate) + 'deg)';
   }
   async function tick() {
     img.src = '/frame.jpg?' + Date.now();
@@ -75,6 +106,7 @@ const PAGE = `<!DOCTYPE html>
       const s = await (await fetch('/state')).json();
       shape(s);
       document.getElementById('status').textContent = s.status;
+      await drawCode(s.code);
     } catch (e) { /* stopped */ }
   }
   setInterval(tick, 500);
@@ -93,11 +125,14 @@ http.createServer((req, res) => {
   if (path === '/state') {
     let status = '';
     try { status = fs.readFileSync(statusFile, 'utf8').trim(); } catch (e) { /* not yet */ }
-    return send(200, 'application/json', JSON.stringify(Object.assign({ status }, screen())));
+    return send(200, 'application/json', JSON.stringify(Object.assign({ status, code: addressCode() }, screen())));
   }
   if (path === '/frame.jpg') {
     const frame = newestFrame();
     return frame ? send(200, 'image/jpeg', frame) : send(404, 'text/plain', 'black');
+  }
+  if (path === '/code.bgra') {
+    try { return send(200, 'application/octet-stream', fs.readFileSync(codeDir + '/address-code.bgra')); } catch (e) { return send(404, 'text/plain', 'none'); }
   }
   return send(404, 'text/plain', 'Not found.');
 }).listen(8081);

@@ -11,6 +11,8 @@ class FakeMpv {
     this.events = [];
     this.commands = [];
     this.props = {}; // properties set with set_property
+    this.overlays = {}; // id -> the overlay-add arguments after the id
+    this.osd = { width: 1920, height: 1080 }; // the panel, as mpv's OSD has it
   }
 
   async command(...args) {
@@ -31,6 +33,10 @@ class FakeMpv {
       else if (this.pos === i && i >= this.entries.length) this.pos = -1;
     } else if (name === 'set_property') {
       this.props[rest[0]] = rest[1];
+    } else if (name === 'overlay-add') {
+      this.overlays[rest[0]] = rest.slice(1);
+    } else if (name === 'overlay-remove') {
+      delete this.overlays[rest[0]];
     } else if (name === 'stop') {
       this.entries = [];
       this.pos = -1;
@@ -41,6 +47,8 @@ class FakeMpv {
   }
 
   async getProperty(name) {
+    if (name === 'osd-width') return this.osd.width;
+    if (name === 'osd-height') return this.osd.height;
     if (name !== 'playlist') throw new Error('fake mpv does not know property ' + name);
     return this.entries.map((e, i) => Object.assign({}, e, i === this.pos ? { current: true, playing: true } : {}));
   }

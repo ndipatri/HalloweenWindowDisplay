@@ -25,6 +25,16 @@ module.exports = {
     lockMinutes: 5, // ...for this long
   },
 
+  // A QR code of the website's address (http://<the box's address>/) shown
+  // in the TV's bottom-right corner as each new item starts, so phones that
+  // can't open tvbox.local can scan it. Switched on and off under TV on the
+  // website.
+  addressCode: {
+    seconds: 3, // how long it stays up
+    size: 240, // at most this many pixels square
+    margin: 24, // pixels from the edges
+  },
+
   box: {
     // Videos, the status file, the override and the log live here. Default:
     // ~/video-scheduler for the user setup.sh was run for.
