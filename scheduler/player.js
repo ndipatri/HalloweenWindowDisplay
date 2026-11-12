@@ -88,7 +88,7 @@ function createPlayer(options) {
   }
 
   async function showCode() {
-    code.lastShow = now().getTime(); // tried now: the next repeat counts from here
+    code.lastShow = now().getTime(); // tried now: with a single item, the next try is addressCode.seconds on
     if (!logic.addressCodeOn()) return;
     const url = addressUrl(options.readAddress(), options.config.box.webPort);
     if (!url) return;
@@ -112,10 +112,10 @@ function createPlayer(options) {
     writeText(CODE_STATE, JSON.stringify({ showing: true, x, y, size, width, height, url }) + '\n');
   }
 
-  // Each tick: up when a new item comes on screen, and again every
-  // addressCode.every seconds while it stays (a lone photo is held, so no
-  // new item ever starts); down after addressCode.seconds, when switched
-  // off, or when the screen goes black.
+  // Each tick: up when a new item comes on screen, down after
+  // addressCode.seconds, when switched off, or when the screen goes black.
+  // With a single item to play (a lone photo is held on screen, so nothing
+  // new ever starts) it stays up the whole time instead.
   async function followCode() {
     const entries = active ? ((await mpv.getProperty('playlist')) || []) : [];
     const at = entries.findIndex((e) => e.current);
@@ -128,11 +128,16 @@ function createPlayer(options) {
       code.entry = entry;
       return showCode();
     }
+    const lone = logic.playlistItems(active).items.length === 1;
     if (code.shownAt !== null) {
-      if (now().getTime() - code.shownAt >= codeSettings.seconds * 1000 || !logic.addressCodeOn()) await hideCode();
+      const over = !lone && now().getTime() - code.shownAt >= codeSettings.seconds * 1000;
+      if (over || !logic.addressCodeOn()) await hideCode();
       return;
     }
-    if (codeSettings.every && now().getTime() - code.lastShow >= codeSettings.every * 1000) await showCode();
+    // Down with a single item (switched back on, the TV turned, or the
+    // second-last item taken away): up again, trying at most every
+    // addressCode.seconds when there's no address or no code.
+    if (lone && logic.addressCodeOn() && now().getTime() - code.lastShow >= codeSettings.seconds * 1000) await showCode();
   }
 
   async function blank() {
