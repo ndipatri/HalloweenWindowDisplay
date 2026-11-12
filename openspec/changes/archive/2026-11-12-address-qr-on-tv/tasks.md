@@ -22,4 +22,4 @@
 ## 5. Rest
 
 - [x] 5.1 README (the code, the switch, reserving the address on the router) and the schedule skill
-- [ ] 5.2 Check on the real TV, both ways: the code is in the bottom-right and a phone opens the website from it
+- [x] 5.2 Check on the real TV, both ways: the code is in the bottom-right and a phone opens the website from it
