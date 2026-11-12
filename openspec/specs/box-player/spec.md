@@ -30,7 +30,7 @@ When mpv exits, the box SHALL log it and exit with an error, so the system servi
 - **AND** the box exits with code 1
 
 ### Requirement: Shows each photo for a set time
-The box SHALL have mpv keep each photo on screen for the number of seconds set as `photoSeconds` in the configuration (10 as shipped), with black behind any transparent parts, then move on to the next item. A photo the same shape as the screen (portrait on a portrait TV, landscape on a landscape TV, judged as the photo is shown, after its EXIF orientation) SHALL fill the screen (zoomed until there is no black around it, its edges cropped evenly); any other photo that plays (square, or played because nothing is the screen's shape) SHALL be shown whole with black around it. Videos SHALL be fitted to the screen whole, with black around them. When the only item to play is one photo, the box SHALL queue it once and hold it on screen, rather than reloading it (which flashes black), and SHALL let it give way, without going black, as soon as something else is to play.
+The box SHALL have mpv keep each photo on screen for the number of seconds set as `photoSeconds` in the configuration (10 as shipped), with black behind any transparent parts, then move on to the next item. A photo the same shape as the screen (portrait on a portrait TV, landscape on a landscape TV, judged as the photo is shown, after its EXIF orientation) SHALL fill the screen (zoomed until there is no black around it, its edges cropped evenly); any other photo that plays (square, or tagged with a shape it isn't) SHALL be shown whole with black around it. Videos SHALL be fitted to the screen whole, with black around them. When the only item to play is one photo, the box SHALL queue it once and hold it on screen, rather than reloading it (which flashes black), and SHALL let it give way, without going black, as soon as something else is to play.
 
 #### Scenario: the box shows each photo for 10 seconds
 - **GIVEN** the shipped configuration
@@ -57,15 +57,15 @@ The box SHALL have mpv keep each photo on screen for the number of seconds set a
 - **AND** the queue is b, a, b, each shown for the usual time
 
 #### Scenario: a photo that isn't the screen's shape is shown whole
-- **GIVEN** the TV portrait and only landscape uploads, `00001-wide.jpg` and `00002-wide.png`
-- **WHEN** the box plays the tag `upload` (nothing being the TV's shape, it plays them all)
+- **GIVEN** the TV portrait and the landscape uploads `00001-wide.jpg` and `00002-wide.png`, both tagged `portrait`
+- **WHEN** the box plays the tag `upload`
 - **THEN** mpv is given each of them with no `panscan`, so each is shown whole
 
 #### Scenario: a square photo plays either way, shown whole
 - **GIVEN** the TV portrait and the uploads `00001-square.png` (square), `00002-broken.jpg` (not measurable), `00003-wide.jpg` (landscape) and `00004-tall.jpg` (portrait)
 - **WHEN** the box plays the tag `upload`
 - **THEN** square (with no `panscan`, shown whole) and tall are queued, and not broken or wide
-- **AND** the box logs once that it is leaving broken out: `WARNING: Leaving out 00002-broken.jpg in #upload: it can't be measured, so it may not play. It plays only when nothing else does.`
+- **AND** the box logs once that it is leaving broken out: `WARNING: Leaving out 00002-broken.jpg in #upload: it can't be measured. Tag it portrait or landscape to play it.`
 - **AND** with the TV landscape, square and wide are queued, and not broken
 
 #### Scenario: a photo stored on its side is measured the way it is shown
@@ -207,25 +207,22 @@ When `tiltSwitch` is set in the configuration (off as shipped), the box SHALL re
 - **WHEN** setup runs
 - **THEN** it installs `gpiod` and adds the box's user to the `gpio` group
 
-### Requirement: Plays only items the TV's shape
-Of the items picked to play (by a filter's schedule or an override), the box SHALL play only those the TV's shape (portrait items while the TV is portrait, landscape ones while it is landscape); square items SHALL play either way. An item's shape SHALL be the tag `portrait` or `landscape` when it has exactly one of them, and otherwise its shape as measured after its rotation. Items that can't be measured (and have no shape tag) SHALL play only when none of the picked items is the TV's shape (and leaving one out SHALL be logged once): then the box SHALL play them all, shown whole, and log that once. A shape tag SHALL NOT change how a photo is fitted: it fills the screen only when its measured shape is the TV's.
+### Requirement: Puts each picture on the TV as soon as it is drawn
+The box SHALL have mpv keep at most one drawn frame waiting to be shown, so a photo (drawn only once or twice) reaches the TV as soon as mpv draws it, rather than waiting until later frames push it out.
+
+#### Scenario: the box sends each picture to the TV as soon as it is drawn
+- **GIVEN** the shipped configuration
+- **WHEN** the box starts mpv
+- **THEN** mpv is told to keep at most one drawn frame waiting (`--swapchain-depth=1`)
+
+### Requirement: Plays only what fits the TV
+Of the items picked to play, the box SHALL play only those the TV's shape (portrait while the TV is portrait, landscape while it is landscape); square items SHALL play either way. An item's shape SHALL be the tag `portrait` or `landscape` when it has exactly one, otherwise its measured shape after its rotation. A shape tag SHALL NOT change how a photo is fitted.
 
 #### Scenario: only items the TV's shape play
 - **GIVEN** the uploads `00001-tall.jpg`, `00002-tall.mp4` (portrait), `00003-wide.jpg` and `00004-wide.mp4` (landscape)
 - **WHEN** the box plays the tag `upload` with the TV portrait
 - **THEN** only the tall photo and video are queued
 - **AND** with the TV landscape, only the wide photo and video
-
-#### Scenario: with nothing the TV's shape, everything plays, shown whole
-- **GIVEN** the TV landscape and the uploads `00001-a.jpg` and `00002-b.mp4`, both portrait
-- **WHEN** the box plays the tag `upload` for a while
-- **THEN** both are queued, the photo with `panscan=0`
-- **AND** the box logs `Nothing in #upload is landscape, so it all plays, shown whole.` once
-
-#### Scenario: an item that can't be measured plays only when nothing matches the TV
-- **GIVEN** the TV portrait and the uploads `00001-broken.jpg` (not measurable) and `00002-wide.jpg` (landscape)
-- **WHEN** the box plays the tag `upload`
-- **THEN** both are queued, and the box logs `Nothing in #upload is portrait, so it all plays, shown whole.`
 
 #### Scenario: a shape tag decides which way an item plays
 - **GIVEN** the uploads `00001-tall.jpg`, `00002-wide.mp4` tagged `portrait`, and `00003-wide.jpg`
@@ -243,10 +240,21 @@ Of the items picked to play (by a filter's schedule or an override), the box SHA
 - **WHEN** the box plays the tag `upload`
 - **THEN** only the tall photo is queued
 
-### Requirement: Puts each picture on the TV as soon as it is drawn
-The box SHALL have mpv keep at most one drawn frame waiting to be shown, so a photo (drawn only once or twice) reaches the TV as soon as mpv draws it, rather than waiting until later frames push it out.
+### Requirement: Items that can't be measured need a shape tag
+An item whose shape can't be measured and that has no shape tag SHALL NOT play, and leaving it out SHALL be logged once.
 
-#### Scenario: the box sends each picture to the TV as soon as it is drawn
-- **GIVEN** the shipped configuration
-- **WHEN** the box starts mpv
-- **THEN** mpv is told to keep at most one drawn frame waiting (`--swapchain-depth=1`)
+#### Scenario: an item that can't be measured doesn't play until it has a shape tag
+- **GIVEN** the TV portrait and the uploads `00001-broken.jpg` (not measurable) and `00002-wide.jpg` (landscape)
+- **WHEN** the box plays the tag `upload`
+- **THEN** nothing is queued, and the box logs once `WARNING: Leaving out 00001-broken.jpg in #upload: it can't be measured. Tag it portrait or landscape to play it.`
+- **AND** once `00001-broken.jpg` is tagged `portrait`, it is queued
+
+### Requirement: Shows black when nothing is the TV's shape
+When none of the picked items is the TV's shape, the box SHALL show black, and log that once, until something is or the TV is turned back.
+
+#### Scenario: with nothing the TV's shape, the screen is black
+- **GIVEN** the uploads `00001-a.jpg` and `00002-b.mp4`, both portrait, playing on the TV portrait
+- **WHEN** the TV is turned landscape
+- **THEN** the screen goes black and nothing is queued
+- **AND** the box logs `Nothing in #upload is landscape. Showing black until something is, or the TV is turned back.` once
+- **AND** turned back to portrait, they play again

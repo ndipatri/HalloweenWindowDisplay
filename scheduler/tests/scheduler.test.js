@@ -39,6 +39,8 @@ function load({ files = {}, dirs = {}, filters, github, tags } = {}) {
     writeText: (p, text) => { fileMap[p] = text; },
     removeFile: (p) => { delete fileMap[p]; },
     listFolder: (p) => (p in folders ? folders[p].slice() : null),
+    // Every item is portrait, like the TV: an item that can't be measured doesn't play.
+    mediaSize: () => ({ width: 96, height: 160 }),
     log: (m) => logs.push(m),
   });
   return { T, logs, files: fileMap, folders };

@@ -240,6 +240,7 @@ test('each photo fills the screen and each video is fitted whole', async () => {
 
 test('a photo that isn\'t the screen\'s shape is shown whole', async () => {
   const b = box({ photos: ['00001-wide.jpg', '00002-wide.png'] });
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-wide.jpg': ['portrait'], 'photos/00002-wide.png': ['portrait'] } });
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   await b.tick();
   const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
@@ -254,7 +255,7 @@ test('a square photo plays either way, shown whole', async () => {
   assert.deepEqual(queued, [['00001-square.png', 'panscan=0'], ['00004-tall.jpg', 'panscan=1.0'], ['00001-square.png', 'panscan=0']],
     'square plays, shown whole; broken (unmeasurable) and wide do not');
   await b.tick();
-  const left = b.logs.filter((l) => l.startsWith('WARNING: Leaving out 00002-broken.jpg in #upload: it can\'t be measured'));
+  const left = b.logs.filter((l) => l.startsWith('WARNING: Leaving out 00002-broken.jpg in #upload: it can\'t be measured. Tag it'));
   assert.equal(left.length, 1, b.logs.join('\n'));
   b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
   await b.tick();
@@ -262,12 +263,17 @@ test('a square photo plays either way, shown whole', async () => {
   assert.ok(!b.rel().includes('photos/00002-broken.jpg'), b.rel().join(' '));
 });
 
-test('an item that can\'t be measured plays only when nothing matches the TV', async () => {
+test('an item that can\'t be measured doesn\'t play until it has a shape tag', async () => {
   const b = box({ photos: ['00001-broken.jpg', '00002-wide.jpg'] });
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   await b.tick();
-  assert.ok(b.rel().includes('photos/00001-broken.jpg') && b.rel().includes('photos/00002-wide.jpg'), b.rel().join(' '));
-  assert.ok(b.logs.includes('Nothing in #upload is portrait, so it all plays, shown whole.'), b.logs.join('\n'));
+  await b.tick();
+  assert.deepEqual(b.rel(), [], 'portrait TV: the wide photo does not fit, the broken one is left out');
+  const left = b.logs.filter((l) => l === "WARNING: Leaving out 00001-broken.jpg in #upload: it can't be measured. Tag it portrait or landscape to play it.");
+  assert.equal(left.length, 1, b.logs.join('\n'));
+  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-broken.jpg': ['portrait'] } });
+  await b.tick();
+  assert.ok(b.rel().includes('photos/00001-broken.jpg'), b.rel().join(' '));
 });
 
 test('only items the TV\'s shape play', async () => {
@@ -311,16 +317,20 @@ test('an item tagged both portrait and landscape keeps its measured shape', asyn
   assert.deepEqual(b.rel(), ['photos/00001-tall.jpg'], 'the wide photo stays landscape');
 });
 
-test('with nothing the TV\'s shape, everything plays, shown whole', async () => {
+test('with nothing the TV\'s shape, the screen is black', async () => {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4'] });
-  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
-  for (let i = 0; i < 4; i++) { await b.tick(); b.mpv.finish(); }
-  const queued = b.mpv.entries.map((e) => [e.filename.split('/').pop(), e.options]);
-  assert.ok(queued.some((q) => q[0] === '00001-a.jpg') && queued.some((q) => q[0] === '00002-b.mp4'), JSON.stringify(queued));
-  assert.ok(queued.filter((q) => q[0] === '00001-a.jpg').every((q) => q[1] === 'panscan=0'), 'the photo is shown whole');
-  const said = b.logs.filter((l) => l === 'Nothing in #upload is landscape, so it all plays, shown whole.');
+  await b.tick();
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'portrait TV: the portrait items play');
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
+  for (let i = 0; i < 4; i++) await b.tick();
+  assert.equal(b.mpv.playing(), null, 'turned landscape: black');
+  assert.deepEqual(b.rel(), []);
+  const said = b.logs.filter((l) => l === 'Nothing in #upload is landscape. Showing black until something is, or the TV is turned back.');
   assert.equal(said.length, 1, b.logs.join('\n'));
+  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'portrait' });
+  await b.tick();
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'turned back: playing again');
 });
 
 test('the box turns the picture when the TV is turned to landscape', async () => {

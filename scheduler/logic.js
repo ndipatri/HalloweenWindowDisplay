@@ -658,7 +658,7 @@ function createScheduler(io) {
 
   // Whether an item plays on a TV facing that way: when it's the TV's
   // shape, or square. One that can't be measured (and has no shape tag)
-  // plays only when nothing else does (it may well not play at all).
+  // never plays.
   function suitsScreen(path, orientation, tags) {
     const shape = itemShape(path, tags);
     return shape === 'square' || shape === orientation;
@@ -706,21 +706,20 @@ function createScheduler(io) {
     let list = Array.from(chosen)
       .sort((a, b) => compareNames(a.name, b.name) || compareNames(a.path, b.path))
       .map((i) => ({ name: i.name, path: i.file, tags: i.folderTags.concat(i.boxTags) }));
-    // Only the items the TV's shape play; with none, all of them (shown whole).
+    // Only the items the TV's shape play; with none, nothing (black).
     const orientation = readScreen();
-    const suiting = list.filter((i) => suitsScreen(i.path, orientation, i.tags));
-    for (const o of ORIENTATIONS) if (o !== orientation || suiting.length) clearWarning(playlist, 'shape:' + o);
-    if (suiting.length) {
-      for (const i of list) {
-        if (itemShape(i.path, i.tags) === null) {
-          warnOnce(playlist, 'unmeasured:' + i.path, 'WARNING: Leaving out ' + i.name + ' in ' + playlist.name +
-            ": it can't be measured, so it may not play. It plays only when nothing else does.");
-        }
+    for (const i of list) {
+      if (itemShape(i.path, i.tags) === null) {
+        warnOnce(playlist, 'unmeasured:' + i.path, 'WARNING: Leaving out ' + i.name + ' in ' + playlist.name +
+          ": it can't be measured. Tag it portrait or landscape to play it.");
       }
-      list = suiting;
-    } else if (list.length) {
-      warnOnce(playlist, 'shape:' + orientation, 'Nothing in ' + playlist.name + ' is ' + orientation + ', so it all plays, shown whole.');
     }
+    const suiting = list.filter((i) => suitsScreen(i.path, orientation, i.tags));
+    if (list.length && !suiting.length) {
+      return { known: true, items: [], none: 'Nothing in ' + playlist.name + ' is ' + orientation +
+        '. Showing black until something is, or the TV is turned back.' };
+    }
+    list = suiting;
     let none;
     if (!names.length) none = 'Nothing tagged ' + tags.join(', ') + ' yet. Showing black until something is.';
     else if (!tags.length && names.length === 1 && picked.length === 1) {
