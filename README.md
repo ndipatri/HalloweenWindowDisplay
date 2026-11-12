@@ -165,6 +165,12 @@ Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It show
 
 At the bottom, **Recent activity** shows the last things the box did: each video as it starts, changes, and syncs.
 
+#### When tvbox.local doesn't open
+
+Some phones and computers (many Android phones among them) can't open names ending in `.local`. For those, the TV shows the box's number address as a small QR code in its bottom-right corner for the first 3 seconds of each photo or video: point the phone's camera at it and tap the link. The address is also written on the page under **TV**, next to **Show the box's address on the TV**, which turns the code off and on.
+
+The router can give the box a new number now and then (the code always shows the current one). To keep it the same, so a bookmark keeps working, reserve the box's address in your router's settings (often called a DHCP reservation or reserved IP).
+
 Changes show on the TV within a couple of seconds. **For how long** starts on "Until switched back", so whatever you choose stays on until you press **Back to schedule**, even overnight. To have it end by itself, pick "Until the schedule changes" or a number of minutes first.
 
 ### Favorites and tags
@@ -262,6 +268,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 
 | Problem | Try |
 |---|---|
+| The page doesn't open on one phone, but does on another | That phone can't open `.local` names: scan the QR code in the corner of the TV as a photo or video starts, or type the address shown under **TV** on another phone |
 | The page doesn't open | The box is off or not on the Wi‑Fi. Unplug it and plug it back in, wait two minutes, and try again |
 | A new box's page never opens | The first setup takes up to 20 minutes, and needs the Wi‑Fi you typed for the card. If it's longer: `ssh tvbox.local` (your box's name), then `cat /var/log/tvbox-firstboot.log` shows how far it got |
 | It says `waiting for the clock to be set` | The box can't reach the internet to get the time. Check the Wi‑Fi |

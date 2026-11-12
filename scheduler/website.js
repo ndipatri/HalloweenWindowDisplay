@@ -9,6 +9,7 @@ const http = require('http');
 const { Transform, pipeline: pipeStreams } = require('stream');
 const { pipeline } = require('stream/promises');
 const { createScheduler } = require('./logic.js');
+const { addressUrl } = require('./address_code.js');
 
 // How much of the log to show, and how much of its end to read for that.
 const LOG_LINES = 20;
@@ -28,7 +29,8 @@ const COUNTS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Ei
 //              readTail(path, bytes) -> text or null,
 //              startSync() -> false if a sync it started is still running,
 //              freeBytes() -> bytes free on the SD card,
-//              beforeRemove(path) -> promise, run before an upload is deleted }
+//              beforeRemove(path) -> promise, run before an upload is deleted,
+//              readAddress() -> the box's IPv4 address or null }
 // Uploads are written with Node's fs directly, as they are streamed to disk.
 function createWebsite(options) {
   const { config, videoRoot, now, readText, writeText, removeFile, listFolder, readTail, startSync } = options;
@@ -534,6 +536,20 @@ function createWebsite(options) {
     return ok('The picture is turned for a ' + orientation + ' TV.');
   }
 
+  // GET /api/address-code: whether the TV shows the address code, and the
+  // address. POST { show }: switches it, with no PIN, like the TV buttons.
+  function addressCode() {
+    const address = options.readAddress ? options.readAddress() : null;
+    return { show: logic.addressCodeOn(), url: addressUrl(address, config.box.webPort) };
+  }
+  function switchAddressCode(body) {
+    const show = body && body.show;
+    if (show !== true && show !== false) return fail('Say true or false.');
+    writeText(logic.ADDRESS_CODE_PATH, JSON.stringify({ show }) + '\n');
+    log('Address code on the TV: ' + (show ? 'on' : 'off') + ' (from the website).');
+    return ok(show ? 'The TV shows the address as each item starts.' : "The TV doesn't show the address.");
+  }
+
   async function handle({ method, path, headers, body }) {
     const route = method + ' ' + path.split('?')[0];
     if (route === 'GET /') return { status: 200, type: 'text/html', body: PAGE };
@@ -546,6 +562,12 @@ function createWebsite(options) {
     if (route === 'GET /api/items') return json(200, listItems());
     if (route === 'GET /api/filters') return json(200, logic.readRawFilters());
     if (route === 'GET /api/screen') return json(200, { orientation: logic.readScreen() });
+    if (route === 'GET /api/address-code') return json(200, addressCode());
+    if (route === 'POST /api/address-code') {
+      let parsed;
+      try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
+      return switchAddressCode(parsed);
+    }
     if (route === 'POST /api/screen') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
@@ -740,6 +762,8 @@ const PAGE = `<!DOCTYPE html>
   .group { font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
   .group:first-child { margin-top: 0; }
   .hint { font-size: 14px; color: var(--dim); margin-bottom: 10px; }
+  .switch { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; }
+  .switch input { width: 20px; height: 20px; }
   .note { font-size: 14px; color: var(--accent); margin-top: 8px; }
   .note:empty { display: none; }
   .note.error { color: #ff6b6b; }
@@ -797,6 +821,8 @@ const PAGE = `<!DOCTYPE html>
   <div class="card">
     <div class="hint">Turned the TV on its mount? Tap the way it faces now, and the picture turns to match.</div>
     <div class="grid"><button data-tv="portrait">Portrait</button><button data-tv="landscape">Landscape</button></div>
+    <label class="switch"><input id="addresscode" type="checkbox"> Show the box's address on the TV</label>
+    <div class="hint" id="address"></div>
   </div>
 
   <h2>Photos and videos</h2>
@@ -893,9 +919,14 @@ const PAGE = `<!DOCTYPE html>
     b.onclick = async () => { if ((await post('/api/screen', { orientation: b.dataset.tv })).ok) markScreen(b.dataset.tv); };
   }
 
+  // The address code switch, and the address written beside it.
+  $('addresscode').onchange = () => post('/api/address-code', { show: $('addresscode').checked });
   async function refresh() {
     try {
       markScreen((await (await fetch('/api/screen')).json()).orientation);
+      const a = await (await fetch('/api/address-code')).json();
+      $('addresscode').checked = a.show;
+      setText($('address'), a.url ? 'The address: ' + a.url + ' (a QR code of it shows in the corner of the TV as each item starts).' : 'No network address.');
     } catch (e) { /* the status line says when the box can't be reached */ }
     try {
       const r = await (await fetch('/api/status')).json();

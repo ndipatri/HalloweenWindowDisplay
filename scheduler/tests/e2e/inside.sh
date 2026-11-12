@@ -95,7 +95,7 @@ if [ $setup_status -ne 0 ]; then
   exit 1
 fi
 check "setup copies the player and website to /opt/tvbox" \
-  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/media_size.js -a -f /opt/tvbox/tilt.js
+  test -f /opt/tvbox/player.js -a -f /opt/tvbox/website.js -a -f /opt/tvbox/logic.js -a -f /opt/tvbox/mpv.js -a -f /opt/tvbox/config.js -a -f /opt/tvbox/media_size.js -a -f /opt/tvbox/tilt.js -a -f /opt/tvbox/address_code.js
 check "setup installs and enables the three units" \
   grep -q "systemctl enable tvbox.service tvbox-sync.timer" "$E/calls"
 check "systemd accepts the units" \
@@ -356,6 +356,38 @@ check "back in portrait, the portrait uploads play again, not the landscape one"
 echo "   $(post /api/schedule '{}')"
 # (The rehearsal's broken.mp4 may be skipped meanwhile: that error is expected.)
 check "turning the TV logs no error" bash -c "! tail -n +$turn_from '$LOG' | grep 'ERROR' | grep -qv 'Skipping broken.mp4'"
+
+echo "== The address code on the TV"
+CODE=/run/tvbox/address-code.json
+code_up() { [ -f $CODE ] && node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).showing ? 0 : 1)' $CODE; }
+export CODE
+export -f code_up
+check "setup installs qrencode, for the address code" bash -c "command -v qrencode >/dev/null"
+site_url="$(curl -fsS $SITE/api/address-code | node -pe 'JSON.parse(require("fs").readFileSync(0)).url')"
+check "the website gives the box's address, and the code is on at first" \
+  bash -c "curl -fsS $SITE/api/address-code | grep -q '\"show\":true' && [[ '$site_url' =~ ^http://[0-9.]+:8080/$ ]]"
+# Logged as the first item started, so maybe before the log was rotated above.
+check "the box makes the code of its address, logged" within 20 bash -c "cat '$LOG'* | grep -qF 'Address code: $site_url'"
+check "the code is a QR code of the address" \
+  bash -c "size=\$(node -pe 'JSON.parse(require(\"fs\").readFileSync(\"$CODE\",\"utf8\")).size || 232'); [ \$((size * size * 4)) = \$(stat -c %s /run/tvbox/address-code.bgra) ] && ffmpeg -loglevel error -y -f rawvideo -pix_fmt bgra -s \${size}x\${size} -i /run/tvbox/address-code.bgra $E/code.png && [ \"\$(cd $E && node -e '
+    // A dark finder pattern in the corner, light around it: the first row of the code proper.
+    const { execFileSync } = require(\"child_process\");
+    const raw = execFileSync(\"ffmpeg\", [\"-loglevel\", \"error\", \"-i\", \"code.png\", \"-f\", \"rawvideo\", \"-pix_fmt\", \"gray\", \"-\"]);
+    const n = Math.sqrt(raw.length), m = n / 29;
+    process.stdout.write(raw[0] > 200 && raw[Math.floor(2.5 * m) * n + Math.floor(2.5 * m)] < 50 ? \"ok\" : \"no\");
+  ')\" = ok ]"
+echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
+check "the code is drawn when a photo starts, in the top-right of the panel (bottom-right of the portrait TV)" \
+  within 30 bash -c "code_up && grep -q '\"x\":1780,\"y\":24' $CODE"
+check "and taken away 3 to 4 seconds later" within 8 bash -c "! code_up"
+echo "   $(post /api/address-code '{"show":false}')"
+sleep 12 # past the next item
+check "switched off on the website, the code is not drawn again" bash -c "! code_up && curl -fsS $SITE/api/address-code | grep -q '\"show\":false'"
+echo "   $(post /api/address-code '{"show":true}')"
+check "switched back on, it is drawn when the next item starts" within 30 code_up
+echo "   $(post /api/show '{"target":"black","until":"cleared"}')"
+check "on a black screen, the code is taken away" within 5 bash -c "! code_up"
+echo "   $(post /api/schedule '{}')"
 
 echo "== Check for new videos now, and the recent activity"
 syncs_before=$(grep -c "sync: Done:" "$LOG")

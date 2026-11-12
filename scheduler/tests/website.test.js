@@ -69,6 +69,7 @@ function site(dirs = {}, extra = {}) {
     },
     log: extra.log,
     filtersChanged: extra.filtersChanged,
+    readAddress: 'address' in extra ? () => extra.address : () => '10.0.0.25',
   });
   const call = async (method, path, body, headers = {}) => {
     const r = await w.handle({ method, path, headers, body: body === undefined ? '' : JSON.stringify(body) });
@@ -298,6 +299,48 @@ test('the page offers Portrait and Landscape', async () => {
   const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let filterNames'));
   assert.ok(refresh.includes("fetch('/api/screen')") && refresh.includes('markScreen('), 'the saved way is marked');
   assert.ok(page.includes("post('/api/screen'"), 'the buttons save it');
+  assertScriptCompiles(page);
+});
+
+// ---- The address code ----
+
+test('the address code is on until switched off', async () => {
+  const s = site();
+  assert.deepEqual((await s.call('GET', '/api/address-code')).json, { show: true, url: 'http://10.0.0.25/' });
+  assert.deepEqual((await site({}, { address: null }).call('GET', '/api/address-code')).json, { show: true, url: null });
+  // Unreadable counts as on.
+  assert.equal((await site({}, { files: { [ROOT + '/address-code.json']: 'nonsense' } }).call('GET', '/api/address-code')).json.show, true);
+});
+
+test('the address code is switched off and on with no PIN', async () => {
+  const logs = [];
+  const s = site({}, { log: (m) => logs.push(m), pin: '1234' });
+  let r = await s.call('POST', '/api/address-code', { show: false });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(JSON.parse(s.files[ROOT + '/address-code.json']), { show: false });
+  assert.equal((await s.call('GET', '/api/address-code')).json.show, false);
+  assert.ok(logs.includes('Address code on the TV: off (from the website).'), logs.join('\n'));
+  r = await s.call('POST', '/api/address-code', { show: true });
+  assert.equal(r.status, 200);
+  assert.equal((await s.call('GET', '/api/address-code')).json.show, true);
+  for (const bad of [{ show: 'no' }, {}, { show: 1 }]) {
+    r = await s.call('POST', '/api/address-code', bad);
+    assert.equal(r.status, 400, JSON.stringify(bad));
+  }
+  assert.deepEqual(JSON.parse(s.files[ROOT + '/address-code.json']), { show: true });
+});
+
+test('the page has the address code switch under TV', async () => {
+  const page = (await site().call('GET', '/')).body;
+  const body = page.slice(page.indexOf('<main>'));
+  const tv = body.indexOf('<h2>TV</h2>');
+  const section = body.slice(tv, body.indexOf('<h2>', tv + 1));
+  assert.ok(section.includes('<input id="addresscode" type="checkbox"> Show the box\'s address on the TV'), section);
+  assert.ok(section.includes('id="address"'), section);
+  const refresh = page.slice(page.indexOf('async function refresh()'), page.indexOf('let filterNames'));
+  assert.ok(refresh.includes("fetch('/api/address-code')") && refresh.includes("$('addresscode').checked = a.show"), 'ticked as the box has it');
+  assert.ok(refresh.includes("'No network address.'"), 'says when there is none');
+  assert.ok(page.includes("post('/api/address-code', { show: $('addresscode').checked })"), 'the checkbox saves it');
   assertScriptCompiles(page);
 });
 

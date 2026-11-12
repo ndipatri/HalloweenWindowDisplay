@@ -34,6 +34,8 @@ function box(dirs = {}, extra = {}) {
   b.player = createPlayer({
     config: extra.config || config,
     readTilt: extra.readTilt,
+    readAddress: extra.readAddress,
+    makeAddressCode: extra.makeAddressCode,
     videoRoot: ROOT,
     mpv,
     now: () => b.now,
@@ -597,6 +599,107 @@ test("changing tags that don't touch the playing filter leaves its queue as it w
   b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-a.jpg': ['favorites'] } });
   await b.player.refilter();
   assert.deepEqual(b.rel(), before);
+});
+
+// ---- The address code ----
+
+// A box playing the uploads a and b, at the address `b.address` (null: none).
+// The codes it makes are listed in `b.made`.
+async function codeBox(more = {}) {
+  const state = { address: '10.0.0.25' };
+  const made = [];
+  const b = box({ photos: ['00001-a.jpg', '00002-b.jpg'] }, Object.assign({
+    readAddress: () => state.address,
+    makeAddressCode: async (url, maxSize) => { made.push([url, maxSize]); return { size: 116, stride: 464, pixels: Buffer.from(url) }; },
+  }, more));
+  b.made = made;
+  b.setAddress = (a) => { state.address = a; };
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
+  b.later = (seconds) => { b.now = new Date(b.now.getTime() + seconds * 1000); };
+  b.overlay = () => b.mpv.overlays[1] || null;
+  b.state = () => JSON.parse(b.files['/run/tvbox/address-code.json'] || 'null');
+  return b;
+}
+
+test('the address code shows for 3 seconds when an item starts', async () => {
+  const b = await codeBox();
+  await b.tick(); // a starts
+  assert.deepEqual(b.made, [['http://10.0.0.25/', 120]]);
+  assert.equal(b.files['/run/tvbox/address-code.bgra'].toString(), 'http://10.0.0.25/');
+  // Portrait (turned 270): the viewer's bottom-right is the panel's top-right.
+  assert.deepEqual(b.overlay(), [1920 - 116 - 24, 24, '/run/tvbox/address-code.bgra', 0, 'bgra', 116, 116, 464]);
+  assert.deepEqual(b.state(), { showing: true, x: 1780, y: 24, size: 116, width: 1920, height: 1080, url: 'http://10.0.0.25/' });
+  for (const s of [1, 1]) { b.later(s); await b.tick(); assert.ok(b.overlay(), 'still up after ' + s); }
+  b.later(1); // 3 seconds
+  await b.tick();
+  assert.equal(b.overlay(), null);
+  assert.equal(b.state().showing, false);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
+  b.mpv.finish(); // b starts
+  await b.tick();
+  assert.ok(b.overlay(), 'drawn again for b');
+  assert.equal(b.made.length, 1, 'the same address: the code is not made again');
+  assert.equal(b.logs.filter((l) => l === 'Address code: http://10.0.0.25/').length, 1, b.logs.join('\n'));
+});
+
+test('the address code follows a new address', async () => {
+  const b = await codeBox();
+  await b.tick();
+  b.setAddress('10.0.0.31');
+  b.mpv.finish();
+  await b.tick();
+  assert.deepEqual(b.made.map((m) => m[0]), ['http://10.0.0.25/', 'http://10.0.0.31/']);
+  assert.equal(b.files['/run/tvbox/address-code.bgra'].toString(), 'http://10.0.0.31/');
+  assert.equal(b.state().url, 'http://10.0.0.31/');
+});
+
+test('no address code without an address or when switched off', async () => {
+  const b = await codeBox();
+  b.setAddress(null);
+  await b.tick();
+  assert.equal(b.overlay(), null);
+  assert.deepEqual(b.made, []);
+  b.setAddress('10.0.0.25');
+  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: false });
+  b.mpv.finish();
+  await b.tick();
+  assert.equal(b.overlay(), null);
+  // Switched back on: from the next item.
+  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: true });
+  b.mpv.finish();
+  await b.tick();
+  assert.ok(b.overlay());
+  // Switched off while up: taken away at the next tick.
+  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: false });
+  await b.tick();
+  assert.equal(b.overlay(), null);
+  // qrencode missing: no code, and a warning once.
+  const c = await codeBox({ makeAddressCode: async () => { throw new Error('spawn qrencode ENOENT'); } });
+  await c.tick();
+  c.mpv.finish();
+  await c.tick();
+  assert.equal(c.overlay(), null);
+  assert.equal(c.logs.filter((l) => l === "WARNING: Couldn't make the address code: spawn qrencode ENOENT").length, 1, c.logs.join('\n'));
+});
+
+test('no address code on a black screen', async () => {
+  const b = await codeBox();
+  await b.tick();
+  assert.ok(b.overlay());
+  b.files[ROOT + '/override.json'] = JSON.stringify({ tags: null, filters: [], setAt: +b.now, expires: null, untilCleared: true });
+  await b.tick();
+  assert.equal(b.mpv.playing(), null);
+  assert.equal(b.overlay(), null);
+  assert.equal(b.state().showing, false);
+  // Turning the TV takes it away too (its corner moves); the next item shows it in the new one.
+  const c = await codeBox();
+  await c.tick();
+  c.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
+  c.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-a.jpg': ['landscape'], 'photos/00002-b.jpg': ['landscape'] } });
+  await c.tick();
+  c.mpv.finish();
+  await c.tick();
+  assert.deepEqual(c.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape (turned 0): the panel\'s bottom-right');
 });
 
 (async () => {

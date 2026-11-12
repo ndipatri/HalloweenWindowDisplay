@@ -26,6 +26,8 @@ function createScheduler(io) {
   // Which way the TV faces, set on the website: { "orientation": "landscape" }.
   const SCREEN_PATH = videoRoot + '/screen.json';
   const ORIENTATIONS = ['portrait', 'landscape'];
+  // Whether the TV shows the address code, set on the website: { "show": false }.
+  const ADDRESS_CODE_PATH = videoRoot + '/address-code.json';
 
   // Videos queued ahead of time, so one follows the next without a gap.
   const QUEUE_AHEAD = 3;
@@ -630,6 +632,18 @@ function createScheduler(io) {
     return 'portrait';
   }
 
+  // Whether to show the address code on the TV: yes unless switched off
+  // (also when what is saved can't be read).
+  function addressCodeOn() {
+    const text = readText(ADDRESS_CODE_PATH);
+    if (text === null) return true;
+    try {
+      return JSON.parse(text).show !== false;
+    } catch (e) {
+      return true;
+    }
+  }
+
   // How far mpv turns the picture for the way the TV faces.
   function rotationFor(orientation) {
     return orientation === 'landscape' ? CONFIG.box.landscapeRotate : CONFIG.box.rotate;
@@ -887,8 +901,8 @@ function createScheduler(io) {
   }
 
   return {
-    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, SCREEN_PATH, ORIENTATIONS, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
-    readScreen, rotationFor, photoFills, suitsScreen, shapeOf, itemShape, isPhotoFile,
+    CONFIG, videoRoot, OVERRIDE_PATH, STATUS_PATH, FILTERS_PATH, GITHUB_FILTERS_PATH, TAGS_PATH, SCREEN_PATH, ADDRESS_CODE_PATH, ORIENTATIONS, QUEUE_AHEAD, PHOTOS, UPLOAD_TAG,
+    readScreen, addressCodeOn, rotationFor, photoFills, suitsScreen, shapeOf, itemShape, isPhotoFile,
     isTagName, tagFromFolder, readBoxTags, items, tagsInUse,
     isFilterName, checkFilters, readFilters, readRawFilters, findFilter, filterItems,
     scheduledFilter, nextScheduleChange, whatToShow, parseOverride, pickName, parseDay, parseWeekdays, formatTime,
