@@ -338,9 +338,9 @@ echo "   $(post /api/screen '{"orientation":"landscape"}')"
 check "turning the TV to landscape turns mpv's picture to 0 degrees, logged" \
   within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 0 ] && logged 'Screen: landscape (the picture turned 0 degrees).'"
 # The Rehearsal filter's clips are all portrait (measured from their MP4
-# headers): with nothing landscape, it plays them all, and says so.
-check "with no landscape clip in the filter, it all plays, logged" \
-  within 10 logged "Nothing in Rehearsal is landscape, so it all plays, shown whole."
+# headers): with nothing landscape, the screen goes black, and it says so.
+check "with no landscape clip in the filter, the screen is black, logged" \
+  within 10 bash -c "logged 'Nothing in Rehearsal is landscape. Showing black until something is, or the TV is turned back.' && [ \"\$(mpv_get playlist-count)\" = 0 ]"
 ffmpeg -loglevel error -y -f lavfi -i "color=c=cyan:s=160x96" -frames:v 1 "$E/wide.jpg"
 echo "   $(upload "$E/wide.jpg" Wide.jpg 4321)"
 wide="$(ls "$VIDEOS/photos" | grep -- '-wide.jpg$')"

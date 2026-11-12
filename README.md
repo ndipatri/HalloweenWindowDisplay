@@ -219,7 +219,7 @@ Good to know:
 
 The TV hangs on its side (portrait), but its mount turns. For landscape photos and videos, turn the TV to landscape, then on the page under **TV** tap **Landscape**. The picture turns to match within a second. Tap **Portrait** when you turn it back. The box remembers which way it's facing, even after it's unplugged.
 
-The box plays only what fits the way the TV faces: out of whatever is playing (the schedule, or what you picked under **Play**), portrait photos and videos while the TV is portrait, landscape ones while it's landscape. Square ones play either way. When you turn the TV, whatever is on screen moves on at once if it no longer fits. If nothing playing fits (say, the schedule's videos are all portrait and the TV is landscape), the box plays it all anyway, shown whole with black around it, and Recent activity says `Nothing in … is landscape, so it all plays, shown whole.`
+The box plays only what fits the way the TV faces: out of whatever is playing (the schedule, or what you picked under **Play**), portrait photos and videos while the TV is portrait, landscape ones while it's landscape. Square ones play either way. When you turn the TV, whatever is on screen moves on at once if it no longer fits. If nothing playing fits (say, the schedule's videos are all portrait and the TV is landscape), the screen stays black, and Recent activity says `Nothing in … is landscape. Showing black until something is, or the TV is turned back.` It plays again as soon as something fits: turn the TV back, add something that shape, or tag something **portrait** or **landscape**.
 
 To have something play the other way, give it the tag **portrait** or **landscape** under **Photos and videos**. The box then treats it as that shape, whatever shape it really is: a landscape video tagged portrait plays while the TV is portrait, shown whole with black above and below. A photo tagged the other way is shown whole too, not cropped. Tags can be added only to your own photos and videos, not to the videos from the repo.
 
@@ -272,7 +272,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The page says `The box has not started yet` | Unplug it and plug it back in. If that doesn't help, run setup again |
 | The picture is upside down | Switch `rotate` between 90 and 270 in `scheduler/config.js`, then run setup again |
 | The picture is sideways | Under **TV** on the page, tap the way the TV faces now |
-| Recent activity says `Leaving out … it can't be measured` | That file is probably damaged: remove it and add it again |
+| Recent activity says `Leaving out … it can't be measured` | That file is probably damaged: remove it and add it again, or tag it **portrait** or **landscape** to play it that way |
 | Recent activity says `Couldn't read the tilt switch` | Check its two wires (pins 11 and 9), then run setup again |
 | The picture is upside down with the TV landscape | Switch `landscapeRotate` between 0 and 180 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
