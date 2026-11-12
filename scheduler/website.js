@@ -84,12 +84,15 @@ function createWebsite(options) {
     writeText(logic.TAGS_PATH, JSON.stringify({ tags: kept }, null, 2) + '\n');
   }
 
-  // The uploads, for tagging, and every tag in use (folder tags too, for the filter editor).
+  // The uploads, for tagging, with the shape the box measures for each
+  // (null when it can't), and every tag in use (folder tags too, for the
+  // filter editor).
   function listItems() {
     const list = logic.items();
     return {
-      items: list.filter(isUpload)
-        .map((i) => ({ path: i.path, group: i.group, folderTags: i.folderTags, boxTags: i.boxTags, kind: i.kind })),
+      items: list.filter(isUpload).map((i) => ({
+        path: i.path, group: i.group, folderTags: i.folderTags, boxTags: i.boxTags, kind: i.kind, shape: logic.shapeOf(i.file),
+      })),
       tags: logic.tagsInUse(list),
     };
   }
@@ -730,7 +733,9 @@ const PAGE = `<!DOCTYPE html>
   .pick { display: block; position: relative; text-align: center; background: var(--accent); color: #1a1a1a; font-weight: 600; border-radius: 10px; padding: 12px; cursor: pointer; }
   .pick input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
   #progress { font-size: 14px; color: var(--dim); margin-top: 8px; }
-  .tagrow .thumb { width: 44px; height: 44px; flex: none; object-fit: cover; border-radius: 6px; background: #000; }
+  .tagrow .thumbbox { position: relative; flex: none; }
+  .tagrow .thumb { display: block; width: 44px; height: 44px; object-fit: cover; border-radius: 6px; background: #000; }
+  .tagrow .shape { position: absolute; left: 2px; bottom: 2px; padding: 0 3px; font-size: 9px; line-height: 13px; border-radius: 3px; color: #fff; background: rgba(0, 0, 0, 0.7); white-space: nowrap; }
   .tagrow .remove { width: auto; padding: 4px 10px; font-size: 13px; }
   .group { font-size: 13px; color: var(--dim); margin: 12px 0 4px; }
   .group:first-child { margin-top: 0; }
@@ -1111,7 +1116,9 @@ const PAGE = `<!DOCTYPE html>
         const name = item.path.split('/').pop();
         const src = '/photos/' + encodeURIComponent(name);
         row.innerHTML = '<div class="top">' +
+          '<span class="thumbbox">' +
           (item.kind === 'photo' ? '<img class="thumb" loading="lazy" alt="">' : '<video class="thumb" preload="metadata" muted playsinline></video>') +
+          '<span class="shape" hidden></span></span>' +
           '<button class="star"></button><span class="name"></span><button class="remove">Remove</button></div>' +
           '<div class="chips"></div><div class="add"><input list="tagnames" placeholder="add a tag"><button>Add</button></div>' +
           '<div class="note" role="status"></div>';
@@ -1127,6 +1134,14 @@ const PAGE = `<!DOCTYPE html>
         star.onclick = () => changeTag(item.path, fav ? { remove: 'favorites' } : { add: 'favorites' });
         row.querySelector('.thumb').src = item.kind === 'photo' ? src : src + '#t=0.1';
         row.querySelector('.name').textContent = name;
+        // The shape the box measured, unless a portrait or landscape tag says otherwise.
+        if (!item.boxTags.includes('portrait') && !item.boxTags.includes('landscape')) {
+          const mark = row.querySelector('.shape');
+          mark.textContent = item.shape || '?';
+          mark.title = item.shape ? 'The box measures this as ' + item.shape + '.'
+            : "The box can't tell its shape: tag it portrait or landscape to play it.";
+          mark.hidden = false;
+        }
         row.querySelector('.remove').onclick = () => removeUpload(name);
         const chips = row.querySelector('.chips');
         for (const t of item.folderTags) chips.appendChild(chip(t));
