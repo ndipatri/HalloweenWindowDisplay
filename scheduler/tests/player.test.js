@@ -605,10 +605,10 @@ test("changing tags that don't touch the playing filter leaves its queue as it w
 
 // A box playing the uploads a and b, at the address `b.address` (null: none).
 // The codes it makes are listed in `b.made`.
-async function codeBox(more = {}) {
+async function codeBox(more = {}, photos = ['00001-a.jpg', '00002-b.jpg']) {
   const state = { address: '10.0.0.25' };
   const made = [];
-  const b = box({ photos: ['00001-a.jpg', '00002-b.jpg'] }, Object.assign({
+  const b = box({ photos }, Object.assign({
     readAddress: () => state.address,
     makeAddressCode: async (url, maxSize) => { made.push([url, maxSize]); return { size: 116, stride: 464, pixels: Buffer.from(url) }; },
   }, more));
@@ -700,6 +700,45 @@ test('no address code on a black screen', async () => {
   c.mpv.finish();
   await c.tick();
   assert.deepEqual(c.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape (turned 0): the panel\'s bottom-right');
+});
+
+// Ticks once a second for `seconds`, noting the seconds (from now) at which the code is up.
+async function codeUpTimes(b, seconds) {
+  const up = [];
+  for (let s = 1; s <= seconds; s++) { b.later(1); await b.tick(); if (b.overlay()) up.push(s); }
+  return up;
+}
+
+test('the address code shows again every 10 seconds while one item stays on screen', async () => {
+  const b = await codeBox({}, ['00001-a.jpg']);
+  await b.tick(); // a starts, and stays
+  assert.ok(b.overlay(), 'drawn when a starts');
+  const up = await codeUpTimes(b, 23);
+  assert.deepEqual(up, [1, 2, 10, 11, 12, 20, 21, 22]);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
+  assert.equal(b.made.length, 1, 'the code is made once');
+});
+
+test('a new item starts the 10 seconds again', async () => {
+  const b = await codeBox();
+  await b.tick(); // a starts at 0
+  for (let s = 0; s < 6; s++) { b.later(1); await b.tick(); }
+  b.mpv.finish(); // b starts at 6
+  await b.tick();
+  assert.ok(b.overlay(), 'drawn when b starts');
+  // Seconds after b started: up for 3, then not at 4 (10 after a), then again at 10.
+  assert.deepEqual(await codeUpTimes(b, 12), [1, 2, 10, 11, 12]);
+});
+
+test('no repeated address code when switched off', async () => {
+  const b = await codeBox({}, ['00001-a.jpg']);
+  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: false });
+  await b.tick();
+  assert.deepEqual(await codeUpTimes(b, 12), []);
+  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: true });
+  const up = await codeUpTimes(b, 10);
+  assert.ok(up.length > 0 && up[0] <= 10, 'drawn within 10 seconds: ' + up);
+  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
 });
 
 (async () => {

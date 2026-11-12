@@ -73,7 +73,7 @@ function createPlayer(options) {
   const CODE_OVERLAY = 1;
   // The TV's panel, when mpv can't say (it says 0 with no picture output).
   const PANEL = { width: 1920, height: 1080 };
-  const code = { entry: null, shownAt: null, url: null, made: null, warned: null };
+  const code = { entry: null, shownAt: null, lastShow: null, url: null, made: null, warned: null };
 
   function warnCode(message) {
     if (code.warned !== message) log('WARNING: ' + message);
@@ -88,6 +88,7 @@ function createPlayer(options) {
   }
 
   async function showCode() {
+    code.lastShow = now().getTime(); // tried now: the next repeat counts from here
     if (!logic.addressCodeOn()) return;
     const url = addressUrl(options.readAddress(), options.config.box.webPort);
     if (!url) return;
@@ -111,8 +112,10 @@ function createPlayer(options) {
     writeText(CODE_STATE, JSON.stringify({ showing: true, x, y, size, width, height, url }) + '\n');
   }
 
-  // Each tick: up when a new item comes on screen, down after
-  // addressCode.seconds, when switched off, or when the screen goes black.
+  // Each tick: up when a new item comes on screen, and again every
+  // addressCode.every seconds while it stays (a lone photo is held, so no
+  // new item ever starts); down after addressCode.seconds, when switched
+  // off, or when the screen goes black.
   async function followCode() {
     const entries = active ? ((await mpv.getProperty('playlist')) || []) : [];
     const at = entries.findIndex((e) => e.current);
@@ -125,10 +128,11 @@ function createPlayer(options) {
       code.entry = entry;
       return showCode();
     }
-    if (code.shownAt !== null &&
-        (now().getTime() - code.shownAt >= codeSettings.seconds * 1000 || !logic.addressCodeOn())) {
-      await hideCode();
+    if (code.shownAt !== null) {
+      if (now().getTime() - code.shownAt >= codeSettings.seconds * 1000 || !logic.addressCodeOn()) await hideCode();
+      return;
     }
+    if (codeSettings.every && now().getTime() - code.lastShow >= codeSettings.every * 1000) await showCode();
   }
 
   async function blank() {

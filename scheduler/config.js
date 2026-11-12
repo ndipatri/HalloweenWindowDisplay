@@ -26,11 +26,13 @@ module.exports = {
   },
 
   // A QR code of the website's address (http://<the box's address>/) shown
-  // in the TV's bottom-right corner as each new item starts, so phones that
+  // in the TV's bottom-right corner as each new item starts (and every 10 s
+  // while one item stays on screen), so phones that
   // can't open tvbox.local can scan it. Switched on and off under TV on the
   // website.
   addressCode: {
     seconds: 3, // how long it stays up
+    every: 10, // while one item stays on screen, show it again this often (0: never)
     size: 120, // at most this many pixels square
     margin: 24, // pixels from the edges
   },
