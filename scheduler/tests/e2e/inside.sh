@@ -378,7 +378,7 @@ check "the code is a QR code of the address" \
   ')\" = ok ]"
 echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
 check "the code is drawn when a photo starts, in the top-right of the panel (bottom-right of the portrait TV)" \
-  within 30 bash -c "code_up && grep -q '\"x\":1664,\"y\":24' $CODE"
+  within 30 bash -c "code_up && grep -q '\"x\":1780,\"y\":24' $CODE"
 check "and taken away 3 to 4 seconds later" within 8 bash -c "! code_up"
 echo "   $(post /api/address-code '{"show":false}')"
 sleep 12 # past the next item

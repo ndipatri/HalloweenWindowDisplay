@@ -610,7 +610,7 @@ async function codeBox(more = {}) {
   const made = [];
   const b = box({ photos: ['00001-a.jpg', '00002-b.jpg'] }, Object.assign({
     readAddress: () => state.address,
-    makeAddressCode: async (url, maxSize) => { made.push([url, maxSize]); return { size: 232, stride: 928, pixels: Buffer.from(url) }; },
+    makeAddressCode: async (url, maxSize) => { made.push([url, maxSize]); return { size: 116, stride: 464, pixels: Buffer.from(url) }; },
   }, more));
   b.made = made;
   b.setAddress = (a) => { state.address = a; };
@@ -624,11 +624,11 @@ async function codeBox(more = {}) {
 test('the address code shows for 3 seconds when an item starts', async () => {
   const b = await codeBox();
   await b.tick(); // a starts
-  assert.deepEqual(b.made, [['http://10.0.0.25/', 240]]);
+  assert.deepEqual(b.made, [['http://10.0.0.25/', 120]]);
   assert.equal(b.files['/run/tvbox/address-code.bgra'].toString(), 'http://10.0.0.25/');
   // Portrait (turned 270): the viewer's bottom-right is the panel's top-right.
-  assert.deepEqual(b.overlay(), [1920 - 232 - 24, 24, '/run/tvbox/address-code.bgra', 0, 'bgra', 232, 232, 928]);
-  assert.deepEqual(b.state(), { showing: true, x: 1664, y: 24, size: 232, width: 1920, height: 1080, url: 'http://10.0.0.25/' });
+  assert.deepEqual(b.overlay(), [1920 - 116 - 24, 24, '/run/tvbox/address-code.bgra', 0, 'bgra', 116, 116, 464]);
+  assert.deepEqual(b.state(), { showing: true, x: 1780, y: 24, size: 116, width: 1920, height: 1080, url: 'http://10.0.0.25/' });
   for (const s of [1, 1]) { b.later(s); await b.tick(); assert.ok(b.overlay(), 'still up after ' + s); }
   b.later(1); // 3 seconds
   await b.tick();
@@ -699,7 +699,7 @@ test('no address code on a black screen', async () => {
   await c.tick();
   c.mpv.finish();
   await c.tick();
-  assert.deepEqual(c.overlay().slice(0, 2), [1920 - 232 - 24, 1080 - 232 - 24], 'landscape (turned 0): the panel\'s bottom-right');
+  assert.deepEqual(c.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape (turned 0): the panel\'s bottom-right');
 });
 
 (async () => {

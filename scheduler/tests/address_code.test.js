@@ -15,21 +15,21 @@ function test(name, fn) { tests.push([name, fn]); }
 
 test('the address code is a QR code of the box\'s address', async () => {
   const runs = [];
-  const code = await makeAddressCode('http://10.0.0.25/', 240, async (cmd, args) => { runs.push([cmd].concat(args)); return QR_TEXT; });
+  const code = await makeAddressCode('http://10.0.0.25/', 120, async (cmd, args) => { runs.push([cmd].concat(args)); return QR_TEXT; });
   assert.deepEqual(runs, [['qrencode', '-t', 'ASCII', '-m', '0', '-l', 'M', 'http://10.0.0.25/']]);
   const grid = readGrid(QR_TEXT);
   assert.equal(grid.length, 25);
-  // 25 modules and a 2-module border: 29 modules of 8 pixels.
-  assert.equal(code.size, 232);
-  assert.ok(code.size <= 240);
-  assert.equal(code.stride, 232 * 4);
-  const scale = 8;
+  // 25 modules and a 2-module border: 29 modules of 4 pixels.
+  assert.equal(code.size, 116);
+  assert.ok(code.size <= 120);
+  assert.equal(code.stride, 116 * 4);
+  const scale = 4;
   const px = (x, y) => Array.from(code.pixels.subarray(y * code.stride + x * 4, y * code.stride + x * 4 + 4));
   const WHITE = [255, 255, 255, 255];
   const BLACK = [0, 0, 0, 255];
   // The border is white all round.
   for (let i = 0; i < code.size; i += 7) {
-    for (const [x, y] of [[i, 0], [i, 15], [0, i], [15, i], [i, code.size - 1], [code.size - 1, i]]) {
+    for (const [x, y] of [[i, 0], [i, 7], [0, i], [7, i], [i, code.size - 1], [code.size - 1, i]]) {
       assert.deepEqual(px(x, y), WHITE, 'border at ' + x + ',' + y);
     }
   }
@@ -37,7 +37,7 @@ test('the address code is a QR code of the box\'s address', async () => {
   for (let my = 0; my < 25; my++) {
     for (let mx = 0; mx < 25; mx++) {
       const want = grid[my][mx] ? BLACK : WHITE;
-      for (const [dx, dy] of [[0, 0], [7, 0], [0, 7], [7, 7], [3, 4]]) {
+      for (const [dx, dy] of [[0, 0], [3, 0], [0, 3], [3, 3], [1, 2]]) {
         assert.deepEqual(px((2 + mx) * scale + dx, (2 + my) * scale + dy), want, 'module ' + mx + ',' + my);
       }
     }
@@ -48,10 +48,10 @@ test('the address code is a QR code of the box\'s address', async () => {
 });
 
 test('the address code sits bottom-right however the TV faces', () => {
-  assert.deepEqual(codeCorner(0, 1920, 1080, 240), { x: 1920 - 240 - 24, y: 1080 - 240 - 24 });
-  assert.deepEqual(codeCorner(90, 1920, 1080, 240), { x: 24, y: 1080 - 240 - 24 });
-  assert.deepEqual(codeCorner(180, 1920, 1080, 240), { x: 24, y: 24 });
-  assert.deepEqual(codeCorner(270, 1920, 1080, 240), { x: 1920 - 240 - 24, y: 24 });
+  assert.deepEqual(codeCorner(0, 1920, 1080, 116), { x: 1920 - 116 - 24, y: 1080 - 116 - 24 });
+  assert.deepEqual(codeCorner(90, 1920, 1080, 116), { x: 24, y: 1080 - 116 - 24 });
+  assert.deepEqual(codeCorner(180, 1920, 1080, 116), { x: 24, y: 24 });
+  assert.deepEqual(codeCorner(270, 1920, 1080, 116), { x: 1920 - 116 - 24, y: 24 });
 });
 
 test('the box finds its address on the home network', () => {

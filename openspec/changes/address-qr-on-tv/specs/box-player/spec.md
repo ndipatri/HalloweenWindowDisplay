@@ -11,7 +11,7 @@ When a new item starts on screen, the box SHALL show a QR code of its website's 
 - **AND** it is drawn again when b starts
 
 #### Scenario: the address code sits bottom-right however the TV faces
-- **GIVEN** a 1920×1080 panel and a 240-pixel code
+- **GIVEN** a 1920×1080 panel and a 120-pixel code
 - **WHEN** the picture is turned 0, 90, 180 or 270 degrees
 - **THEN** the code is drawn 24 pixels in from the panel's bottom-right, bottom-left, top-left or top-right corner, in that order
 
@@ -19,7 +19,7 @@ When a new item starts on screen, the box SHALL show a QR code of its website's 
 - **GIVEN** `qrencode`'s text output for `http://10.0.0.25/`
 - **WHEN** the box makes the code
 - **THEN** each dark module is black and each light one white, every module the same whole number of pixels, inside a white border two modules wide
-- **AND** the whole code is at most 240 pixels square
+- **AND** the whole code is at most 120 pixels square
 
 #### Scenario: the address code follows a new address
 - **GIVEN** the box showing the code of `http://10.0.0.25/`

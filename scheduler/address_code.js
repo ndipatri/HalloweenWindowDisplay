@@ -39,7 +39,7 @@ function readGrid(text) {
 // The code as BGRA pixels: black and white modules, each the same whole
 // number of pixels, inside a white border `border` modules wide, at most
 // `maxSize` pixels square. { size, stride, pixels }.
-function drawCode(grid, maxSize = 240, border = 2) {
+function drawCode(grid, maxSize = 120, border = 2) {
   const modules = grid.length + 2 * border;
   const scale = Math.floor(maxSize / modules);
   if (scale < 1) throw new Error('the code is too big for ' + maxSize + ' pixels');
@@ -83,7 +83,7 @@ function run(cmd, args) {
 }
 
 // The code for `url`, drawn at most `maxSize` pixels square.
-async function makeAddressCode(url, maxSize = 240, runner = run) {
+async function makeAddressCode(url, maxSize = 120, runner = run) {
   const text = await runner('qrencode', ['-t', 'ASCII', '-m', '0', '-l', 'M', url]);
   return drawCode(readGrid(text), maxSize);
 }

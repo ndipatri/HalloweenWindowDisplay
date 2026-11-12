@@ -31,7 +31,7 @@ module.exports = {
   // website.
   addressCode: {
     seconds: 3, // how long it stays up
-    size: 240, // at most this many pixels square
+    size: 120, // at most this many pixels square
     margin: 24, // pixels from the edges
   },
 
