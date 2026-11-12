@@ -349,8 +349,8 @@ echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
 check "with the TV landscape, only the landscape upload plays, held and filling the screen" \
   within 20 bash -c "logged '#upload: playing $wide' && [ \"\$(mpv_get playlist-count)\" = 1 ] && [ \"\$(mpv_get path)\" = '$VIDEOS/photos/$wide' ] && panscan_is 1"
 echo "   $(post /api/screen '{"orientation":"portrait"}')"
-check "turning it back to portrait turns the picture to 90 degrees again" \
-  within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 90 ]"
+check "turning it back to portrait turns the picture to 270 degrees again" \
+  within 10 bash -c "[ \"\$(mpv_get video-rotate)\" = 270 ]"
 check "back in portrait, the portrait uploads play again, not the landscape one" \
   within 15 bash -c "[ \"\$(mpv_get playlist-count)\" -gt 1 ] && [ \"\$(mpv_get path)\" != '$VIDEOS/photos/$wide' ]"
 echo "   $(post /api/schedule '{}')"
