@@ -6,4 +6,4 @@
 ## 2. Rest
 
 - [x] 2.1 README and the schedule skill
-- [ ] 2.2 Check on the real TV with a single photo playing: the code stays up
+- [x] 2.2 Check on the real TV with a single photo playing: the code stays up
