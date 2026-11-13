@@ -217,7 +217,7 @@ To take one off, tap **Remove** next to it under **Photos and videos**. It goes 
 
 The box's address, **http://tvbox.local/**, and the QR code on the TV open the easy page, made for someone standing at the window with their phone:
 
-1. They type **their name** and tap **Choose photos or videos**.
+1. They type **their name** and tap **Choose photos or videos**. Each one shows as a thumbnail marked **Portrait**, **Landscape** or **Square**. If none of them fit the way the TV faces now (say, all landscape on a portrait TV), the page warns them: those won't show until the TV is turned.
 2. They tap **Put them on the TV**. Each file is sent, and once they're all added the TV plays their pictures, and only theirs, until someone changes it on either page.
 
 Their name becomes a tag (`Aunt Sue` → `aunt-sue`) on everything they add, so you'll find it under Play and on each upload on the advanced page. The same name next time replaces what they added before: once the new pictures are all on the box, their earlier ones under that name are deleted, so only the latest batch plays. A name that would make a tag the box already uses for something else (`upload`, `portrait`, `landscape`, `square`, or a GitHub folder's, like `halloween`) is refused: "That name is taken by the box. Try adding your last name." **Advanced** at the bottom goes to the full page, which has **Easy page** at the top to come back.
