@@ -375,7 +375,7 @@ function createWebsite(options) {
       writeBoxTags(tags);
       await filtersChanged();
     }
-    return ok('Added ' + name + '.');
+    return json(200, { message: 'Added ' + name + '.', saved });
   }
 
   // Gives the part file the next number. A link never overwrites, so two
@@ -434,6 +434,30 @@ function createWebsite(options) {
     dropTags(logic.PHOTOS + '/' + name);
     await filtersChanged();
     return ok('Removed ' + name + '.');
+  }
+
+  // POST /api/visitor/play { tag, keep: [name…] }: the easy page's last step.
+  // Every other upload with the visitor's tag (from an earlier visit under
+  // the same name) is deleted, so only `keep` is left under it, then the tag
+  // plays until cleared. Refused, doing nothing, unless the tag is one a
+  // visitor's name gives and every kept name is an upload with that tag.
+  async function visitorPlay(body) {
+    const tag = body ? body.tag : undefined;
+    const keep = body && Array.isArray(body.keep) ? body.keep : null;
+    if (typeof tag !== 'string' || checkVisitorTag(tag)) return fail('Bad request.');
+    const tags = logic.readBoxTags();
+    const has = (name) => Array.isArray(tags[logic.PHOTOS + '/' + name]) && tags[logic.PHOTOS + '/' + name].includes(tag);
+    const names = uploadNames();
+    if (!keep || !keep.length || !keep.every((n) => typeof n === 'string' && names.includes(n) && has(n))) return fail('Bad request.');
+    for (const name of names.filter((n) => has(n) && !keep.includes(n))) {
+      const file = PHOTOS_DIR + '/' + name;
+      if (options.beforeRemove) await options.beforeRemove(file);
+      removeFile(file);
+      log('Removed photos/' + name + ' (' + tag + ' added new pictures)');
+      dropTags(logic.PHOTOS + '/' + name);
+    }
+    await filtersChanged();
+    return show({ tags: [tag], until: 'cleared' });
   }
 
   // What to send for GET /photos/<name>: { status, headers, path, start, end }
@@ -602,11 +626,11 @@ function createWebsite(options) {
       removeFile(logic.OVERRIDE_PATH);
       return ok('Override cancelled. Following the schedule.');
     }
-    if (route === 'POST /api/show') {
+    if (route === 'POST /api/show' || route === 'POST /api/visitor/play') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
       if (!parsed || typeof parsed !== 'object') return fail('Bad request.');
-      return show(parsed);
+      return route === 'POST /api/show' ? show(parsed) : visitorPlay(parsed);
     }
     return json(404, { error: 'Not found.' });
   }
@@ -1483,13 +1507,14 @@ const EASY_PAGE = `<!DOCTYPE html>
         x.onload = () => {
           let d = {};
           try { d = JSON.parse(x.responseText); } catch (e) { /* no answer */ }
-          resolve({ ok: x.status === 200, message: d.message, error: d.error || 'The box refused it.' });
+          resolve({ ok: x.status === 200, message: d.message, saved: d.saved, error: d.error || 'The box refused it.' });
         };
         x.onerror = () => resolve({ ok: false, error: 'The upload stopped. Keep this page open while it sends, then try again.' });
         x.send(file);
       });
     },
-    show: (tag) => postJson('/api/show', { tags: [tag], until: 'cleared' }),
+    // Keeps just these under the tag (earlier visits' pictures go), then plays it until cleared.
+    play: (tag, keep) => postJson('/api/visitor/play', { tag, keep }),
   };
 
   const rows = {};
@@ -1520,7 +1545,8 @@ const EASY_PAGE = `<!DOCTYPE html>
 <script>
   // Put them on the TV: a name and files are needed; the box checks the
   // name and the whole batch, each file is sent with the visitor's tag, and
-  // only when all were added is the tag played, until changed. Stops at the
+  // only when all were added does the box keep just these under the tag
+  // (deleting an earlier visit's) and play it, until changed. Stops at the
   // first refusal. No page code here, so it can be tried on its own.
   async function sendVisit(form, api, ui) {
     const name = String(form.name || '').trim();
@@ -1533,6 +1559,7 @@ const EASY_PAGE = `<!DOCTYPE html>
       return false;
     }
     ui.remember(name);
+    const saved = [];
     for (const file of files) {
       ui.progress(file.name, 'Sending…');
       const r = await api.upload(file, checked.tag, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
@@ -1541,8 +1568,9 @@ const EASY_PAGE = `<!DOCTYPE html>
         ui.say(r.error, true);
         return false;
       }
+      saved.push(r.saved);
     }
-    const shown = await api.show(checked.tag);
+    const shown = await api.play(checked.tag, saved);
     if (!shown.ok) { ui.say(shown.error, true); return false; }
     ui.say('Done! Your pictures are on the TV now.');
     return true;

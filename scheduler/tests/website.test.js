@@ -1118,8 +1118,8 @@ async function visitFlow(form, answers = {}) {
   const said = [];
   const api = {
     check: async (files, name) => { calls.push(['check', files.map((f) => f.name), name]); return answers.check || { ok: true, tag: 'aunt-sue' }; },
-    upload: async (file, tag, onProgress) => { calls.push(['upload', file.name, tag]); onProgress(100); return (answers.upload && answers.upload(file)) || { ok: true }; },
-    show: async (tag) => { calls.push(['show', tag]); return { ok: true }; },
+    upload: async (file, tag, onProgress) => { calls.push(['upload', file.name, tag]); onProgress(100); return (answers.upload && answers.upload(file)) || { ok: true, saved: '0000' + (calls.length) + '-' + file.name }; },
+    play: async (tag, keep) => { calls.push(['play', tag, keep]); return { ok: true }; },
   };
   const ui = {
     say: (text, error) => said.push([text, Boolean(error)]),
@@ -1186,18 +1186,6 @@ test('a name with no letters or numbers is refused', async () => {
   assert.equal((await u.check('!!!')).json.error, 'Use some letters or numbers in your name.');
 });
 
-test('a returning visitor adds to their tag', async () => {
-  const u = visitorBox();
-  assert.equal((await u.sendFor('first.jpg', 'aunt-sue')).status, 200);
-  const tag = (await u.check('Aunt Sue')).json.tag;
-  assert.equal(tag, 'aunt-sue');
-  await u.sendFor('second.jpg', tag);
-  await u.sendFor('third.jpg', tag);
-  assert.deepEqual(u.tags(), {
-    'photos/00001-first.jpg': ['aunt-sue'], 'photos/00002-second.jpg': ['aunt-sue'], 'photos/00003-third.jpg': ['aunt-sue'],
-  });
-});
-
 test('each visitor upload is tagged with their name', async () => {
   const u = visitorBox();
   const r = await u.sendFor('Beach.JPG', 'aunt-sue', Buffer.alloc(2 * MB, 3));
@@ -1229,12 +1217,18 @@ test('the visitor\'s pictures play until changed', async () => {
     ['remember', 'Aunt Sue'],
     ['upload', 'a.jpg', 'aunt-sue'],
     ['upload', 'b.mp4', 'aunt-sue'],
-    ['show', 'aunt-sue'],
+    ['play', 'aunt-sue', ['00003-a.jpg', '00004-b.mp4']],
   ]);
   assert.deepEqual(f.said.pop(), ['Done! Your pictures are on the TV now.', false]);
-  // The page asks the box to play it until cleared.
-  const page = (await site().call('GET', '/')).body;
-  assert.ok(page.includes("postJson('/api/show', { tags: [tag], until: 'cleared' })"));
+  // The box keeps just those two under aunt-sue and plays it until cleared.
+  const u = visitorBox();
+  const a = await u.sendFor('a.jpg', 'aunt-sue');
+  const b = await u.sendFor('b.mp4', 'aunt-sue');
+  assert.deepEqual([a.json.saved, b.json.saved], ['00001-a.jpg', '00002-b.mp4']);
+  const played = await u.call('POST', '/api/visitor/play', { tag: 'aunt-sue', keep: [a.json.saved, b.json.saved] });
+  assert.equal(played.status, 200, played.body);
+  const o = JSON.parse(fs.readFileSync(u.root + '/override.json', 'utf8'));
+  assert.deepEqual([o.tags, o.untilCleared], [['aunt-sue'], true]);
 });
 
 test('nothing plays when an upload is refused', async () => {
@@ -1243,13 +1237,13 @@ test('nothing plays when an upload is refused', async () => {
   const f = await visitFlow(form, { check: { ok: false, error: taken } });
   assert.equal(f.result, false);
   assert.deepEqual(f.said, [[taken, true]]);
-  assert.ok(!f.calls.some((c) => c[0] === 'show' || c[0] === 'upload'));
+  assert.ok(!f.calls.some((c) => c[0] === 'play' || c[0] === 'upload'));
   // Refused partway: stops there, plays nothing.
   const g = await visitFlow({ name: 'Aunt Sue', files: [{ name: 'a.jpg' }, { name: 'b.jpg' }] },
     { upload: (file) => (file.name === 'a.jpg' ? { ok: false, error: 'Too big: one file can be at most 4 GB.' } : null) });
   assert.equal(g.result, false);
   assert.deepEqual(g.said, [['Too big: one file can be at most 4 GB.', true]]);
-  assert.ok(!g.calls.some((c) => c[0] === 'show' || (c[0] === 'upload' && c[1] === 'b.jpg')));
+  assert.ok(!g.calls.some((c) => c[0] === 'play' || (c[0] === 'upload' && c[1] === 'b.jpg')), 'nothing played, so nothing old deleted');
 });
 
 test('the easy page needs a name and a file', async () => {
@@ -1263,6 +1257,43 @@ test('the easy page needs a name and a file', async () => {
     assert.deepEqual(f.said, [[text, true]]);
     assert.deepEqual(f.calls, [], 'nothing sent');
   }
+});
+
+test('a returning visitor\'s old pictures are replaced', async () => {
+  const u = visitorBox();
+  u.put('00001-old.jpg', 5);
+  u.put('00002-other.jpg', 5);
+  fs.writeFileSync(u.root + '/tags.json', JSON.stringify({ tags: {
+    'photos/00001-old.jpg': ['aunt-sue', 'favorites'], 'photos/00002-other.jpg': ['bob'] } }));
+  const tag = (await u.check('Aunt Sue')).json.tag;
+  const n1 = (await u.sendFor('new.jpg', tag)).json.saved;
+  const n2 = (await u.sendFor('new2.jpg', tag)).json.saved;
+  assert.deepEqual([n1, n2], ['00003-new.jpg', '00004-new2.jpg']);
+  assert.ok(u.photos().includes('00001-old.jpg'), 'nothing old goes until the batch is done');
+  const r = await u.call('POST', '/api/visitor/play', { tag, keep: [n1, n2] });
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(u.photos(), ['00002-other.jpg', '00003-new.jpg', '00004-new2.jpg']);
+  assert.deepEqual(u.tags(), {
+    'photos/00002-other.jpg': ['bob'], 'photos/00003-new.jpg': ['aunt-sue'], 'photos/00004-new2.jpg': ['aunt-sue'],
+  });
+  assert.ok(u.logs.includes('Removed photos/00001-old.jpg (aunt-sue added new pictures)'), u.logs.join('\n'));
+  assert.deepEqual(u.removed, [u.root + '/photos/00001-old.jpg'], 'taken off mpv first');
+  const o = JSON.parse(fs.readFileSync(u.root + '/override.json', 'utf8'));
+  assert.deepEqual([o.tags, o.untilCleared], [['aunt-sue'], true]);
+});
+
+test('the box keeps only a visitor\'s own new pictures', async () => {
+  const u = visitorBox();
+  u.put('00001-a.jpg', 5);
+  u.put('00002-b.jpg', 5);
+  fs.writeFileSync(u.root + '/tags.json', JSON.stringify({ tags: { 'photos/00001-a.jpg': ['aunt-sue'], 'photos/00002-b.jpg': ['bob'] } }));
+  for (const body of [{ tag: 'aunt-sue', keep: ['00002-b.jpg'] }, { tag: 'aunt-sue', keep: [] }, { tag: 'aunt-sue' },
+    { tag: 'aunt-sue', keep: ['missing.jpg'] }, { tag: 'halloween', keep: ['00001-a.jpg'] }, { keep: ['00001-a.jpg'] }]) {
+    const r = await u.call('POST', '/api/visitor/play', body);
+    assert.equal(r.status, 400, JSON.stringify(body));
+  }
+  assert.deepEqual(u.photos(), ['00001-a.jpg', '00002-b.jpg']);
+  assert.ok(!fs.existsSync(u.root + '/override.json'), 'nothing played');
 });
 
 (async () => {

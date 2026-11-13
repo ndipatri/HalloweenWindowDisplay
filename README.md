@@ -220,7 +220,7 @@ The box's address, **http://tvbox.local/**, and the QR code on the TV open the e
 1. They type **their name** and tap **Choose photos or videos**.
 2. They tap **Put them on the TV**. Each file is sent, and once they're all added the TV plays their pictures, and only theirs, until someone changes it on either page.
 
-Their name becomes a tag (`Aunt Sue` → `aunt-sue`) on everything they add, so you'll find it under Play and on each upload on the advanced page. The same name next time adds to the same tag. A name that would make a tag the box already uses for something else (`upload`, `portrait`, `landscape`, `square`, or a GitHub folder's, like `halloween`) is refused: "That name is taken by the box. Try adding your last name." **Advanced** at the bottom goes to the full page, which has **Easy page** at the top to come back.
+Their name becomes a tag (`Aunt Sue` → `aunt-sue`) on everything they add, so you'll find it under Play and on each upload on the advanced page. The same name next time replaces what they added before: once the new pictures are all on the box, their earlier ones under that name are deleted, so only the latest batch plays. A name that would make a tag the box already uses for something else (`upload`, `portrait`, `landscape`, `square`, or a GitHub folder's, like `halloween`) is refused: "That name is taken by the box. Try adding your last name." **Advanced** at the bottom goes to the full page, which has **Easy page** at the top to come back.
 
 Good to know:
 - The GitHub filters never show your photos by themselves: they show when you play Uploads or Favorites, or in a filter of your own that names their tags.
