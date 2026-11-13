@@ -222,11 +222,11 @@ The website SHALL let anyone on the box's network switch the address code on the
 - **AND** the address is written beside it, or "No network address" when there is none
 
 ### Requirement: The advanced page is at /advanced
-The website SHALL serve the full page (Play, TV, tags, uploads, filters, the log) at `/advanced`, with a link to the easy page at `/`.
+The website SHALL serve the full page (Play, TV, tags, uploads, filters, the log) at `/advanced`, titled tvBox, with a link to the easy page at `/`.
 
 #### Scenario: the advanced page is at /advanced and links to the easy page
 - **WHEN** a phone opens `/advanced`
-- **THEN** it gets the full page, with Play and Back to schedule
+- **THEN** it gets the full page, titled tvBox, with Play and Back to schedule
 - **AND** a link to `/`
 
 ### Requirement: The page edits filters with no PIN

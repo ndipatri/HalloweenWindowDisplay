@@ -13,5 +13,5 @@
 
 ## Workflow follow-up
 
-- [ ] 4.1 Rename the GitHub repo to `tvBox` (on the user's OK)
-- [ ] 4.2 On the box: move `~/HalloweenWindowDisplay` to `~/tvBox`, point `origin` at the new URL, run setup
+- [x] 4.1 Rename the GitHub repo to `tvBox` (on the user's OK): done, now https://github.com/ndipatri/tvBox
+- [x] 4.2 On the box: move `~/HalloweenWindowDisplay` to `~/tvBox`, point `origin` at the new URL, run setup: done; sync runs from `~/tvBox`

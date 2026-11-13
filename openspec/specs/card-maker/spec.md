@@ -54,14 +54,15 @@ A card's `network-config` SHALL be a netplan version 2 config through NetworkMan
 - **THEN** the access point's name is `Nick's "Net": 5G` and its password is `a:b"c\d #e`, exactly
 
 ### Requirement: The box sets itself up on first boot
-A card SHALL install a first-boot service that waits for the network, installs git if missing, clones the repo, and runs `scheduler/setup.sh` for the user, retrying after a failure, even across reboots, until it succeeds once.
+A card SHALL install a first-boot service that waits for the network, installs git if missing, clones the repo (by default `https://github.com/ndipatri/tvBox.git`) into the user's `~/tvBox`, and runs its `scheduler/setup.sh` for the user, retrying after a failure, even across reboots, until it succeeds once.
 
 #### Scenario: the card sets the box up on first boot
-- **GIVEN** answers with user `nick` and repo `https://github.com/ndipatri/HalloweenWindowDisplay.git`
+- **GIVEN** answers with user `nick` and repo `https://github.com/ndipatri/tvBox.git`
 - **WHEN** the card's files are made
 - **THEN** `user-data` writes `/etc/tvbox/firstboot.conf` (naming the user, repo and time zone), `/usr/local/sbin/tvbox-firstboot` (the first-boot script) and `/etc/systemd/system/tvbox-firstboot.service`
 - **AND** the service restarts on failure and only runs until `/var/lib/tvbox/firstboot-done` exists
 - **AND** `runcmd` enables the service and starts it without waiting
+- **AND** the first-boot script clones into `~/tvBox`, and the card maker offers `https://github.com/ndipatri/tvBox.git` as the repo
 
 ### Requirement: Box names
 Box names SHALL default to `tvbox`, then `tvbox2`, `tvbox3`, and so on. A name SHALL be accepted only if it is a valid host name: 1–63 lowercase letters, digits and hyphens, not starting or ending with a hyphen.
