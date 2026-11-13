@@ -1,6 +1,6 @@
 # tvBox
 
-tvBox turns any TV into something that plays itself. A small Raspberry Pi box plugged into the TV plays videos and photos full-screen, on a schedule you set: seasonal videos at the right times of year and day, your own photos and videos whenever you like, and pictures that visitors add from their own phones by scanning a QR code on the screen. Everything is run from a web page on your phone, with nothing to install.
+tvBox turns any TV into a display that runs on its own. A small Raspberry Pi box plugged into the TV plays videos and photos full-screen, on a schedule you set: seasonal videos at the right times of year and day, your own photos and videos whenever you like, and pictures that visitors add from their own phones by scanning a QR code on the screen. Everything is run from a web page on your phone, with nothing to install.
 
 The first tvBox is a Halloween window: a portrait TV behind a sheer curtain in an upstairs window. A shadowy woman appears in it, wanders past and presses her hand against the glass; fuzzy googly-eyed creatures crowd the window; Mochi the dog turns into a glowing green-eyed ghost-dog; and in November, an autumn sunset fades into a moonlit night.
 
