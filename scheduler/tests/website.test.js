@@ -1135,7 +1135,7 @@ test('the easy page is at the box\'s address', async () => {
   assert.equal(r.status, 200);
   assert.equal(r.type, 'text/html');
   assert.ok(!r.body.includes('id="pin"') && !r.body.includes('X-Upload-Pin'), 'no PIN field');
-  for (const text of ['id="name"', 'type="file"', 'accept="image/*,video/*"', 'multiple',
+  for (const text of ['<title>tvBox</title>', 'id="name"', 'type="file"', 'accept="image/*,video/*"', 'multiple',
     '>Put them on the TV<', 'href="/advanced"']) {
     assert.ok(r.body.includes(text), 'easy page has ' + text);
   }
@@ -1154,7 +1154,7 @@ test('the address code opens the easy page', async () => {
 test('the advanced page is at /advanced and links to the easy page', async () => {
   const r = await site().call('GET', '/advanced');
   assert.equal(r.status, 200);
-  for (const text of ['>Back to schedule<', '>Black<', '<h2>Play</h2>', 'href="/"']) assert.ok(r.body.includes(text), 'advanced page has ' + text);
+  for (const text of ['<title>tvBox</title>', '<h1>tvBox', '>Back to schedule<', '>Black<', '<h2>Play</h2>', 'href="/"']) assert.ok(r.body.includes(text), 'advanced page has ' + text);
 });
 
 test('a visitor\'s name becomes their tag', async () => {

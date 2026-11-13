@@ -1,11 +1,11 @@
 ---
-name: "window-display-schedule"
-description: "Add or change a season, its videos, tags, or the GitHub filters and their schedules for the HalloweenWindowDisplay box, test it, ship it, and make sure the Raspberry Pi box actually picks it up."
+name: "tvbox-schedule"
+description: "Add or change a season, its videos, tags, or the GitHub filters and their schedules for the tvBox, test it, ship it, and make sure the Raspberry Pi box actually picks it up."
 ---
 
-# Window display schedule
+# tvBox schedule
 
-For ndipatri/HalloweenWindowDisplay: a Raspberry Pi box ("the box") plugged into a portrait TV plays videos from `~/video-scheduler/` through mpv. A Node player (`scheduler/player.js`, run by systemd as `tvbox.service`) decides what plays from the box's **filters** (`~/video-scheduler/filters.json`) over **tags**, using the logic in `scheduler/logic.js`, and serves a website for choosing a filter, tagging items and editing filters. Videos come from the repo's `playlists/` via `~/video-scheduler/sync`, run hourly by `tvbox-sync.timer`. The Mac version is kept only at the git tag `mac-legacy`. Use this skill for any change to *what plays when*. For making a new video, use the window-display-video skill.
+For ndipatri/tvBox: a Raspberry Pi box ("the box") plugged into a portrait TV plays videos from `~/video-scheduler/` through mpv. A Node player (`scheduler/player.js`, run by systemd as `tvbox.service`) decides what plays from the box's **filters** (`~/video-scheduler/filters.json`) over **tags**, using the logic in `scheduler/logic.js`, and serves a website for choosing a filter, tagging items and editing filters. Videos come from the repo's `playlists/` via `~/video-scheduler/sync`, run hourly by `tvbox-sync.timer`. The Mac version is kept only at the git tag `mac-legacy`. Use this skill for any change to *what plays when*. For making a new video, use the tvbox-video skill.
 
 ## How tags, filters and schedules fit together
 
@@ -30,7 +30,7 @@ For ndipatri/HalloweenWindowDisplay: a Raspberry Pi box ("the box") plugged into
   - nth or last weekday of a month, so it moves with the year: `'11-4thu'` (Thanksgiving), `'05-lastmon'`;
   - either of the above with `+N`/`-N` days: `'11-4thu-1'`;
   - in `also` only, a one-off `'YYYY-MM-DD'`.
-- Where two filters' entries overlap, the one higher in the list wins. Outside every entry the window is black (`black (nothing scheduled until 5:00 PM)`). A filter with no entries is refused (`a filter needs days and times; to play tags any time, pick them under Play`): tags play any time from Play.
+- Where two filters' entries overlap, the one higher in the list wins. Outside every entry the screen is black (`black (nothing scheduled until 5:00 PM)`). A filter with no entries is refused (`a filter needs days and times; to play tags any time, pick them under Play`): tags play any time from Play.
 - Both files are read again whenever they change (`readFilters`, cached by their text; each filter gets `source: 'custom' | 'github'`); a bad filter is skipped with `ERROR: Ignoring filter N (name): …` (custom) or `ERROR: Ignoring GitHub filter N (name): …`, once per version of the files. The website refuses to save one, with the same reasons.
 
 **The GitHub filters** (`playlists/filters.json`, "the starting filters" in specs) are: Halloween kid (`halloween`, `halloween-kid`; Oct, 05:00–07:00 and 17:00–19:30), Halloween grownup (`halloween`, `halloween-grownup`; Oct, 19:30–23:00), Thanksgiving (`thanksgiving`; Fri/Sat Nov 1 to `11-4thu`, plus `11-4thu-1` and `11-4thu`; 17:00–23:00); `favorites` and `upload` are tags played from Play, not filters. No Christmas filter yet, as there are no Christmas videos.
@@ -39,14 +39,14 @@ For ndipatri/HalloweenWindowDisplay: a Raspberry Pi box ("the box") plugged into
 
 ## Making a change
 
-Changes to how the display behaves (tags, filters and their schedules, the GitHub filters, overrides, the website, sync, setup, what the status and the log report) go through OpenSpec with this repo's `window-display` schema (`openspec/schemas/window-display/`, CLI 1.14.1: `npm install -g @fission-ai/openspec@1.14.1`). Start with the agentic-coding plugin's `openspec-propose` or `openspec-new-change` skill. Every scenario in a spec is enforced by a test with exactly its name in `scheduler/tests/*.test.js`: `node openspec/check-scenarios.js` lists any scenario without one, and `scheduler/tests/specs.test.js` runs that check over `openspec/specs/` with the other tests. Two reviews are part of every change with a design.md: the agentic-coding plugin's `review-opsx-design`, as a read-only subagent once design.md is written, with every BLOCKING finding settled with the person before tasks; and `review-orchestrator` on the whole change as the last verification task, repeated until no BLOCKING findings remain. Both are told the project is Node, bash, mpv and systemd, not Dart or Python (the schema has the wording). A change to `playlists/filters.json` the person has asked for can skip OpenSpec, but it still needs a pinned test (step 4). A change to one box's own filters isn't a code change at all: the person does it on that box's website. The steps below apply either way.
+Changes to how the display behaves (tags, filters and their schedules, the GitHub filters, overrides, the website, sync, setup, what the status and the log report) go through OpenSpec with this repo's `tvbox` schema (`openspec/schemas/tvbox/`, CLI 1.14.1: `npm install -g @fission-ai/openspec@1.14.1`). Start with the agentic-coding plugin's `openspec-propose` or `openspec-new-change` skill. Every scenario in a spec is enforced by a test with exactly its name in `scheduler/tests/*.test.js`: `node openspec/check-scenarios.js` lists any scenario without one, and `scheduler/tests/specs.test.js` runs that check over `openspec/specs/` with the other tests. Two reviews are part of every change with a design.md: the agentic-coding plugin's `review-opsx-design`, as a read-only subagent once design.md is written, with every BLOCKING finding settled with the person before tasks; and `review-orchestrator` on the whole change as the last verification task, repeated until no BLOCKING findings remain. Both are told the project is Node, bash, mpv and systemd, not Dart or Python (the schema has the wording). A change to `playlists/filters.json` the person has asked for can skip OpenSpec, but it still needs a pinned test (step 4). A change to one box's own filters isn't a code change at all: the person does it on that box's website. The steps below apply either way.
 
 1. **Pin down the intent in dates.** Turn the request into the exact days and times it should produce, and state them back. Example: "Thanksgiving: Fri/Sat until Thanksgiving, then the day before and the day" means Nov 6, 7, 13, 14, 20, 21, 25 and 26 in 2026, and other November days are black. Check what nearby filters do on the edge days and which is higher in the list, and whether a box's custom filters (which win) would hide the change.
 2. **Branch from `origin/main`** and edit `playlists/filters.json` for a shared schedule change; every box picks it up with its next sync.
 3. **Videos:** a new season needs `playlists/<name>/` (tag `<name>`), plus subfolders if wanted (`<name>-kid`, …), and a filter that names those tags. A filter whose tags have no videos yet is fine (black, logged once, not an error). Update `playlists/README.md` if the folder rules change.
 4. **Test:** `for f in scheduler/tests/*.test.js; do node "$f" || exit 1; done` (Node; mpv, the clock and files are faked). Add a test that pins the exact days or times from step 1, in the style of the Thanksgiving test (a list of covered days for two or three years, through `scheduledFilter`). If you change the filter or schedule logic itself, also test bad entries being skipped and logged. Run `node --check` on each changed `.js` file. The box runs the Node from Raspberry Pi OS's apt (18 or later) with no npm packages, so use only built-in modules. If the change touches `setup.sh`, sync, the systemd units, `player.js`, `mpv.js` or `website.js`, also run the rehearsal on the box's OS (see "Rehearsing on the box's OS" below).
 5. **README:** it is a plain, non-technical guide for the person, so no config syntax, rules or anything else from this skill goes in it. Update only the "What's playing" table (each GitHub filter's When in plain words, e.g. "Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm"), and "Using it" / "If something's wrong" if something the person does changes. Details belong in this skill.
-6. **Ship:** commit, push, and open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked in cloud sessions, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`. A cloud session can't push tags or create releases; from the shell on the person's Mac, run git and gh through `.git/tools/gh-run git …` / `.git/tools/gh-run gh …`, which signs in with the repo-only token in `.git/credentials` and waits out that shell's flaky DNS.
+6. **Ship:** commit, push, and open a PR with `gh api repos/ndipatri/tvBox/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked in cloud sessions, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/tvBox/pulls/<n>/merge -f merge_method=merge`. A cloud session can't push tags or create releases; from the shell on the person's Mac, run git and gh through `.git/tools/gh-run git …` / `.git/tools/gh-run gh …`, which signs in with the repo-only token in `.git/credentials` and waits out that shell's flaky DNS.
 
 ## Getting it onto the box (the step that gets missed)
 
@@ -54,7 +54,7 @@ A change under `scheduler/` does nothing until setup is rerun on the box, becaus
 
 ```sh
 ssh tvbox.local
-cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
+cd ~/tvBox && git pull && sudo bash scheduler/setup.sh
 ```
 
 Then check it took:
@@ -175,7 +175,7 @@ The box's software today: Raspberry Pi OS Lite (64-bit), Debian 13 (trixie), Nod
 
 ## Trying it without the box (the emulator)
 
-`bash scheduler/tests/e2e/emulate.sh` runs a box on the Mac, in the rehearsal's Docker image, until Ctrl-C. Use it when the person is away from the real box, or to try a website or player change by hand before shipping. **For starting, restarting and testing with it, use the window-display-emulator skill.**
+`bash scheduler/tests/e2e/emulate.sh` runs a box on the Mac, in the rehearsal's Docker image, until Ctrl-C. Use it when the person is away from the real box, or to try a website or player change by hand before shipping. **For starting, restarting and testing with it, use the tvbox-emulator skill.**
 - **What runs:** a copy of this folder as it is (uncommitted changes included), the real `setup.sh`, sync of the real videos from `playlists/`, the player and mpv. Sync pulls from this folder's current branch (`origin` points at `/src`), never from GitHub.
 - **Where:**
   - the website: http://localhost:8080/ (from a phone on the same Wi‑Fi: the Mac's name, port 8080);

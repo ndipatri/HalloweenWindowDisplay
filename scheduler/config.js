@@ -1,5 +1,5 @@
 // The box's settings. After changing them, rerun setup on the box:
-//   cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
+//   cd ~/tvBox && git pull && sudo bash scheduler/setup.sh
 'use strict';
 
 module.exports = {

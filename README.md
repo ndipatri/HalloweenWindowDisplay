@@ -1,8 +1,8 @@
-# Halloween Window Display
+# tvBox
 
-A shadowy woman appears in an upstairs window. She wanders past, vanishes, comes back and presses her hand against the glass. A gang of fuzzy, googly-eyed creatures crowds the window to stare out at the street, Mochi the dog trots up and turns into a glowing green-eyed ghost-dog, and later in the evening a glowing neon monster joins them, along with something that stands very still at the back of the room… until it doesn't. In November, Mochi comes back in a pilgrim hat, between views of an autumn sunset that fades into a moonlit night and a calmer one where the sun hangs still over the hills while the leaves keep falling.
+tvBox turns any TV into something that plays itself. A small Raspberry Pi box plugged into the TV plays videos and photos full-screen, on a schedule you set: seasonal videos at the right times of year and day, your own photos and videos whenever you like, and pictures that visitors add from their own phones by scanning a QR code on the screen. Everything is run from a web page on your phone, with nothing to install.
 
-It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry Pi box that plays AI-generated videos on a schedule: gentler ones while kids are out trick-or-treating, scarier ones later in the evening. The videos change with the seasons: Halloween, Thanksgiving, and more to come.
+The first tvBox is a Halloween window: a portrait TV behind a sheer curtain in an upstairs window. A shadowy woman appears in it, wanders past and presses her hand against the glass; fuzzy googly-eyed creatures crowd the window; Mochi the dog turns into a glowing green-eyed ghost-dog; and in November, an autumn sunset fades into a moonlit night.
 
 <table align="center">
   <tr>
@@ -10,34 +10,46 @@ It's a portrait TV standing behind a sheer curtain, driven by a small Raspberry 
     <td align="center"><img src="docs/images/hero.jpg" width="300" alt="Close-up of the video: the woman's silhouette with her palm pressed against the glass"></td>
   </tr>
   <tr>
-    <td align="center"><em>What trick-or-treaters see from the street</em></td>
-    <td align="center"><em>What's playing on the TV</em></td>
+    <td align="center"><em>The first tvBox, from the street</em></td>
+    <td align="center"><em>What's playing on its TV</em></td>
   </tr>
 </table>
 
 **Contents**
 
-1. [How it works](#how-it-works)
-2. [What's playing](#whats-playing)
-3. [The videos](#the-videos)
-4. [Set it up](#set-it-up)
-5. [Using it](#using-it)
-6. [If something's wrong](#if-somethings-wrong)
+1. [What it does](#what-it-does)
+2. [How it works](#how-it-works)
+3. [What's playing](#whats-playing)
+4. [The videos](#the-videos)
+5. [Set it up](#set-it-up)
+6. [Using it](#using-it)
+7. [If something's wrong](#if-somethings-wrong)
+
+## What it does
+
+- **Plays on a schedule.** Videos come in seasons (Halloween, Thanksgiving, …), and **filters** decide what plays on which days and at which times: gentle "kid" videos early in the evening, scarier ones later, a black screen the rest of the time. A filter is just a set of tags, days and times, and you can add your own.
+- **Plays what you pick, now.** From your phone, play any filter or tag right away, for 15, 30 or 60 minutes, until the schedule changes, or until you switch back. Or show black.
+- **Shows your own photos and videos.** Add them from your phone's camera roll. Star them into **Favorites**, give them your own tags, and play them whenever you like or put them on a schedule.
+- **Lets visitors add theirs.** A small QR code in the corner of the TV opens a simple page on their phone: they type their name, pick photos or videos, and tap **Put them on the TV**. Their pictures play straight away, under their own name. Each thumbnail shows whether it's portrait or landscape, with a warning if none fit the way the TV faces.
+- **Works portrait or landscape.** Turn the TV on its mount and tap **Portrait** or **Landscape** (or fit a tiny tilt switch so the box notices by itself). The picture turns to match, and the box plays only what fits that shape.
+- **Keeps itself up to date.** New videos and shared filters come from this repo; every box picks them up within the hour.
+- **Is easy to set up, many times over.** One command on a Mac writes ready-to-go SD cards, one per box; each box sets itself up the first time it's plugged in.
+- **No passwords on the home Wi‑Fi.** The page and everything on it is open to anyone on your Wi‑Fi, and only to them.
 
 ## How it works
 
-![Side view of the setup: viewer on the street, window, sheer curtain, portrait TV, Raspberry Pi box](docs/images/physical-setup.svg)
+![Side view of the first tvBox: viewer on the street, window, sheer curtain, portrait TV, Raspberry Pi box](docs/images/physical-setup.svg)
 
-A Raspberry Pi box, plugged into the TV's HDMI, plays videos full-screen on a TV standing upright in the window, with a sheer curtain in front to hide the screen's edges. What's on screen is decided by **filters**:
+A Raspberry Pi box, plugged into the TV's HDMI, plays videos and photos full-screen. What's on screen is decided by **tags** and **filters**:
 
-- **Tags:** every video has a tag from its folder in GitHub (`halloween`, `halloween-grownup`, …), and you can add your own, like `favorites`, to the photos and videos you add from your phone.
-- **Filters:** a filter plays everything with its tags, on the days and at the times you give it: gentler "kid" Halloween videos in the early morning and early evening, scarier "grownup" ones later, and a black screen the rest of the time.
+- **Tags:** every video has a tag from its folder in this repo (`halloween`, `halloween-grownup`, `thanksgiving`, …). Photos and videos you add are tagged `upload`, and you can give them your own tags, like `favorites` or `family`. A visitor's pictures are tagged with their name.
+- **Filters:** a filter plays everything with its tags, on the days and at the times you give it. Where two overlap, the higher one wins. When no filter is on, the screen is black.
 
-The videos are kept in this repo, and the box picks up the latest by itself every hour. A page on your phone shows what's playing, lets you change it for a while, and is where you tag things and set the filters.
+The box serves a web page at **http://tvbox.local/** (two pages: a simple one for visitors, and an advanced one for everything else). The videos are kept in this repo, and the box picks up the latest by itself every hour.
 
 ## What's playing
 
-What plays is chosen by **filters**. These come from GitHub, so every box has them; a box can add its own on its website (see "Change what plays when" below):
+What plays is chosen by **filters**. These come from GitHub, so every box has them; a box can add its own on its page (see "Change what plays when" below):
 
 | Filter | Plays | When |
 |---|---|---|
@@ -45,7 +57,7 @@ What plays is chosen by **filters**. These come from GitHub, so every box has th
 | Halloween grownup | Those two plus the monster, the jump scare and the woman | Every day in October, 7:30–11 pm |
 | Thanksgiving | The fall sunset, Mochi the pilgrim and the steady fall sun | Fridays and Saturdays in November until Thanksgiving, then the day before and Thanksgiving Day itself, 5–11 pm |
 
-At any other time the window stays black. You can also play your own **tags** whenever you like (see "Using it"): `favorites` for the photos you've starred, `upload` for all your own photos and videos, or one you've added. The tags these filters use (`halloween`, `halloween-grownup`, `thanksgiving`, …) aren't offered as tags: play those videos with their filter. There's no Christmas filter yet, as there are no Christmas videos.
+At any other time the screen stays black. You can also play your own **tags** whenever you like (see "Using it"): `favorites` for the photos you've starred, `upload` for all your own photos and videos, a visitor's name for theirs, or one you've added. The tags these filters use (`halloween`, `halloween-grownup`, `thanksgiving`, …) aren't offered as tags: play those videos with their filter. There's no Christmas filter yet, as there are no Christmas videos.
 
 ## The videos
 
@@ -71,7 +83,7 @@ The videos play one after another and start over, each fading in from black and 
 
 ### How they were made
 
-The videos were made in a conversation with [Claude](https://claude.ai), Anthropic's AI assistant, connected to [Higgsfield](https://higgsfield.ai), an AI video service. The ideas were described in plain words ("a woman who's just a dark silhouette, walking in and out of the window"); Claude wrote the detailed prompts, made the videos on Higgsfield, and edited them (making her bigger, lowering her to window height, adding a flicker to make it scarier) until they looked right. For the Mochi videos, a photo of the real dog was used so the video shows him rather than any white dog.
+The first season's videos were made in a conversation with [Claude](https://claude.ai), Anthropic's AI assistant, connected to [Higgsfield](https://higgsfield.ai), an AI video service. The ideas were described in plain words ("a woman who's just a dark silhouette, walking in and out of the window"); Claude wrote the detailed prompts, made the videos on Higgsfield, and edited them (making her bigger, lowering her to window height, adding a flicker to make it scarier) until they looked right. For the Mochi videos, a photo of the real dog was used so the video shows him rather than any white dog.
 
 ### The prompts
 
@@ -117,9 +129,9 @@ What was asked for, word for word. The woman's video is two clips joined togethe
 
 ### What you need
 
-- A TV or monitor that can stand upright (this one is 1080 × 1920).
+- A TV or monitor. The box starts set up for one standing upright (portrait, like the first tvBox's 1080 × 1920); it can be turned to landscape any time (see "Turn the TV" below).
 - A Raspberry Pi 5 with its power supply, a microSD card (32 GB or more) and a micro-HDMI to HDMI cable.
-- A sheer white or grey curtain for the window.
+- For a window like the first tvBox: a sheer white or grey curtain.
 
 ### The boxes
 
@@ -128,8 +140,8 @@ Each box is a Raspberry Pi with an SD card made on your Mac. One run makes as ma
 1. On your Mac, in Terminal (this needs Node.js and xz; if they're missing, `brew install node xz` first):
 
    ```sh
-   git clone https://github.com/ndipatri/HalloweenWindowDisplay.git ~/HalloweenWindowDisplay
-   cd ~/HalloweenWindowDisplay && node cards/make-cards.js
+   git clone https://github.com/ndipatri/tvBox.git ~/tvBox
+   cd ~/tvBox && node cards/make-cards.js
    ```
 
    It asks once for your Wi‑Fi, a username and password for the boxes, and your time zone. Then, for each card:
@@ -143,11 +155,14 @@ From then on, each box starts by itself whenever it's plugged in. The screen sta
 
 If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `scheduler/config.js`, then get the latest version on the box (see Everyday tasks).
 
-### The window
+### Placing the TV in a window
 
-- **Hang the sheer curtain between the glass and the TV.** It hides the screen's edges and turns her into a blurry shape behind fabric. This helps more than anything else.
+Anywhere a TV can stand or hang works. For a window seen from outside, as with the first tvBox:
+
+
+- **Hang the sheer curtain between the glass and the TV.** It hides the screen's edges and turns what's playing into a blurry shape behind fabric. This helps more than anything else.
 - **Turn every light in the room off** so nothing gives away that it's a screen.
-- **Turn the TV's brightness down** until she's only just visible from the street. A dim figure reads as real; a bright one reads as a TV.
+- **Turn the TV's brightness down** until it's only just visible from the street. A dim figure reads as real; a bright one reads as a TV.
 - **Turn off the TV's auto power-off.** Many TVs switch off after about 4 hours without a remote button press. Look for "Auto Power Off", "Eco" or "4-hour off" in the TV's settings.
 - Check it from the street after dark and adjust.
 
@@ -180,7 +195,7 @@ Under **Photos and videos** on the page are the photos and videos you've added f
 - Tap **☆** to add one to **Favorites** (it turns to ★). Pick **Favorites** under Play and tap **Play** to show them all, in name order, round and round.
 - Each one is tagged `upload`. You can add your own tags too, like `family`, by typing one and tapping **Add**. Every tag in use shows under Play; make a filter for it only if it should play on a schedule. Tap × on a tag to take it off.
 - The videos from GitHub aren't listed here: each one's tag comes from its folder there (`halloween`, `halloween-grownup`, …), and filters use those tags. To play a GitHub video in a different filter, it goes in a different folder in GitHub.
-- Tags you add are kept on this box only, and changes show on the window straight away if that filter is playing.
+- Tags you add are kept on this box only, and changes show on the TV straight away if that filter is playing.
 
 ### Change what plays when: filters
 
@@ -202,7 +217,7 @@ For your own filters:
 
 Your own filters are kept on this box only, and aren't backed up. A new box starts with just the GitHub ones.
 
-### Put your own photos and videos on the window
+### Put your own photos and videos on the TV
 
 1. On your phone, open **http://tvbox.local/advanced**.
 2. Under **Photos and videos**, tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
@@ -215,7 +230,7 @@ To take one off, tap **Remove** next to it under **Photos and videos**. It goes 
 
 ### Let a visitor add their pictures
 
-The box's address, **http://tvbox.local/**, and the QR code on the TV open the easy page, made for someone standing at the window with their phone:
+The box's address, **http://tvbox.local/**, and the QR code on the TV open the easy page, made for someone standing at the TV with their phone:
 
 1. They type **their name** and tap **Choose photos or videos**. Each one shows as a thumbnail marked **Portrait**, **Landscape** or **Square**. If none of them fit the way the TV faces now (say, all landscape on a portrait TV), the page warns them: those won't show until the TV is turned.
 2. They tap **Put them on the TV**. Each file is sent, and once they're all added the TV plays their pictures, and only theirs, until someone changes it on either page.
@@ -255,7 +270,7 @@ If it always gets it the wrong way round, change `closed: 'portrait'` to `closed
 |---|---|
 | See what's on screen | Open http://tvbox.local/ |
 | Get new videos from the repo | Nothing: the box checks every hour. To get them now, press **Check for new videos now** on the page |
-| Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh` |
+| Get the latest version of the box's software | `ssh tvbox.local`, then `cd ~/tvBox && git pull && sudo bash scheduler/setup.sh` |
 | Show your own photos and videos | On the page: **Add photos or videos**, then pick **Uploads** and tap **Play** (see above) |
 | Play just the photos and videos you choose | On the page: star them under **Photos and videos**, then pick **Favorites** and tap **Play** (see above) |
 | Change the dates or times | For every box: in `playlists/filters.json` in GitHub. For one box only: add your own filter under **Filters** on its page (see above) |
@@ -265,9 +280,11 @@ If it always gets it the wrong way round, change `closed: 'portrait'` to `closed
 
 Videos removed from the repo aren't deleted from the box; they're moved to `~/video-scheduler/.removed/`.
 
+A box set up before the project was called tvBox keeps its software in `~/HalloweenWindowDisplay`, which keeps working. To move it to the new name once: `ssh tvbox.local`, then `mv ~/HalloweenWindowDisplay ~/tvBox && cd ~/tvBox && git remote set-url origin https://github.com/ndipatri/tvBox.git && sudo bash scheduler/setup.sh`.
+
 ### Running it from a Mac instead
 
-Before the box, a Mac ran the window. That version is kept at the git tag `mac-legacy`: `git checkout mac-legacy`, then follow that version's README.
+Before the box, a Mac ran the first tvBox. That version is kept at the git tag `mac-legacy`: `git checkout mac-legacy`, then follow that version's README.
 
 ## If something's wrong
 
@@ -292,7 +309,7 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |
 | A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
-| A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
+| A video of yours stutters on the TV | Share or save it at 1080p (not 4K) and add it again |
 | Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
 | Favorites shows black, or won't start | Nothing is starred yet: star something under **Photos and videos** |
 | A filter won't start: `Nothing in … yet` | Nothing has its tags yet: add the tag to something under **Photos and videos**, or edit the filter |

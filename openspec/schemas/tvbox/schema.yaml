@@ -1,10 +1,9 @@
 # Based on OpenSpec 1.14.1 `spec-driven`. Upstream text is kept verbatim; the
-# HalloweenWindowDisplay additions are the paragraphs that start with "Window
-# display". To rebase, copy the new upstream schema (`openspec schema fork
+# tvBox additions are the paragraphs that start with "tvBox". To rebase, copy the new upstream schema (`openspec schema fork
 # spec-driven`) and re-apply those paragraphs.
-name: window-display
+name: tvbox
 version: 2
-description: HalloweenWindowDisplay workflow on OpenSpec spec-driven 1.14.1, every scenario enforced by a test, design and implementation reviewed - proposal → specs → design → tasks
+description: tvBox workflow on OpenSpec spec-driven 1.14.1, every scenario enforced by a test, design and implementation reviewed - proposal → specs → design → tasks
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -50,23 +49,23 @@ artifacts:
 
       This is the foundation - specs, design, and tasks all build on this.
 
-      Window display scope: OpenSpec is for changes to how the display behaves -
+      tvBox scope: OpenSpec is for changes to how the display behaves -
       the player, seasons, the daily schedule, overrides (the website), syncing,
       setup, and what the log and the website report. Adding or replacing a video
-      in `playlists/` is not an OpenSpec change: use the window-display-video
+      in `playlists/` is not an OpenSpec change: use the tvbox-video
       skill. A README-only or skill-only edit sets `skip_specs: true`.
 
-      Window display product checklist: before writing this artifact, settle the
+      tvBox product checklist: before writing this artifact, settle the
       decisions that change what someone sees or does, while the user is still
       engaged: which days and times the window is on and what plays (season,
       kid or grownup playlist); what happens on the edge days (a season's first
       and last day, midnight inside a period, a day no season covers); what
       the website says and what the log says; and what the person does to use it.
       Turn every date rule into the exact dates it produces for the next two or
-      three years and state them back, as the window-display-schedule skill
+      three years and state them back, as the tvbox-schedule skill
       describes. Ask the user about any the brief or conversation leaves open.
 
-      Window display assumed decisions: when you cannot ask the user (an
+      tvBox assumed decisions: when you cannot ask the user (an
       unattended run, a cloud agent, or a capture the user already approved), do
       not resolve an open decision silently. Add an `## Assumed product
       decisions` section and list each decision you made with the alternative
@@ -185,7 +184,7 @@ artifacts:
 
       Specs should be testable - each scenario is a potential test case.
 
-      Window display enforcement: in this project every scenario IS a test case.
+      tvBox enforcement: in this project every scenario IS a test case.
       Each scenario gets exactly one Node test whose name is the scenario's name,
       character for character: `#### Scenario: Thanksgiving Friday plays the
       grownup playlist` is enforced by `test('Thanksgiving Friday plays the
@@ -196,7 +195,7 @@ artifacts:
       Name scenarios so they read well as test names, and keep names unique
       across the project.
 
-      Window display scenarios: write each one so a Node test can check it with
+      tvBox scenarios: write each one so a Node test can check it with
       the box faked. The tests load the scheduler with fake folders and files, a
       fake mpv, and a fake clock, and pick the moment with `at(month, day, hour,
       minute)`. The website is tested by calling its request handler directly.
@@ -213,13 +212,13 @@ artifacts:
         (inside or outside a period, season or no season, override or not),
         write one scenario per state.
 
-      Window display box-only behaviour: what only the real Raspberry Pi can
+      tvBox box-only behaviour: what only the real Raspberry Pi can
       show (the TV picture, smooth playback at full size, mpv's output straight
       to the screen, systemd starting the services at boot, the network) is not
       a scenario, because no test can enforce it. Put it in design.md, and its
       check in tasks.md's `## Workflow follow-up`.
 
-      Window display rehearsal: between the Node tests and the Pi there is
+      tvBox rehearsal: between the Node tests and the Pi there is
       `scheduler/tests/e2e/box.e2e.sh`, an end-to-end rehearsal on the box's
       own OS (Debian 13 on arm64 with the Raspberry Pi archive, in Docker). It
       runs the real `setup.sh`, sync, player, website and mpv (drawing frames
@@ -230,7 +229,7 @@ artifacts:
       setup on the real OS, the units, mpv's real output) stays out of the
       specs, and design.md says which rehearsal check covers it.
 
-      Window display product decisions: before finishing this artifact, list the
+      tvBox product decisions: before finishing this artifact, list the
       decisions the brief leaves open that would change what is shown or
       reported, such as edge days, overlaps between seasons or periods, what a
       bad configuration entry does, and the exact website and log wording. Ask the
@@ -275,7 +274,7 @@ artifacts:
 
       Good design docs explain the "why" behind technical decisions.
 
-      Window display constraints: the box is a Raspberry Pi 5 running the latest
+      tvBox constraints: the box is a Raspberry Pi 5 running the latest
       Raspberry Pi OS Lite (64-bit): today Debian 13 (trixie) on arm64, with
       Node.js 20 and mpv 0.40 from Debian and ffmpeg from the Raspberry Pi
       archive. The scheduler, player and website run under that Node.js
@@ -283,36 +282,36 @@ artifacts:
       built-in modules. Video plays through mpv. Only
       `scheduler/setup.sh` runs with `sudo`; everything else runs as the
       person's user. The box must keep playing when it is offline or GitHub is
-      unreachable. Follow the window-display-schedule skill for how the
+      unreachable. Follow the tvbox-schedule skill for how the
       configuration, sync and setup fit together.
 
-      Window display testability: for each scenario in the specs, say how its
+      tvBox testability: for each scenario in the specs, say how its
       test reaches the behaviour: through the functions the scheduler tests
       already load, a function the change adds to that list, or a shell script
       run against fake commands. When a scenario cannot be reached that way,
       change the design until it can, or move the behaviour out of the specs
       as box-only.
 
-      Window display rehearsal in the design: say whether the change touches
+      tvBox rehearsal in the design: say whether the change touches
       what the rehearsal runs (`setup.sh`, `sync_videos.sh`, the systemd units,
       `player.js`, `mpv.js`, `website.js`, the apt packages, or the box's OS
       version). If it does, name the rehearsal checks that cover it, and the
       new check `scheduler/tests/e2e/inside.sh` needs for behaviour it adds.
 
-      Window display rollout: add a `## Getting it onto the box` section. Say
+      tvBox rollout: add a `## Getting it onto the box` section. Say
       whether the change needs setup rerun on the box (`cd ~/HalloweenWindowDisplay
       && git pull && sudo bash scheduler/setup.sh`: anything under `scheduler/`)
       or only a sync (videos only, which the box does by itself every hour), and
       what the person checks afterwards (the website's status line, and the
       first lines of `~/video-scheduler/scheduler.log`).
 
-      Window display design review: once design.md is written, always get an
+      tvBox design review: once design.md is written, always get an
       independent review of it before writing tasks. A fresh reviewer catches
       mismatches between the design and the existing code, and wrong claims
       about Node, mpv, systemd or the phones, that the author misses. Launch
       the `review-opsx-design` skill (agentic-coding plugin) as a read-only
       subagent. Give it the paths to proposal.md, every specs/**/spec.md file
-      and design.md, plus this schema and the window-display-schedule skill,
+      and design.md, plus this schema and the tvbox-schedule skill,
       and tell it that this project is Node (built-in modules only), bash, mpv
       and systemd on a Raspberry Pi. Its Dart, Flutter and Python checklists
       don't apply: it judges architecture against the code under `scheduler/`
@@ -395,7 +394,7 @@ artifacts:
 
       Reference specs for what needs to be built, design for how to build it.
 
-      Window display task structure:
+      tvBox task structure:
       - The first group writes the tests: one Node test per spec scenario, named
         exactly as the scenario, written before any implementation so the tests
         define the behaviour before the code exists. Each task names the
@@ -408,7 +407,7 @@ artifacts:
         assertion, not on a crash or a missing function, and that
         `node openspec/check-scenarios.js <change>` reports no missing tests.
       - Implementation groups follow, each landing the extra tests its own work
-        calls for and the documentation it changes: the window-display-schedule
+        calls for and the documentation it changes: the tvbox-schedule
         skill for configuration, box or troubleshooting detail; the README only
         for what the person sees or types, in plain words, as that skill says.
       - The final group is verification. Its tasks, in order:
@@ -462,14 +461,14 @@ apply:
     Read context files, work through pending tasks, mark complete as you go.
     Pause if you hit blockers or need clarification.
 
-    Window display workflow:
+    tvBox workflow:
     1. Write the test group first: one test per scenario, named exactly as
        the scenario. Run the tests and confirm each new one fails on an
        assertion: a failing assertion proves the test reaches behaviour
        that does not exist yet. Run `node openspec/check-scenarios.js
        <change>` and confirm nothing is missing.
     2. Implement the remaining tasks in order, following the
-       window-display-schedule skill. Run the tests after each task and
+       tvbox-schedule skill. Run the tests after each task and
        before marking it done.
     3. When a scenario's test fails, change the implementation, not the
        test. If a test looks wrong because it contradicts the spec, stop and
@@ -486,6 +485,6 @@ apply:
        until no BLOCKING findings remain. It is not optional and does not
        need the user's approval. Report the WARNING findings you left to
        the user when you ship.
-    6. Ship as the window-display-schedule skill describes (branch, commit,
+    6. Ship as the tvbox-schedule skill describes (branch, commit,
        push, PR through `gh api`; merge only when asked), and end by telling
        the person how to get the change onto the box.

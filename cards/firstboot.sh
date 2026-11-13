@@ -21,7 +21,7 @@ if [ -z "$home" ]; then
   log "ERROR: No user $TVBOX_USER yet. Trying again in a minute."
   exit 1
 fi
-repo="$home/HalloweenWindowDisplay"
+repo="$home/tvBox"
 
 # The network: wait for the repo's host when it's on the web (up to 10
 # minutes; the service tries again after that).

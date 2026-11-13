@@ -2,7 +2,7 @@
 # Sets up the box, or updates it after a change to scheduler/. Run on the
 # Raspberry Pi, from the repo, as your own user with sudo:
 #
-#   cd ~/HalloweenWindowDisplay && git pull && sudo bash scheduler/setup.sh
+#   cd ~/tvBox && git pull && sudo bash scheduler/setup.sh
 #
 # Safe to run again. It:
 #   - installs mpv, Node.js, git, logrotate, gpiod (for a tilt switch) and

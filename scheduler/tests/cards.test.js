@@ -27,7 +27,7 @@ const ANSWERS = {
   wifi: { ssid: 'Pumpkin Patch', password: 'hunter22', country: 'US' },
   timezone: 'America/New_York',
   sshKey: null,
-  repoUrl: 'https://github.com/ndipatri/HalloweenWindowDisplay.git',
+  repoUrl: 'https://github.com/ndipatri/tvBox.git',
 };
 const prepared = cards.prepareAnswers(ANSWERS);
 const card = (name, more = {}) => cards.buildCard(Object.assign({}, prepared, more), name);
@@ -113,10 +113,13 @@ test('the card sets the box up on first boot', () => {
   const file = (p) => ud.write_files.find((f) => f.path === p);
   const conf = file('/etc/tvbox/firstboot.conf');
   assert.ok(conf.content.includes('TVBOX_USER="nick"'), conf.content);
-  assert.ok(conf.content.includes('TVBOX_REPO_URL="https://github.com/ndipatri/HalloweenWindowDisplay.git"'), conf.content);
+  assert.ok(conf.content.includes('TVBOX_REPO_URL="https://github.com/ndipatri/tvBox.git"'), conf.content);
   assert.ok(conf.content.includes('TVBOX_TIMEZONE="America/New_York"'), conf.content);
   const script = file('/usr/local/sbin/tvbox-firstboot');
   assert.equal(script.content, fs.readFileSync(path.join(__dirname, '../../cards/firstboot.sh'), 'utf8'));
+  assert.ok(script.content.includes('repo="$home/tvBox"'), 'clones into ~/tvBox');
+  assert.ok(fs.readFileSync(path.join(__dirname, '../../cards/make-cards.js'), 'utf8')
+    .includes("const DEFAULT_REPO = 'https://github.com/ndipatri/tvBox.git';"), 'offers ndipatri/tvBox');
   assert.equal(script.permissions, '0755');
   const unit = file('/etc/systemd/system/tvbox-firstboot.service').content;
   for (const line of ['Restart=on-failure', 'ConditionPathExists=!/var/lib/tvbox/firstboot-done',

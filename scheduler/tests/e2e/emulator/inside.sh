@@ -5,7 +5,7 @@
 # tvbox.service does, the website on 8080, and the TV page on 8081.
 set -euo pipefail
 
-REPO=/home/pi/HalloweenWindowDisplay
+REPO=/home/pi/tvBox
 VIDEOS=/home/pi/video-scheduler
 mkdir -p /tmp/e2e /tmp/tv && chmod 777 /tmp/e2e /tmp/tv && : > /tmp/e2e/calls
 ln -sf "/usr/share/zoneinfo/${TZ:-America/New_York}" /etc/localtime

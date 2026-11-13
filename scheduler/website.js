@@ -751,7 +751,7 @@ const PAGE = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Window</title>
+<title>tvBox</title>
 <style>
   :root { color-scheme: dark; --bg: #121212; --card: #1e1e1e; --text: #f2f2f2; --dim: #a0a0a0; --accent: #ff8a1f; }
   * { box-sizing: border-box; }
@@ -819,7 +819,7 @@ const PAGE = `<!DOCTYPE html>
 </head>
 <body>
 <main>
-  <h1>Window <a class="other" href="/">Easy page</a></h1>
+  <h1>tvBox <a class="other" href="/">Easy page</a></h1>
 
   <h2>Play</h2>
   <div class="card">
@@ -1433,7 +1433,7 @@ const EASY_PAGE = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Window</title>
+<title>tvBox</title>
 <style>
   :root { color-scheme: dark; --bg: #121212; --card: #1e1e1e; --text: #f2f2f2; --dim: #a0a0a0; --accent: #ff8a1f; }
   * { box-sizing: border-box; }
@@ -1469,7 +1469,7 @@ const EASY_PAGE = `<!DOCTYPE html>
 <body>
 <main>
   <h1>Put your pictures on the TV</h1>
-  <p class="lead">Add your photos or videos and they'll play in the window.</p>
+  <p class="lead">Add your photos or videos and they'll play on the TV.</p>
   <div class="card">
     <label for="name">Your name</label>
     <input id="name" type="text" autocomplete="name" maxlength="60" placeholder="Aunt Sue">

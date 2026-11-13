@@ -25,7 +25,7 @@ const { spawn, spawnSync, execFileSync } = require('child_process');
 const cards = require('./cloud-init.js');
 
 const LATEST = 'https://downloads.raspberrypi.com/raspios_lite_arm64_latest';
-const DEFAULT_REPO = 'https://github.com/ndipatri/HalloweenWindowDisplay.git';
+const DEFAULT_REPO = 'https://github.com/ndipatri/tvBox.git';
 const CACHE = process.platform === 'darwin'
   ? path.join(os.homedir(), 'Library', 'Caches', 'tvbox')
   : path.join(os.homedir(), '.cache', 'tvbox');

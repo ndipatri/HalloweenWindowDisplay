@@ -116,7 +116,7 @@ function userData(a, name) {
 }
 
 const FIRSTBOOT_UNIT = `[Unit]
-Description=tvbox first boot: install and set up the window display
+Description=tvBox first boot: install and set up the box
 Wants=network-online.target
 After=network-online.target
 ConditionPathExists=!/var/lib/tvbox/firstboot-done
