@@ -38,6 +38,10 @@ github_filters() {
       rm -f "$root/.github-filters.json.syncing"
       log "ERROR: Couldn't copy the GitHub filters"
     fi
+  elif [ -e "$to" ] && ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+    # No repo at all (moved, or never cloned): that says nothing about the
+    # filters, so the box keeps the ones it has.
+    log "Keeping the GitHub filters: $repo isn't a git checkout."
   elif [ -e "$to" ]; then
     if rm -f "$to" && [ ! -e "$to" ]; then
       log "Removed the GitHub filters (the repo has none)."
