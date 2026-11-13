@@ -54,47 +54,24 @@ function machine() {
   return m;
 }
 
-// ---- Setup sets the upload PIN ----
+// ---- Setup asks for no upload PIN ----
 
-test('setup saves the upload PIN it is given', () => {
-  const m = machine();
-  const r = m.run({ TVBOX_UPLOAD_PIN: '4321' });
-  assert.equal(r.status, 0, r.out);
-  assert.ok(fs.existsSync(m.pinFile), 'the PIN file exists');
-  assert.equal(fs.readFileSync(m.pinFile, 'utf8').trim(), '4321');
-  assert.equal(fs.statSync(m.pinFile).mode & 0o777, 0o600);
-});
-
-test('setup keeps the saved upload PIN', () => {
+test('setup asks for no upload PIN and removes an old one', () => {
   const m = machine();
   fs.mkdirSync(m.videos);
-  // Saved before setup kept it private: setup keeps the PIN and makes the
-  // file readable only by its owner.
   fs.writeFileSync(m.pinFile, '4321\n');
-  fs.chmodSync(m.pinFile, 0o644);
-  const r = m.run();
+  const r = m.run({ TVBOX_UPLOAD_PIN: '4321' }); // an old habit: ignored
   assert.equal(r.status, 0, r.out);
-  assert.equal(fs.readFileSync(m.pinFile, 'utf8').trim(), '4321');
-  assert.equal(fs.statSync(m.pinFile).mode & 0o777, 0o600);
-});
-
-test("setup refuses an upload PIN that isn't 4 to 8 digits", () => {
-  const m = machine();
-  const r = m.run({ TVBOX_UPLOAD_PIN: '12a4' });
-  assert.notEqual(r.status, 0);
-  assert.ok(r.out.includes('The upload PIN must be 4 to 8 digits.'), r.out);
-  assert.ok(!m.installed(), 'nothing installed');
-  assert.ok(!fs.existsSync(path.join(m.root, 'opt/tvbox')), 'nothing copied');
-  assert.ok(!fs.existsSync(m.pinFile));
-});
-
-test('setup without a PIN or a terminal leaves adding photos off', () => {
-  const m = machine();
-  const r = m.run();
-  assert.equal(r.status, 0, r.out);
-  assert.ok(r.out.includes('No upload PIN set, so adding photos is off. To turn it on: ' +
-    'sudo TVBOX_UPLOAD_PIN=<4 to 8 digits> bash scheduler/setup.sh'), r.out);
-  assert.ok(!fs.existsSync(m.pinFile));
+  assert.ok(!fs.existsSync(m.pinFile), 'the old PIN file is gone');
+  assert.ok(r.out.includes('The upload PIN is no longer used, so it was removed.'), r.out);
+  assert.ok(!/Choose a PIN|PIN saved|No upload PIN set/.test(r.out), r.out);
+  // Nothing in setup asks for one, terminal or not.
+  const text = fs.readFileSync(SCRIPT, 'utf8');
+  assert.ok(!/TVBOX_UPLOAD_PIN|read -rs/.test(text), 'setup has no PIN prompt or setting');
+  // Run again: nothing to remove, nothing said.
+  const again = m.run();
+  assert.equal(again.status, 0, again.out);
+  assert.ok(!again.out.includes('upload PIN'), again.out);
 });
 
 test('setup makes the photos folder', () => {

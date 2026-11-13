@@ -109,15 +109,16 @@ check "setup installs the log rule, and logrotate accepts it" \
 check "setup's first sync brings the GitHub filters, owned by pi, and no custom ones" \
   bash -c "test \"\$(stat -c %U '$VIDEOS/github-filters.json')\" = pi && grep -q 'Halloween grownup' '$VIDEOS/github-filters.json' && test ! -e '$VIDEOS/filters.json' && logged 'Updated the GitHub filters.'"
 
-echo "== Adding photos: first boot sets no PIN; setup run again with one"
-check "first boot, with no one to ask, leaves adding photos off and says so" \
-  bash -c "grep -q 'No upload PIN set, so adding photos is off' '$E/setup.out' && test ! -e '$VIDEOS/upload-pin'"
+echo "== Adding photos: no PIN"
+check "first boot asks for no upload PIN and saves none" \
+  bash -c "! grep -q 'PIN' '$E/setup.out' && test ! -e '$VIDEOS/upload-pin'"
 check "setup makes the photos folder" test -d "$VIDEOS/photos"
 check "sync skips the repo's playlists/photos" \
   bash -c "logged 'Skipping playlists/photos: that name is kept for uploads from the website.' && test ! -e '$VIDEOS/photos/x.mp4'"
-env PATH="/opt/e2e-fakes:$PATH" SUDO_USER=pi TVBOX_UPLOAD_PIN=4321 bash "$REPO/scheduler/setup.sh" < /dev/null > "$E/setup2.out" 2>&1
-check "setup run again with TVBOX_UPLOAD_PIN saves it, readable only by pi" \
-  bash -c "[ \"\$(cat '$VIDEOS/upload-pin')\" = 4321 ] && [ \"\$(stat -c '%a %U' '$VIDEOS/upload-pin')\" = '600 pi' ]"
+echo 4321 > "$VIDEOS/upload-pin" # as an older setup left it
+env PATH="/opt/e2e-fakes:$PATH" SUDO_USER=pi bash "$REPO/scheduler/setup.sh" < /dev/null > "$E/setup2.out" 2>&1
+check "setup run again removes an old upload PIN and says so" \
+  bash -c "test ! -e '$VIDEOS/upload-pin' && grep -q 'The upload PIN is no longer used, so it was removed.' '$E/setup2.out'"
 
 echo "== The player, as tvbox.service runs it (website on 8080 instead of 80)"
 # What systemd would provide: /run/tvbox, and the clock set from the network.
@@ -171,8 +172,8 @@ check "back to schedule removes the override" within 10 test ! -e "$VIDEOS/overr
 check "the status leaves the override" within 20 bash -c '! status | grep -q override'
 
 echo "== Photos and videos added from a phone"
-upload() { # file name pin -> the website's answer
-  curl -sS -X POST -H "X-Upload-Pin: $3" --data-binary "@$1" "$SITE/api/uploads?name=$2"
+upload() { # file name -> the website's answer
+  curl -sS -X POST --data-binary "@$1" "$SITE/api/uploads?name=$2"
 }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 # A plain portrait photo, a photo stored sideways with EXIF orientation 6
@@ -195,21 +196,19 @@ if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx265; then
   ffmpeg -loglevel error -f lavfi -i "color=c=yellow:s=108x192:d=2" -r 24 -c:v libx265 -tag:v hvc1 -pix_fmt yuv420p "$E/hevc.mp4" && hevc_ok=1
 fi
 
-check "a batch check with the wrong PIN is refused (403)" \
-  test "$(code -X POST -H 'X-Upload-Pin: 1111' -d '{"files":[{"name":"a.jpg","bytes":10}]}' "$SITE/api/uploads/check")" = 403
-check "a batch check with the right PIN is ready" \
-  bash -c "curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'Ready to add 1 file.'"
-echo "   $(upload "$E/red.jpg" Red.JPG 4321)"
-check "an upload with the right PIN is added and logged" \
+check "a batch check with no PIN is ready" \
+  bash -c "curl -sS -X POST -d '{\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'Ready to add 1 file.'"
+echo "   $(upload "$E/red.jpg" Red.JPG)"
+check "an upload with no PIN is added and logged" \
   bash -c "test -f '$VIDEOS/photos/00001-red.jpg' && logged 'Uploaded photos/00001-red.jpg'"
-echo "   $(upload "$E/sideways.jpg" Sideways.jpg 4321)"
-echo "   $(upload "$E/half.png" Half.png 4321)"
-[ $hevc_ok -eq 1 ] && echo "   $(upload "$E/hevc.mp4" Phone.mp4 4321)"
+echo "   $(upload "$E/sideways.jpg" Sideways.jpg)"
+echo "   $(upload "$E/half.png" Half.png)"
+[ $hevc_ok -eq 1 ] && echo "   $(upload "$E/hevc.mp4" Phone.mp4)"
 check "the website lists the uploads in order" bash -c "
   curl -fsS $SITE/api/uploads | node -e '
     const d = JSON.parse(require(\"fs\").readFileSync(0));
     const names = d.uploads.map((u) => u.name);
-    process.exit(d.pinSet && names[0] === \"00001-red.jpg\" && names[1] === \"00002-sideways.jpg\" && names[2] === \"00003-half.png\" ? 0 : 1);'"
+    process.exit(names[0] === \"00001-red.jpg\" && names[1] === \"00002-sideways.jpg\" && names[2] === \"00003-half.png\" ? 0 : 1);'"
 check "the website sends an upload with a range" \
   test "$(code -H 'Range: bytes=0-9' "$SITE/photos/00001-red.jpg")" = 206
 
@@ -267,7 +266,7 @@ lines=$(grep -c '#upload: playing' "$LOG")
 within 15 bash -c "[ \$(grep -c '#upload: playing' '$LOG') -gt $lines ]"
 playing="$(grep -o '#upload: playing [^ ]*' "$LOG" | tail -1 | cut -d' ' -f3)"
 errors_before=$(grep -c 'ERROR' "$LOG")
-echo "   removing $playing: $(curl -sS -X POST -H 'X-Upload-Pin: 4321' -d "{\"name\":\"$playing\"}" "$SITE/api/uploads/remove")"
+echo "   removing $playing: $(curl -sS -X POST -d "{\"name\":\"$playing\"}" "$SITE/api/uploads/remove")"
 check "removing the upload on screen deletes it and logs it" \
   bash -c "test ! -e '$VIDEOS/photos/$playing' && logged 'Removed photos/$playing (from the website)'"
 check "the next upload comes on at once after the removed one" within 5 bash -c "
@@ -315,7 +314,7 @@ echo "   $(post /api/show '{"tags":["favorites"],"filters":["Halloween grownup"]
 check "a tag and a filter play together" within 20 bash -c '[ "$(status)" = "#favorites + Halloween grownup (override until cleared)" ]'
 check "the mix plays the filter's video too" within 60 logged "#favorites + Halloween grownup: playing c.mp4"
 echo "   $(post /api/schedule '{}')"
-saved="$(curl -sS -X POST -H 'X-Upload-Pin: 4321' -H 'Content-Type: application/json' \
+saved="$(curl -sS -X POST -H 'Content-Type: application/json' \
   -d '{"filters":[{"name":"Rehearsal","anyOf":["halloween"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' \
   "$SITE/api/filters")"
 echo "   $saved"
@@ -323,7 +322,7 @@ check "a saved custom filter comes first among the choices" bash -c "
   curl -fsS $SITE/api/choices | node -e '
     const d = JSON.parse(require(\"fs\").readFileSync(0));
     process.exit(d.filters.join() === \"Rehearsal,Halloween kid,Halloween grownup,Thanksgiving\" ? 0 : 1);'"
-clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Upload-Pin: 4321' -d '{"filters":[{"name":"Thanksgiving","anyOf":["favorites"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' "$SITE/api/filters")"
+clash_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"filters":[{"name":"Thanksgiving","anyOf":["favorites"],"schedule":[{"from":"01-01","to":"12-31"}]}]}' "$SITE/api/filters")"
 check "a custom filter can't take a GitHub filter's name" test "$clash_code" = 400
 check "a filter scheduled all year plays" within 20 bash -c '[ "$(status)" = "Rehearsal (scheduled all day)" ]'
 check "a video after the photos is fitted whole again (panscan back to 0)" \
@@ -343,7 +342,7 @@ check "turning the TV to landscape turns mpv's picture to 0 degrees, logged" \
 check "with no landscape clip in the filter, the screen is black, logged" \
   within 10 bash -c "logged 'Nothing in Rehearsal is landscape. Showing black until something is, or the TV is turned back.' && [ \"\$(mpv_get playlist-count)\" = 0 ]"
 ffmpeg -loglevel error -y -f lavfi -i "color=c=cyan:s=160x96" -frames:v 1 "$E/wide.jpg"
-echo "   $(upload "$E/wide.jpg" Wide.jpg 4321)"
+echo "   $(upload "$E/wide.jpg" Wide.jpg)"
 wide="$(ls "$VIDEOS/photos" | grep -- '-wide.jpg$')"
 uploads_before="$(ls -A "$VIDEOS/photos")" # for the sync check below, which must leave it alone
 echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
@@ -391,11 +390,11 @@ check "on a black screen, the code is taken away" within 5 bash -c "! code_up"
 echo "   $(post /api/schedule '{}')"
 
 echo "== The easy page: a visitor adds a photo under their name"
-visitor_tag="$(curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{"name":"Aunt Sue","files":[{"name":"red.jpg","bytes":10}]}' "$SITE/api/uploads/check" | node -pe 'JSON.parse(require("fs").readFileSync(0)).tag')"
+visitor_tag="$(curl -sS -X POST -d '{"name":"Aunt Sue","files":[{"name":"red.jpg","bytes":10}]}' "$SITE/api/uploads/check" | node -pe 'JSON.parse(require("fs").readFileSync(0)).tag')"
 check "the visitor's name becomes their tag" test "$visitor_tag" = aunt-sue
 check "a name the box uses is refused" \
-  bash -c "curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{\"name\":\"Upload\",\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'That name is taken by the box'"
-echo "   $(curl -sS -X POST -H 'X-Upload-Pin: 4321' --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=visitor.jpg&tag=aunt-sue")"
+  bash -c "curl -sS -X POST -d '{\"name\":\"Upload\",\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'That name is taken by the box'"
+echo "   $(curl -sS -X POST --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=visitor.jpg&tag=aunt-sue")"
 check "the visitor's upload is tagged with their name, logged" \
   bash -c "grep -q '\"aunt-sue\"' $VIDEOS/tags.json && grep -qE 'Uploaded photos/[0-9]+-visitor.jpg \(0.0 MB\) for aunt-sue' '$LOG'"
 echo "   $(post /api/show '{"tags":["aunt-sue"],"until":"cleared"}')"

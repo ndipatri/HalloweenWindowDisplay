@@ -22,7 +22,6 @@ const CONTENT_TYPES = {
 };
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
-const COUNTS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 
 // `options`: { config, videoRoot, now() -> Date, log, readText, writeText,
 //              removeFile, listFolder, fileSize(path) -> bytes or null,
@@ -39,10 +38,8 @@ function createWebsite(options) {
   // with the filters and tags files.
   const logic = createScheduler(Object.assign({}, options, { log() {} }));
   const PHOTOS_DIR = videoRoot + '/' + logic.PHOTOS;
-  const PIN_PATH = videoRoot + '/upload-pin';
   const COUNTER_PATH = PHOTOS_DIR + '/.last-number';
   const limits = config.uploads;
-  const pinLock = { wrong: 0, until: 0 };
 
   // Part files left by an upload cut off when the box stopped: no upload can
   // be under way yet, so every one is left over.
@@ -237,12 +234,9 @@ function createWebsite(options) {
     }
   })();
 
-  // POST /api/filters { filters } with the upload PIN: replaces the box's
-  // filters, after checking every one.
-  async function saveFilters(headers, body) {
-    if (savedPin() === null) return json(403, { error: 'Editing filters is off until a PIN is set on the box.' });
-    const refused = checkPin(pinFrom(headers));
-    if (refused) return refused;
+  // POST /api/filters { filters }: replaces the box's filters, after
+  // checking every one. No PIN, like the rest of the website.
+  async function saveFilters(body) {
     if (!body || !Array.isArray(body.filters)) return fail('Bad request.');
     const checked = logic.checkFilters(body.filters);
     if (checked.errors.length) {
@@ -276,42 +270,6 @@ function createWebsite(options) {
 
   // ---------- Uploads ----------
 
-  // The saved upload PIN, or null if there is none (or it isn't 4 to 8 digits).
-  function savedPin() {
-    const text = readText(PIN_PATH);
-    const pin = text === null ? '' : text.trim();
-    return /^\d{4,8}$/.test(pin) ? pin : null;
-  }
-
-  function samePin(given, saved) {
-    const a = Buffer.from(typeof given === 'string' ? given : '');
-    const b = Buffer.from(saved);
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
-  }
-
-  // null if `pin` lets the request through, otherwise the refusal. Wrong or
-  // missing PINs in a row lock uploads, checks and removals for a while.
-  function checkPin(pin) {
-    const saved = savedPin();
-    if (saved === null) return json(403, { error: 'Adding photos is off: no upload PIN is set on the box.' });
-    const at = now();
-    if (at.getTime() < pinLock.until) {
-      return json(429, { error: 'Too many wrong PINs. Try again after ' + logic.formatTime(new Date(pinLock.until), at) + '.' });
-    }
-    if (!samePin(pin, saved)) {
-      pinLock.wrong++;
-      if (pinLock.wrong >= limits.pinTries) {
-        pinLock.wrong = 0;
-        pinLock.until = at.getTime() + limits.lockMinutes * 60 * 1000;
-        log((COUNTS[limits.pinTries] || String(limits.pinTries)) + ' wrong upload PINs in a row: uploads locked until ' +
-          logic.formatTime(new Date(pinLock.until), at));
-      }
-      return json(403, { error: 'Wrong PIN.' });
-    }
-    pinLock.wrong = 0;
-    return null;
-  }
-
   function extensionOf(name) {
     return name.includes('.') ? name.split('.').pop().toLowerCase() : '';
   }
@@ -342,7 +300,6 @@ function createWebsite(options) {
 
   function listUploads() {
     return {
-      pinSet: savedPin() !== null,
       uploads: uploadNames().map((name) => ({
         name,
         kind: config.photoExtensions.includes(extensionOf(name)) ? 'photo' : 'video',
@@ -352,19 +309,19 @@ function createWebsite(options) {
   }
 
   // Asked before a batch is sent, so a refusal shows before any file goes.
-  function checkBatch(headers, body) {
+  function checkBatch(body) {
     const files = body && Array.isArray(body.files) ? body.files : null;
     const valid = files && files.length > 0 && files.every((f) =>
       f && typeof f.name === 'string' && Number.isInteger(f.bytes) && f.bytes >= 0);
     if (!valid) return fail('Bad request.');
-    // From the easy page: the visitor's name, checked first (no PIN try).
+    // From the easy page: the visitor's name.
     let tag;
     if (body.name !== undefined) {
       const v = visitorTag(body.name);
       if (v.error) return fail(v.error);
       tag = v.tag;
     }
-    const refused = checkPin(pinFrom(headers)) || checkFiles(files);
+    const refused = checkFiles(files);
     if (refused) return refused;
     const answer = { message: 'Ready to add ' + files.length + (files.length === 1 ? ' file.' : ' files.') };
     if (tag) answer.tag = tag;
@@ -374,9 +331,9 @@ function createWebsite(options) {
   // One file, streamed to a hidden part file and then numbered into place.
   // `stream` is not read at all when the upload is refused.
   // With `tag` (from the easy page) the saved file gets that box tag.
-  async function receiveUpload({ name, pin, length, stream, tag }) {
+  async function receiveUpload({ name, length, stream, tag }) {
     if (typeof name !== 'string' || !Number.isInteger(length) || length < 0) return fail('Bad request.');
-    const refused = checkVisitorTag(tag) || checkPin(pin) || checkFiles([{ name, bytes: length }]);
+    const refused = checkVisitorTag(tag) || checkFiles([{ name, bytes: length }]);
     if (refused) return refused;
 
     fs.mkdirSync(PHOTOS_DIR, { recursive: true });
@@ -467,10 +424,8 @@ function createWebsite(options) {
     return (stem || 'upload') + '.' + extension;
   }
 
-  async function removeUpload(headers, body) {
+  async function removeUpload(body) {
     const name = body && typeof body.name === 'string' ? body.name : '';
-    const refused = checkPin(pinFrom(headers));
-    if (refused) return refused;
     if (!uploadNames().includes(name)) return json(404, { error: 'No upload named ' + name + '.' });
     const file = PHOTOS_DIR + '/' + name;
     if (options.beforeRemove) await options.beforeRemove(file);
@@ -623,12 +578,12 @@ function createWebsite(options) {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
       if (!parsed || typeof parsed !== 'object') return fail('Bad request.');
-      return route === 'POST /api/tags' ? changeTag(parsed) : saveFilters(headers, parsed);
+      return route === 'POST /api/tags' ? changeTag(parsed) : saveFilters(parsed);
     }
     if (route === 'POST /api/uploads/check' || route === 'POST /api/uploads/remove') {
       let parsed;
       try { parsed = JSON.parse(body || '{}'); } catch (e) { return fail('Bad request.'); }
-      return route === 'POST /api/uploads/check' ? checkBatch(headers, parsed) : removeUpload(headers, parsed);
+      return route === 'POST /api/uploads/check' ? checkBatch(parsed) : removeUpload(parsed);
     }
     if (route === 'GET /api/log') {
       const text = readTail(videoRoot + '/scheduler.log', LOG_TAIL_BYTES);
@@ -657,10 +612,6 @@ function createWebsite(options) {
   }
 
   return { handle, choices, receiveUpload, fileResponse };
-}
-
-function pinFrom(headers) {
-  return headers ? headers['x-upload-pin'] : undefined;
 }
 
 function gbText(bytes) {
@@ -716,7 +667,7 @@ function startWebsite(options, port) {
       try { tag = t ? decodeURIComponent(t[1]) : undefined; } catch (e) { tag = ''; }
       const length = Number(req.headers['content-length']);
       if (!name || !Number.isInteger(length)) return send(json(400, { error: 'Bad request.' }));
-      site.receiveUpload({ name, pin: req.headers['x-upload-pin'], length, stream: req, tag }).then(send, failed);
+      site.receiveUpload({ name, length, stream: req, tag }).then(send, failed);
       return undefined;
     }
 
@@ -837,7 +788,7 @@ const PAGE = `<!DOCTYPE html>
   .editor label { display: block; font-size: 14px; color: var(--dim); margin: 8px 0 4px; }
   .editor .ticks label { display: inline-flex; align-items: center; gap: 4px; margin: 2px 10px 2px 0; color: var(--text); }
   .editor .entry { border-top: 1px dashed #3a3a3a; margin-top: 8px; padding-top: 6px; }
-  #filter-pin { margin: 10px 0; }
+  #filter-save { margin-top: 10px; }
   h1 .other { float: right; font-size: 15px; font-weight: 400; color: var(--accent); margin-top: 4px; }
   [hidden] { display: none !important; }
 </style>
@@ -877,25 +828,20 @@ const PAGE = `<!DOCTYPE html>
 
   <h2>Photos and videos</h2>
   <div class="card">
-    <div id="add-off" hidden>Adding photos is off until a PIN is set on the box.</div>
-    <div id="add-on">
-      <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
-      <label class="pick">Add photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
-      <div id="progress"></div>
-    </div>
-    <div class="hint">Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Adding and removing need the PIN. Videos from GitHub take their tags from their folders there.</div>
+    <label class="pick">Add photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
+    <div id="progress"></div>
+    <div class="hint">Tap ☆ to add one to Favorites, or add any tag to put it in the filters with that tag. Each change is saved straight away. Videos from GitHub take their tags from their folders there.</div>
     <div id="taglist">Loading…</div>
     <datalist id="tagnames"></datalist>
   </div>
 
   <h2>Filters</h2>
   <div class="card">
-    <div class="hint">A filter plays everything with any of its tags, except its "except" tags. Your own filters come first: where schedules overlap, the higher filter wins. Changes need the PIN, and Save filters.</div>
+    <div class="hint">A filter plays everything with any of its tags, except its "except" tags. Your own filters come first: where schedules overlap, the higher filter wins. Changes need Save filters.</div>
     <div class="group">Yours</div>
     <div id="filterlist">Loading…</div>
     <div id="filter-editor" class="editor" hidden></div>
     <button id="filter-new">New filter</button>
-    <input id="filter-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
     <button class="primary" id="filter-save">Save filters</button>
     <div id="filter-note" class="note" role="status" aria-live="polite"></div>
     <div class="group">From GitHub</div>
@@ -1037,33 +983,25 @@ const PAGE = `<!DOCTYPE html>
 
   // ---- Adding and removing photos ----
 
-  const PIN_KEY = 'tvbox-upload-pin';
-  const remember = (pin) => { try { localStorage.setItem(PIN_KEY, pin); } catch (e) { /* not kept */ } };
-  function forgetPin() {
-    try { localStorage.removeItem(PIN_KEY); } catch (e) { /* nothing kept */ }
-    $('pin').value = '';
-    $('pin').focus();
-  }
-  try { $('pin').value = localStorage.getItem(PIN_KEY) || ''; } catch (e) { /* type it */ }
-  const refusedPin = (error) => error === 'Wrong PIN.' || /^Too many wrong PINs/.test(error || '');
+  // A PIN kept by an older page is no longer needed.
+  try { localStorage.removeItem('tvbox-upload-pin'); } catch (e) { /* nothing kept */ }
 
   const api = {
-    async check(pin, files) {
+    async check(files) {
       try {
         const r = await fetch('/api/uploads/check', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Upload-Pin': pin },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ files: files.map((f) => ({ name: f.name, bytes: f.size })) }),
         });
         const d = await r.json();
         return { ok: r.ok, message: d.message, error: d.error };
       } catch (e) { return { ok: false, error: "Couldn't reach the box." }; }
     },
-    upload(file, pin, onProgress) {
+    upload(file, onProgress) {
       return new Promise((resolve) => {
         const x = new XMLHttpRequest();
         x.open('POST', '/api/uploads?name=' + encodeURIComponent(file.name));
-        x.setRequestHeader('X-Upload-Pin', pin);
         x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded * 100) / e.total)); };
         x.onload = () => {
           let d = {};
@@ -1079,7 +1017,6 @@ const PAGE = `<!DOCTYPE html>
   const rows = {};
   const ui = {
     say,
-    forgetPin,
     progress(name, text) {
       if (!rows[name]) {
         rows[name] = document.createElement('div');
@@ -1093,39 +1030,23 @@ const PAGE = `<!DOCTYPE html>
     const files = Array.from($('files').files);
     $('files').value = '';
     if (!files.length) return;
-    const pin = $('pin').value.trim();
-    if (!pin) { say('Type the PIN first.', true); $('pin').focus(); return; }
-    remember(pin);
     $('progress').textContent = '';
     for (const k of Object.keys(rows)) delete rows[k];
-    await sendBatch(files, pin, api, ui);
-    loadUploads();
+    await sendBatch(files, api, ui);
     loadItems();
   };
 
   async function removeUpload(name) {
-    const pin = $('pin').value.trim();
-    if (!pin) { say('Type the PIN first.', true); $('pin').focus(); return; }
     try {
       const r = await fetch('/api/uploads/remove', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Upload-Pin': pin },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
       const d = await r.json();
       say(d.message || d.error, !r.ok);
-      if (refusedPin(d.error)) forgetPin(); else remember(pin);
     } catch (e) { say("Couldn't reach the box.", true); }
-    loadUploads();
     loadItems();
-  }
-
-  async function loadUploads() {
-    try {
-      const d = await (await fetch('/api/uploads')).json();
-      $('add-off').hidden = d.pinSet;
-      $('add-on').hidden = !d.pinSet;
-    } catch (e) { /* the status line already says the box can't be reached */ }
   }
 
   // ---- Tags ----
@@ -1397,24 +1318,16 @@ const PAGE = `<!DOCTYPE html>
   }
 
   $('filter-new').onclick = () => openEditor(-1);
-  try { $('filter-pin').value = localStorage.getItem(PIN_KEY) || ''; } catch (e) { /* type it */ }
   $('filter-save').onclick = async () => {
-    const pin = $('filter-pin').value.trim();
-    if (!pin) { noteFilters('Type the PIN first.', true); $('filter-pin').focus(); return; }
     noteFilters('Saving…');
     try {
       const r = await fetch('/api/filters', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Upload-Pin': pin },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filters }),
       });
       const d = await r.json();
       noteFilters(r.ok ? '✓ ' + d.message : d.error, !r.ok);
-      if (refusedPin(d.error)) {
-        try { localStorage.removeItem(PIN_KEY); } catch (e) { /* nothing kept */ }
-        $('filter-pin').value = '';
-        $('filter-pin').focus();
-      } else if (r.ok) remember(pin);
       if (r.ok) { loadFilters(); load(); }
     } catch (e) { noteFilters("Couldn't reach the box.", true); }
   };
@@ -1428,7 +1341,6 @@ const PAGE = `<!DOCTYPE html>
     $('sync-note').className = 'note' + (r.ok ? '' : ' error');
   };
   load().catch(() => say("Couldn't reach the box.", true));
-  loadUploads();
   loadItems();
   loadFilters();
   refresh();
@@ -1436,24 +1348,20 @@ const PAGE = `<!DOCTYPE html>
 </script>
 <script>
   // Adding a batch of files: the box checks the whole batch first, then each
-  // file is sent in turn. Stops at the first refusal; a wrong PIN or a lock
-  // forgets the remembered PIN, so it is asked for again. No page code here,
-  // so it can be tried on its own.
-  async function sendBatch(files, pin, api, ui) {
-    const refusedPin = (error) => error === 'Wrong PIN.' || /^Too many wrong PINs/.test(error || '');
-    const checked = await api.check(pin, files);
+  // file is sent in turn. Stops at the first refusal. No page code here, so
+  // it can be tried on its own.
+  async function sendBatch(files, api, ui) {
+    const checked = await api.check(files);
     if (!checked.ok) {
       ui.say(checked.error, true);
-      if (refusedPin(checked.error)) ui.forgetPin();
       return false;
     }
     for (const file of files) {
       ui.progress(file.name, 'Sending…');
-      const r = await api.upload(file, pin, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
+      const r = await api.upload(file, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
       ui.progress(file.name, r.ok ? r.message : r.error);
       if (!r.ok) {
         ui.say(r.error, true);
-        if (refusedPin(r.error)) ui.forgetPin();
         return false;
       }
     }
@@ -1532,9 +1440,6 @@ const EASY_PAGE = `<!DOCTYPE html>
   <div class="card">
     <label for="name">Your name</label>
     <input id="name" type="text" autocomplete="name" maxlength="60" placeholder="Aunt Sue">
-    <label for="pin">PIN</label>
-    <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
-    <div class="hint">Ask whoever runs the window for the PIN.</div>
     <label>Photos and videos</label>
     <label class="pick">Choose photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
     <div id="chosen"></div>
@@ -1546,8 +1451,7 @@ const EASY_PAGE = `<!DOCTYPE html>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
-  const PIN_KEY = 'tvbox-upload-pin';
-  try { $('pin').value = localStorage.getItem(PIN_KEY) || ''; } catch (e) { /* type it */ }
+  try { localStorage.removeItem('tvbox-upload-pin'); } catch (e) { /* no longer needed */ }
   try { $('name').value = localStorage.getItem('tvbox-visitor-name') || ''; } catch (e) { /* type it */ }
 
   function say(text, error) {
@@ -1560,24 +1464,21 @@ const EASY_PAGE = `<!DOCTYPE html>
     $('chosen').textContent = n ? (n === 1 ? '1 file chosen' : n + ' files chosen') : '';
   };
 
-  async function postJson(path, body, pin) {
+  async function postJson(path, body) {
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (pin) headers['X-Upload-Pin'] = pin;
-      const r = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
+      const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json();
       return { ok: r.ok, message: d.message, error: d.error, tag: d.tag };
     } catch (e) { return { ok: false, error: "Couldn't reach the box." }; }
   }
 
   const api = {
-    check: (pin, files, name) => postJson('/api/uploads/check',
-      { name, files: files.map((f) => ({ name: f.name, bytes: f.size })) }, pin),
-    upload(file, pin, tag, onProgress) {
+    check: (files, name) => postJson('/api/uploads/check',
+      { name, files: files.map((f) => ({ name: f.name, bytes: f.size })) }),
+    upload(file, tag, onProgress) {
       return new Promise((resolve) => {
         const x = new XMLHttpRequest();
         x.open('POST', '/api/uploads?name=' + encodeURIComponent(file.name) + '&tag=' + encodeURIComponent(tag));
-        x.setRequestHeader('X-Upload-Pin', pin);
         x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded * 100) / e.total)); };
         x.onload = () => {
           let d = {};
@@ -1594,12 +1495,8 @@ const EASY_PAGE = `<!DOCTYPE html>
   const rows = {};
   const ui = {
     say,
-    forgetPin() {
-      try { localStorage.removeItem(PIN_KEY); } catch (e) { /* nothing kept */ }
-      $('pin').value = '';
-    },
-    remember(name, pin) {
-      try { localStorage.setItem(PIN_KEY, pin); localStorage.setItem('tvbox-visitor-name', name); } catch (e) { /* not kept */ }
+    remember(name) {
+      try { localStorage.setItem('tvbox-visitor-name', name); } catch (e) { /* not kept */ }
     },
     progress(name, text) {
       if (!rows[name]) {
@@ -1614,40 +1511,34 @@ const EASY_PAGE = `<!DOCTYPE html>
     $('send').disabled = true;
     $('progress').textContent = '';
     for (const k of Object.keys(rows)) delete rows[k];
-    const form = { name: $('name').value, pin: $('pin').value, files: Array.from($('files').files) };
+    const form = { name: $('name').value, files: Array.from($('files').files) };
     const done = await sendVisit(form, api, ui);
     if (done) { $('files').value = ''; $('chosen').textContent = ''; }
     $('send').disabled = false;
   };
 </script>
 <script>
-  // Put them on the TV: the name, PIN and files are needed; the box checks
-  // the name and the whole batch, each file is sent with the visitor's tag,
-  // and only when all were added is the tag played, until changed. Stops at
-  // the first refusal; a wrong PIN or a lock forgets the remembered PIN. No
-  // page code here, so it can be tried on its own.
+  // Put them on the TV: a name and files are needed; the box checks the
+  // name and the whole batch, each file is sent with the visitor's tag, and
+  // only when all were added is the tag played, until changed. Stops at the
+  // first refusal. No page code here, so it can be tried on its own.
   async function sendVisit(form, api, ui) {
     const name = String(form.name || '').trim();
-    const pin = String(form.pin || '').trim();
     const files = form.files || [];
     if (!name) { ui.say('Type your name first.', true); return false; }
-    if (!pin) { ui.say('Type the PIN first.', true); return false; }
     if (!files.length) { ui.say('Choose some photos or videos first.', true); return false; }
-    const refusedPin = (error) => error === 'Wrong PIN.' || /^Too many wrong PINs/.test(error || '');
-    const checked = await api.check(pin, files, name);
+    const checked = await api.check(files, name);
     if (!checked.ok) {
       ui.say(checked.error, true);
-      if (refusedPin(checked.error)) ui.forgetPin();
       return false;
     }
-    ui.remember(name, pin);
+    ui.remember(name);
     for (const file of files) {
       ui.progress(file.name, 'Sending…');
-      const r = await api.upload(file, pin, checked.tag, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
+      const r = await api.upload(file, checked.tag, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
       ui.progress(file.name, r.ok ? 'Added.' : r.error);
       if (!r.ok) {
         ui.say(r.error, true);
-        if (refusedPin(r.error)) ui.forgetPin();
         return false;
       }
     }

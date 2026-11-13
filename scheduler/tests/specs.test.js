@@ -63,6 +63,21 @@ test('the check reports scenarios with no test and skips removed ones', () => {
   assert.deepEqual(missing.map((s) => s.name), ['uncovered thing']);
 });
 
+test('the check skips a main spec requirement that a change in progress removes', () => {
+  const MAIN = `### Requirement: Old\nThe system SHALL.\n\n#### Scenario: old thing\n- **WHEN** x\n- **THEN** y\n\n` +
+    `### Requirement: Kept\nThe system SHALL.\n\n#### Scenario: kept thing\n- **WHEN** x\n- **THEN** y\n`;
+  const root = project({
+    'openspec/specs/thing/spec.md': MAIN,
+    'openspec/changes/demo/specs/thing/spec.md': '## REMOVED Requirements\n\n### Requirement: Old\n**Reason**: gone\n',
+    'scheduler/tests/a.test.js': '',
+  });
+  assert.deepEqual(check({ root, changes: [] }).missing.map((s) => s.name), ['kept thing']);
+  assert.deepEqual(check({ root }).missing.map((s) => s.name), ['kept thing']);
+  // Once archived (no change in progress), the main spec is checked whole.
+  const archived = project({ 'openspec/specs/thing/spec.md': MAIN, 'scheduler/tests/a.test.js': '' });
+  assert.deepEqual(check({ root: archived }).missing.map((s) => s.name), ['old thing', 'kept thing']);
+});
+
 test('the check matches names exactly, including quotes', () => {
   const root = project({
     'openspec/specs/thing/spec.md': "#### Scenario: Mochi's night\n#### Scenario: covered Thing\n",
