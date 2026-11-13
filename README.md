@@ -17,13 +17,29 @@ The first tvBox is a Halloween window: a portrait TV behind a sheer curtain in a
 
 **Contents**
 
-1. [What it does](#what-it-does)
-2. [How it works](#how-it-works)
-3. [What's playing](#whats-playing)
-4. [The videos](#the-videos)
-5. [Set it up](#set-it-up)
-6. [Using it](#using-it)
-7. [If something's wrong](#if-somethings-wrong)
+1. [Two ways to use it](#two-ways-to-use-it)
+2. [What it does](#what-it-does)
+3. [How it works](#how-it-works)
+4. [What's playing](#whats-playing)
+5. [The videos](#the-videos)
+6. [Set it up](#set-it-up)
+7. [Using it](#using-it)
+8. [If something's wrong](#if-somethings-wrong)
+
+## Two ways to use it
+
+The same box works in two quite different ways, and can switch between them whenever you like.
+
+**As a holiday window display.** The TV faces out of a window, usually standing upright behind a sheer curtain, for people passing in the street. It runs by itself on the shared schedule: Halloween videos in October (gentler ones early in the evening, scarier ones later), Thanksgiving in November, and a black screen the rest of the time. You set it up once and leave it; new videos and schedule changes arrive from this repo by themselves. This is how the first tvBox is used. See "Placing the TV in a window" for getting it to look right from outside.
+
+**As a picture frame at home.** The TV sits in a room, portrait or landscape, and shows your own photos and videos. Anyone at home can add pictures whenever they like, straight from their phone, with no app and no password:
+
+- scan the QR code in the corner of the TV, type a name, pick some photos or videos, and tap **Put them on the TV**: they start playing straight away, under that name;
+- or, on the advanced page, add them to **Uploads**, star the best ones into **Favorites**, or give them tags like `family` or `summer-2026`.
+
+Then pick what the frame shows under **Play** (Favorites, one person's pictures, a tag, or several at once) and leave it **Until switched back**, so it stays on that until someone changes it. Or make your own filter to put a tag on a schedule, like the kids' pictures every morning. If you don't want the QR code on screen, switch it off under **TV**.
+
+One thing to know when using it as a frame: the shared holiday schedule still applies in its season. Anything you choose **Until switched back** stays on regardless, but if you go **Back to schedule** in October, the Halloween videos take over. A box can happily be a picture frame most of the year and a window display for the holidays.
 
 ## What it does
 
