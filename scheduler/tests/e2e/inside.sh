@@ -403,6 +403,7 @@ check "the visitor's tag plays, and only that" within 30 bash -c "logged '#aunt-
 echo "   $(post /api/schedule '{}')"
 
 echo "== Check for new videos now, and the recent activity"
+uploads_before="$(ls -A "$VIDEOS/photos")" # the visitor's photo included
 syncs_before=$(grep -c "sync: Done:" "$LOG")
 echo "   $(post /api/sync '{}')"
 check "Check for new videos now starts a sync that finishes in the log" \
