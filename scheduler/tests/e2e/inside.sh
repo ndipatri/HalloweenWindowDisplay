@@ -377,14 +377,15 @@ check "the code is a QR code of the address" \
     process.stdout.write(raw[0] > 200 && raw[Math.floor(2.5 * m) * n + Math.floor(2.5 * m)] < 50 ? \"ok\" : \"no\");
   ')\" = ok ]"
 echo "   $(post /api/show '{"tags":["upload"],"until":"cleared"}')"
-check "the code is drawn when a photo starts, in the top-right of the panel (bottom-right of the portrait TV)" \
+check "the code is drawn as photos play, in the top-right of the panel (bottom-right of the portrait TV)" \
   within 30 bash -c "code_up && grep -q '\"x\":1780,\"y\":24' $CODE"
-check "and taken away 3 to 4 seconds later" within 8 bash -c "! code_up"
-echo "   $(post /api/address-code '{"show":false}')"
 sleep 12 # past the next item
-check "switched off on the website, the code is not drawn again" bash -c "! code_up && curl -fsS $SITE/api/address-code | grep -q '\"show\":false'"
+check "and it is still up after the next photo starts" code_up
+echo "   $(post /api/address-code '{"show":false}')"
+sleep 3
+check "switched off on the website, the code is taken away" bash -c "! code_up && curl -fsS $SITE/api/address-code | grep -q '\"show\":false'"
 echo "   $(post /api/address-code '{"show":true}')"
-check "switched back on, it is drawn when the next item starts" within 30 code_up
+check "switched back on, it is drawn again within seconds" within 6 code_up
 echo "   $(post /api/show '{"target":"black","until":"cleared"}')"
 check "on a black screen, the code is taken away" within 5 bash -c "! code_up"
 echo "   $(post /api/schedule '{}')"

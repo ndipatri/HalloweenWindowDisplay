@@ -616,11 +616,14 @@ async function codeBox(more = {}, photos = ['00001-a.jpg', '00002-b.jpg']) {
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], filters: [], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
   b.later = (seconds) => { b.now = new Date(b.now.getTime() + seconds * 1000); };
   b.overlay = () => b.mpv.overlays[1] || null;
+  b.adds = 0;
+  const command = b.mpv.command.bind(b.mpv);
+  b.mpv.command = (name, ...rest) => { if (name === 'overlay-add') b.adds++; return command(name, ...rest); };
   b.state = () => JSON.parse(b.files['/run/tvbox/address-code.json'] || 'null');
   return b;
 }
 
-test('the address code shows for 3 seconds when an item starts', async () => {
+test('the address code stays up while items play', async () => {
   const b = await codeBox();
   await b.tick(); // a starts
   assert.deepEqual(b.made, [['http://10.0.0.25/', 120]]);
@@ -628,16 +631,16 @@ test('the address code shows for 3 seconds when an item starts', async () => {
   // Portrait (turned 270): the viewer's bottom-right is the panel's top-right.
   assert.deepEqual(b.overlay(), [1920 - 116 - 24, 24, '/run/tvbox/address-code.bgra', 0, 'bgra', 116, 116, 464]);
   assert.deepEqual(b.state(), { showing: true, x: 1780, y: 24, size: 116, width: 1920, height: 1080, url: 'http://10.0.0.25/' });
-  for (const s of [1, 1]) { b.later(s); await b.tick(); assert.ok(b.overlay(), 'still up after ' + s); }
-  b.later(1); // 3 seconds
-  await b.tick();
-  assert.equal(b.overlay(), null);
-  assert.equal(b.state().showing, false);
-  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
-  b.mpv.finish(); // b starts
-  await b.tick();
-  assert.ok(b.overlay(), 'drawn again for b');
-  assert.equal(b.made.length, 1, 'the same address: the code is not made again');
+  const started = [];
+  for (let s = 1; s <= 60; s++) {
+    b.later(1);
+    if (s % 10 === 0) { b.mpv.finish(); started.push(b.mpv.playing()); }
+    await b.tick();
+    assert.ok(b.overlay(), 'up at ' + s + ' s');
+  }
+  assert.ok(started.includes(ROOT + '/photos/00002-b.jpg') && started.includes(ROOT + '/photos/00001-a.jpg'), 'a and b took turns');
+  assert.equal(b.adds, 1, 'drawn once, not again as each item starts');
+  assert.equal(b.made.length, 1, 'made once');
   assert.equal(b.logs.filter((l) => l === 'Address code: http://10.0.0.25/').length, 1, b.logs.join('\n'));
 });
 
@@ -663,11 +666,14 @@ test('no address code without an address or when switched off', async () => {
   b.mpv.finish();
   await b.tick();
   assert.equal(b.overlay(), null);
-  // Switched back on: from the next item.
+  // Switched back on: within a second, with the same item on screen, and staying.
   b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: true });
-  b.mpv.finish();
+  const onScreen = b.mpv.playing();
+  b.later(1);
   await b.tick();
-  assert.ok(b.overlay());
+  assert.ok(b.overlay(), 'back within a second');
+  assert.equal(b.mpv.playing(), onScreen);
+  for (let i = 0; i < 5; i++) { b.later(1); await b.tick(); assert.ok(b.overlay(), 'stays up'); }
   // Switched off while up: taken away at the next tick.
   b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: false });
   await b.tick();
@@ -690,69 +696,14 @@ test('no address code on a black screen', async () => {
   assert.equal(b.mpv.playing(), null);
   assert.equal(b.overlay(), null);
   assert.equal(b.state().showing, false);
-  // Turning the TV takes it away too (its corner moves); the next item shows it in the new one.
+  // Turning the TV moves it: back in the new corner straight away.
   const c = await codeBox();
   await c.tick();
   c.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
   c.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-a.jpg': ['landscape'], 'photos/00002-b.jpg': ['landscape'] } });
   await c.tick();
-  c.mpv.finish();
-  await c.tick();
-  assert.deepEqual(c.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape (turned 0): the panel\'s bottom-right');
-});
-
-// Ticks once a second for `seconds`, noting the seconds (from now) at which the code is up.
-async function codeUpTimes(b, seconds) {
-  const up = [];
-  for (let s = 1; s <= seconds; s++) { b.later(1); await b.tick(); if (b.overlay()) up.push(s); }
-  return up;
-}
-const range = (n) => Array.from({ length: n }, (_, i) => i + 1);
-
-test('the address code stays up while a single item plays', async () => {
-  const b = await codeBox({}, ['00001-a.jpg']);
-  await b.tick(); // a starts, and stays
-  assert.ok(b.overlay(), 'drawn when a starts');
-  assert.deepEqual(await codeUpTimes(b, 60), range(60), 'up every second for a minute');
-  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
-  assert.equal(b.made.length, 1, 'the code is made once');
-  // Turned: taken away, then straight back in the new corner.
-  b.files[ROOT + '/screen.json'] = JSON.stringify({ orientation: 'landscape' });
-  b.files[ROOT + '/tags.json'] = JSON.stringify({ tags: { 'photos/00001-a.jpg': ['landscape'] } });
-  await b.tick();
-  b.later(1);
-  await b.tick();
-  assert.deepEqual(b.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape: the panel\'s bottom-right');
-});
-
-test('the address code comes down when a second item is added', async () => {
-  const b = await codeBox({}, ['00001-a.jpg']);
-  await b.tick();
-  await codeUpTimes(b, 5);
-  assert.ok(b.overlay(), 'up with a alone');
-  b.folders[ROOT + '/photos'].push('00002-b.jpg'); // b uploaded
-  await b.player.refilter();
-  await b.tick();
-  // Up for at most 3 more seconds, then down until the next item starts.
-  const up = await codeUpTimes(b, 9);
-  assert.ok(up.length <= 2 && up.every((s) => s <= 2), 'taken away within 3 seconds: ' + up);
-  assert.equal(b.state().showing, false);
-  const before = b.mpv.playing();
-  b.mpv.finish();
-  await b.tick();
-  assert.notEqual(b.mpv.playing(), before);
-  assert.ok(b.overlay(), 'drawn when the next item starts');
-  assert.deepEqual(await codeUpTimes(b, 5), [1, 2], 'for 3 seconds, as with any two items');
-});
-
-test('no lone-item address code when switched off', async () => {
-  const b = await codeBox({}, ['00001-a.jpg']);
-  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: false });
-  await b.tick();
-  assert.deepEqual(await codeUpTimes(b, 60), []);
-  b.files[ROOT + '/address-code.json'] = JSON.stringify({ show: true });
-  assert.deepEqual(await codeUpTimes(b, 30), range(30), 'up at the next tick, and staying');
-  assert.equal(b.mpv.playing(), ROOT + '/photos/00001-a.jpg', 'a is still on screen');
+  if (!c.overlay()) { c.later(1); await c.tick(); }
+  assert.deepEqual(c.overlay().slice(0, 2), [1920 - 116 - 24, 1080 - 116 - 24], 'landscape (turned 0): the panel\'s bottom-right, straight away');
 });
 
 (async () => {
