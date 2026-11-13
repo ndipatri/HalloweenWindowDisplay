@@ -1,11 +1,11 @@
 ---
-name: "window-display-video"
-description: "Make a new video for the HalloweenWindowDisplay portrait window TV with the Higgsfield MCP: prompt, generate, finish with ffmpeg, add to a season's folder (its tag), update the README."
+name: "tvbox-video"
+description: "Make a new video for the tvBox portrait TV with the Higgsfield MCP: prompt, generate, finish with ffmpeg, add to a season's folder (its tag), update the README."
 ---
 
-# Window display video
+# tvBox video
 
-Videos for ndipatri/HalloweenWindowDisplay play on a portrait TV (1080 × 1920) in an upstairs window, seen from the street at night. A Raspberry Pi box ("the box") plugged into the TV plays videos through mpv, chosen by the box's filters: each video's folder gives it a tag (`playlists/halloween/` → `halloween`, `playlists/halloween/grownup/` → `halloween-grownup`), and filters with schedules play the tags they name. It syncs videos from the repo a minute after boot and then hourly. For seasons, tags, filters or schedules, use the window-display-schedule skill.
+Videos for ndipatri/tvBox play on a portrait TV (1080 × 1920). The first tvBox stands in an upstairs window, seen from the street at night, which is what the figure framing and black backgrounds below are for; ask where a new video will be seen if it isn't that window. A Raspberry Pi box ("the box") plugged into the TV plays videos through mpv, chosen by the box's filters: each video's folder gives it a tag (`playlists/halloween/` → `halloween`, `playlists/halloween/grownup/` → `halloween-grownup`), and filters with schedules play the tags they name. It syncs videos from the repo a minute after boot and then hourly. For seasons, tags, filters or schedules, use the tvbox-schedule skill.
 
 ## 1. Agree the idea and the cost
 
@@ -109,5 +109,5 @@ Settings each current video was finished with:
   - "The videos": a row in the season's table: **Name:** one plain sentence of what you see | Kid and grownup hours / Grownup hours / All evening | m:ss;
   - "The prompts": the full prompt, word for word, under a plain heading like **Mochi the pilgrim (20 s)**, only for videos that are in `playlists/`; a video made of two clips gets one entry per clip;
   - the opening paragraph, if the new video is worth a mention.
-- Commit, push, open a PR with `gh api repos/ndipatri/HalloweenWindowDisplay/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/HalloweenWindowDisplay/pulls/<n>/merge -f merge_method=merge`.
+- Commit, push, open a PR with `gh api repos/ndipatri/tvBox/pulls -f title=… -f head=<branch> -f base=main -F body=@file` (GraphQL is blocked, so no `gh pr create`). Merge only when asked: `gh api -X PUT repos/ndipatri/tvBox/pulls/<n>/merge -f merge_method=merge`.
 - Tell the person the box picks it up within the hour (or now: `ssh tvbox.local`, then `sudo systemctl start tvbox-sync.service`), and how to see it: on http://tvbox.local/, under **Play**, pick a filter that names its folder's tag (e.g. Halloween grownup) and tap **Play**, with a duration. A video in a new folder shows as its own tag under Play until a GitHub filter names that tag; to play on a schedule it needs a filter that names its tag (in `playlists/filters.json` in the repo, which every box picks up with its next sync).

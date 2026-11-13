@@ -5,7 +5,7 @@
 set -uo pipefail
 
 E=/tmp/e2e
-REPO=/home/pi/HalloweenWindowDisplay
+REPO=/home/pi/tvBox
 VIDEOS=/home/pi/video-scheduler
 LOG=$VIDEOS/scheduler.log
 SITE=http://localhost:8080

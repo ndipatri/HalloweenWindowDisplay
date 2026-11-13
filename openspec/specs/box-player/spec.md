@@ -1,7 +1,7 @@
 # box-player Specification
 
 ## Purpose
-Puts the right videos on the TV from the Raspberry Pi box through mpv, keeps the screen black when nothing should play, and reports what it shows, so the window runs without a computer.
+Puts the right videos on the TV from the Raspberry Pi box through mpv, keeps the screen black when nothing should play, and reports what it shows, so the tvBox runs on its own.
 
 ## Requirements
 

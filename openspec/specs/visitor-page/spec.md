@@ -1,7 +1,7 @@
 # visitor-page Specification
 
 ## Purpose
-Gives someone at the window, who scanned the QR code on the TV, one simple page to put their own photos and videos on the TV under their name: their name becomes a tag, a new visit replaces their earlier pictures, each picked file shows its shape with a warning when none fit the way the TV faces, and their tag then plays until someone changes it.
+Gives someone at the TV, who scanned the QR code on the TV, one simple page to put their own photos and videos on the TV under their name: their name becomes a tag, a new visit replaces their earlier pictures, each picked file shows its shape with a warning when none fit the way the TV faces, and their tag then plays until someone changes it.
 
 ## Requirements
 

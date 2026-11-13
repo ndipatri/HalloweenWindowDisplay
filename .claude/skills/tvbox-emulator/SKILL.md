@@ -1,11 +1,11 @@
 ---
-name: "window-display-emulator"
-description: "Run, restart and test with the local tvBox emulator for HalloweenWindowDisplay: a whole box (setup, sync, player, website, mpv) in Docker on the Mac, with its website on localhost:8080 and a picture of the TV on localhost:8081. Use when the person is away from the real box, asks to deploy to or try something on the emulator or local box, or wants a website or player change checked by hand before it ships."
+name: "tvbox-emulator"
+description: "Run, restart and test with the local tvBox emulator for tvBox: a whole box (setup, sync, player, website, mpv) in Docker on the Mac, with its website on localhost:8080 and a picture of the TV on localhost:8081. Use when the person is away from the real box, asks to deploy to or try something on the emulator or local box, or wants a website or player change checked by hand before it ships."
 ---
 
 # The tvBox emulator
 
-For ndipatri/HalloweenWindowDisplay. `scheduler/tests/e2e/emulate.sh` runs the box's own software on the box's OS (the rehearsal's `tvbox-e2e` Docker image, arm64) on the Mac, with the real videos from `playlists/`. It is how changes are tried by hand when the real box (a Raspberry Pi at tvbox.local) is out of reach, and a quick look before shipping even when it isn't. What the box does and how the website works is in the window-display-schedule skill; this one is only about running and using the emulator.
+For ndipatri/tvBox. `scheduler/tests/e2e/emulate.sh` runs the box's own software on the box's OS (the rehearsal's `tvbox-e2e` Docker image, arm64) on the Mac, with the real videos from `playlists/`. It is how changes are tried by hand when the real box (a Raspberry Pi at tvbox.local) is out of reach, and a quick look before shipping even when it isn't. What the box does and how the website works is in the tvbox-schedule skill; this one is only about running and using the emulator.
 
 ## What it is
 
@@ -42,7 +42,7 @@ The emulator copies the code only when it starts. **After any change to the code
   docker exec tvbox-emulator bash -c 'ffmpeg -loglevel error -y -f lavfi -i color=c=green:s=720x1280 -frames:v 1 /tmp/test.png && curl -sS -X POST --data-binary @/tmp/test.png "localhost:8080/api/uploads?name=test.png"'
   ```
 
-- **Tags, filters, Play:** through the page, or the API (`POST /api/tags`, `POST /api/filters`, `POST /api/show`); see the window-display-schedule skill for the bodies.
+- **Tags, filters, Play:** through the page, or the API (`POST /api/tags`, `POST /api/filters`, `POST /api/show`); see the tvbox-schedule skill for the bodies.
 
 ## Checking a change
 
@@ -61,4 +61,4 @@ When something "doesn't show", check the status before suspecting a bug: an uplo
 ## Related
 
 - The rehearsal (`scheduler/tests/e2e/box.e2e.sh`, `inside.sh`) is the automated version in the same image: it checks the box end to end and is part of verifying a change. The emulator is for looking by hand.
-- Shipping and updating the real box: the window-display-schedule skill.
+- Shipping and updating the real box: the tvbox-schedule skill.

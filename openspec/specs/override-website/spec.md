@@ -1,7 +1,7 @@
 # override-website Specification
 
 ## Purpose
-Lets anyone on the home network see what the window is showing and change it for a while from a phone or laptop, replacing the Mac's `show` command.
+Lets anyone on the home network see what the TV is showing and change it for a while from a phone or laptop, replacing the Mac's `show` command.
 
 ## Requirements
 
