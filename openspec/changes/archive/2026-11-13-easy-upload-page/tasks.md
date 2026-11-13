@@ -21,4 +21,4 @@
 
 ## Workflow follow-up
 
-- [ ] 5.1 On the real box: scan the QR code with a phone, add a photo with a name, and see it play
+- [x] 5.1 On the real box: scan the QR code with a phone, add a photo with a name, and see it play (done by the user: the box logged `Uploaded … for nicky`, the replacement, and `#nicky: playing …`)

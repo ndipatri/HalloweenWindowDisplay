@@ -259,15 +259,14 @@ When none of the picked items is the TV's shape, the box SHALL show black, and l
 - **AND** the box logs `Nothing in #upload is landscape. Showing black until something is, or the TV is turned back.` once
 - **AND** turned back to portrait, they play again
 
-### Requirement: Shows its address on the TV as each item starts
-When a new item starts on screen, the box SHALL show a QR code of its website's address (`http://<its IPv4 address>/`) in the corner that is bottom-right for someone looking at the TV, whichever way it faces, for `addressCode.seconds` (3 as shipped), then take it away, unless the address code is switched off or the box has no address. It SHALL draw it on top of the picture without changing it, and never while the screen is black.
+### Requirement: Keeps its address on the TV while something plays
+While something plays and the address code is switched on, the box SHALL keep a QR code of its website's address (`http://<its IPv4 address>/`) on top of the picture in the viewer's bottom-right corner, left up from item to item without being redrawn. It SHALL take it away only when switched off, with no address, or on black, and put it back straight away after a turn or being switched back on.
 
-#### Scenario: the address code shows for 3 seconds when an item starts
-- **GIVEN** the box at 10.0.0.25 with the address code on, playing the uploads a and b
-- **WHEN** a starts
-- **THEN** mpv is told to draw the code of `http://10.0.0.25/` on top of the picture
-- **AND** it is taken away 3 to 4 seconds later, while a is still on screen
-- **AND** it is drawn again when b starts
+#### Scenario: the address code stays up while items play
+- **GIVEN** the box at 10.0.0.25 with the address code on, playing the uploads a and b, 10 seconds each
+- **WHEN** a starts, and a minute passes with a and b taking turns
+- **THEN** mpv is told to draw the code of `http://10.0.0.25/` when a starts
+- **AND** it is up every second of that minute, and is not drawn again as each item starts
 
 #### Scenario: the address code sits bottom-right however the TV faces
 - **GIVEN** a 1920×1080 panel and a 120-pixel code
@@ -287,36 +286,17 @@ When a new item starts on screen, the box SHALL show a QR code of its website's 
 
 #### Scenario: no address code without an address or when switched off
 - **GIVEN** the box with no network address, or with the address code switched off
-- **WHEN** an item starts
+- **WHEN** an item plays
 - **THEN** no code is drawn
+- **AND** once it is switched back on, it is drawn within a second and stays up
 
 #### Scenario: no address code on a black screen
 - **GIVEN** the box showing the address code
 - **WHEN** the screen goes black (nothing to play)
 - **THEN** the code is taken away straight away
+- **AND** when the TV is turned, the code is drawn again in the new corner straight away
 
 #### Scenario: setup installs qrencode for the address code
 - **GIVEN** a fresh box
 - **WHEN** setup runs
 - **THEN** it installs `qrencode`
-
-### Requirement: Keeps its address on the TV while a single item plays
-When what's playing has only one item, the box SHALL keep the address code up for as long as that item plays, instead of taking it away after `addressCode.seconds`, under the same conditions as when an item starts (switched on, an address, not black). If the code comes down while the single item stays (switched back on, the TV turned), the box SHALL show it again straight away. With two or more items it SHALL show the code for `addressCode.seconds` as each starts, as before.
-
-#### Scenario: the address code stays up while a single item plays
-- **GIVEN** the box at 10.0.0.25 with the address code on, playing a single upload a
-- **WHEN** a starts and stays on screen for a minute
-- **THEN** the code is drawn when a starts and is still up a minute later
-- **AND** after the TV is turned, it is drawn again in the new corner straight away
-
-#### Scenario: the address code comes down when a second item is added
-- **GIVEN** the box playing a single upload a, with the code up
-- **WHEN** a second upload b is added to what's playing
-- **THEN** the code is taken away within 3 seconds
-- **AND** from then on it shows for 3 seconds as each item starts, as with any two items
-
-#### Scenario: no lone-item address code when switched off
-- **GIVEN** a single upload a playing with the address code switched off
-- **WHEN** a minute passes
-- **THEN** no code is drawn
-- **AND** once it is switched back on, it is drawn and stays up, with a still on screen

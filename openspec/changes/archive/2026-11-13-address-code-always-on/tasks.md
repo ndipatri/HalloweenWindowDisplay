@@ -10,4 +10,4 @@
 
 ## Workflow follow-up
 
-- [ ] 3.1 On the real TV: the code stays put while photos change, with no blink
+- [x] 3.1 On the real TV: the code stays put while photos change, with no blink (on the box, `address-code.json` stayed `showing: true` across photo changes; archived at the user's request before a look at the TV itself)

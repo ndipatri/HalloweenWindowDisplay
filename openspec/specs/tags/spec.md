@@ -44,8 +44,8 @@ Box tags on an item that is no longer on the box, or on a video from GitHub, SHA
 - **THEN** no item is `photos/00009-gone.jpg`, and `family` is not among the tags in use
 
 #### Scenario: removing an upload drops its box tags
-- **GIVEN** the upload PIN `4321` and `photos/00001-a.jpg` with the box tag `family`
-- **WHEN** the website is asked to remove `00001-a.jpg` with PIN `4321`
+- **GIVEN** `photos/00001-a.jpg` with the box tag `family`
+- **WHEN** the website is asked to remove `00001-a.jpg`
 - **THEN** `tags.json` no longer mentions `photos/00001-a.jpg`
 
 #### Scenario: box tags on a video from GitHub are ignored and dropped
