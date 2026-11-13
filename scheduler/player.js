@@ -61,8 +61,8 @@ function createPlayer(options) {
   // ---------- The address code ----------
 
   // A QR code of the website's address, drawn by mpv on top of the picture
-  // (overlay-add, from raw pixels in a file) for the first few seconds of
-  // each item, in the corner that is bottom-right for someone looking at the
+  // (overlay-add, from raw pixels in a file) the whole time something
+  // plays, in the corner that is bottom-right for someone looking at the
   // TV. Its place is also written to address-code.json beside the file, for
   // the emulator's picture of the TV (its mpv draws nothing).
   const codeSettings = options.config.addressCode;
@@ -83,12 +83,13 @@ function createPlayer(options) {
   async function hideCode() {
     if (code.shownAt === null) return;
     code.shownAt = null;
+    code.lastShow = null; // taken down on purpose: back as soon as it may be
     writeText(CODE_STATE, JSON.stringify({ showing: false }) + '\n');
     await mpv.command('overlay-remove', CODE_OVERLAY);
   }
 
   async function showCode() {
-    code.lastShow = now().getTime(); // tried now: with a single item, the next try is addressCode.seconds on
+    code.lastShow = now().getTime(); // tried now: the next try is CODE_RETRY_MS on
     if (!logic.addressCodeOn()) return;
     const url = addressUrl(options.readAddress(), options.config.box.webPort);
     if (!url) return;
@@ -112,32 +113,29 @@ function createPlayer(options) {
     writeText(CODE_STATE, JSON.stringify({ showing: true, x, y, size, width, height, url }) + '\n');
   }
 
-  // Each tick: up when a new item comes on screen, down after
-  // addressCode.seconds, when switched off, or when the screen goes black.
-  // With a single item to play (a lone photo is held on screen, so nothing
-  // new ever starts) it stays up the whole time instead.
+  // Each tick: up whenever something plays and the switch is on, and left
+  // up from item to item (not redrawn, so it never blinks); redrawn when an
+  // item starts with a new address. Down when switched off or when nothing
+  // is left to play (black). Taken down for a turn, it is back next tick.
+  // Between items (no current entry for a moment) it is left as it is.
+  const CODE_RETRY_MS = 3000; // with no address or no code, try again this often
   async function followCode() {
-    const entries = active ? ((await mpv.getProperty('playlist')) || []) : [];
-    const at = entries.findIndex((e) => e.current);
-    if (at === -1) {
+    const items = active ? logic.playlistItems(active).items : [];
+    if (!items.length || !logic.addressCodeOn()) {
       code.entry = null;
       return hideCode();
     }
+    const entries = (await mpv.getProperty('playlist')) || [];
+    const at = entries.findIndex((e) => e.current);
+    if (at === -1) return;
     const entry = entries[at].id !== undefined ? entries[at].id : entries[at].filename + '#' + at;
     if (entry !== code.entry) {
       code.entry = entry;
+      const url = addressUrl(options.readAddress(), options.config.box.webPort);
+      if (code.shownAt !== null && url === code.url) return;
       return showCode();
     }
-    const lone = logic.playlistItems(active).items.length === 1;
-    if (code.shownAt !== null) {
-      const over = !lone && now().getTime() - code.shownAt >= codeSettings.seconds * 1000;
-      if (over || !logic.addressCodeOn()) await hideCode();
-      return;
-    }
-    // Down with a single item (switched back on, the TV turned, or the
-    // second-last item taken away): up again, trying at most every
-    // addressCode.seconds when there's no address or no code.
-    if (lone && logic.addressCodeOn() && now().getTime() - code.lastShow >= codeSettings.seconds * 1000) await showCode();
+    if (code.shownAt === null && (code.lastShow === null || now().getTime() - code.lastShow >= CODE_RETRY_MS)) await showCode();
   }
 
   async function blank() {

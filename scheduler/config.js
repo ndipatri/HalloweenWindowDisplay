@@ -25,13 +25,11 @@ module.exports = {
     lockMinutes: 5, // ...for this long
   },
 
-  // A QR code of the website's address (http://<the box's address>/) shown
-  // in the TV's bottom-right corner as each new item starts (the whole time
-  // when there's only one item to play), so phones that
-  // can't open tvbox.local can scan it. Switched on and off under TV on the
-  // website.
+  // A QR code of the website's address (http://<the box's address>/) kept
+  // in the TV's bottom-right corner whenever something plays, so phones
+  // that can't open tvbox.local can scan it. Switched on and off under TV
+  // on the website.
   addressCode: {
-    seconds: 3, // how long it stays up (with only one item to play: always)
     size: 120, // at most this many pixels square
     margin: 24, // pixels from the edges
   },
