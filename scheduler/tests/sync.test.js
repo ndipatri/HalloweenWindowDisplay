@@ -312,6 +312,24 @@ test('sync removes the GitHub filters when the repo has no playlists folder at a
   assert.ok(!s.has('github-filters.json'), 'the copy is gone');
 });
 
+test('sync keeps the GitHub filters when the repo isn\'t there', () => {
+  const s = setup({ 'playlists/halloween/a.mp4': 'A', 'playlists/filters.json': GITHUB_FILTERS });
+  s.put('github-filters.json', GITHUB_FILTERS);
+  s.put('halloween/a.mp4', 'A');
+  const moved = path.join(s.dir, 'moved-away');
+  const plain = path.join(s.dir, 'plain');
+  fs.mkdirSync(plain);
+  for (const repo of [moved, plain]) {
+    const r = s.sync([], { VIDEO_SCHEDULER_REPO: repo });
+    assert.equal(r.status, 0, r.log);
+    assert.equal(s.read('github-filters.json'), GITHUB_FILTERS, 'kept for ' + repo);
+    assert.equal(s.read('halloween/a.mp4'), 'A', 'videos left alone');
+    assert.ok(!s.has('.removed/halloween/a.mp4'), 'nothing set aside');
+    assert.ok(r.log.includes('Keeping the GitHub filters: ' + repo + " isn't a git checkout."), r.log);
+    assert.ok(!r.log.includes('Removed the GitHub filters'), r.log);
+  }
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }
