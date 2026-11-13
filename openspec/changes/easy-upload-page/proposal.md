@@ -5,8 +5,8 @@ Someone who walks up to the window and scans the QR code lands on the box's full
 ## What Changes
 
 - **A new "easy" page at the box's address (`/`)**, made for a phone: the visitor's name, a picker for photos and videos, and a **Put them on the TV** button. The QR code (`http://<address>/`) opens it, unchanged.
-- **The visitor's name becomes a tag** (`Aunt Sue` → `aunt-sue`), put on everything they add. A returning visitor with the same name adds to the same tag. A name that turns into a tag the box already uses for something else (a GitHub folder's tag such as `halloween`, or `upload`, `portrait`, `landscape`) is refused: "That name is taken by the box. Try adding your last name."
-- **Put them on the TV** sends the files, then plays that tag, and only that tag, until someone changes it, and says so.
+- **The visitor's name becomes a tag** (`Aunt Sue` → `aunt-sue`), put on everything they add. A returning visitor with the same name replaces their earlier pictures: once the new batch is all on the box, every other upload with their tag is deleted. A name that turns into a tag the box already uses for something else (a GitHub folder's tag such as `halloween`, or `upload`, `portrait`, `landscape`) is refused: "That name is taken by the box. Try adding your last name."
+- **Put them on the TV** sends the files, deletes the visitor's earlier pictures under that name, then plays that tag, and only that tag, until someone changes it, and says so.
 - **The full page moves to `/advanced`.** Each page links to the other.
 - **Uploads can carry a visitor tag:** `POST /api/uploads/check` takes the name and answers with its tag; `POST /api/uploads?name=…&tag=…` tags the saved file.
 

@@ -395,11 +395,18 @@ visitor_tag="$(curl -sS -X POST -d '{"name":"Aunt Sue","files":[{"name":"red.jpg
 check "the visitor's name becomes their tag" test "$visitor_tag" = aunt-sue
 check "a name the box uses is refused" \
   bash -c "curl -sS -X POST -d '{\"name\":\"Upload\",\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'That name is taken by the box'"
-echo "   $(curl -sS -X POST --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=visitor.jpg&tag=aunt-sue")"
+saved_name() { node -pe 'JSON.parse(require("fs").readFileSync(0)).saved'; }
+first="$(curl -sS -X POST --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=visitor.jpg&tag=aunt-sue" | saved_name)"
+echo "   added $first"
 check "the visitor's upload is tagged with their name, logged" \
   bash -c "grep -q '\"aunt-sue\"' $VIDEOS/tags.json && grep -qE 'Uploaded photos/[0-9]+-visitor.jpg \(0.0 MB\) for aunt-sue' '$LOG'"
-echo "   $(post /api/show '{"tags":["aunt-sue"],"until":"cleared"}')"
+echo "   $(post /api/visitor/play "{\"tag\":\"aunt-sue\",\"keep\":[\"$first\"]}")"
 check "the visitor's tag plays, and only that" within 30 bash -c "logged '#aunt-sue: playing' && status | grep -q '^#aunt-sue (override until cleared)'"
+second="$(curl -sS -X POST --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=again.jpg&tag=aunt-sue" | saved_name)"
+echo "   $(post /api/visitor/play "{\"tag\":\"aunt-sue\",\"keep\":[\"$second\"]}")"
+check "a second visit under the same name leaves only the new picture" \
+  bash -c "test ! -e '$VIDEOS/photos/$first' && test -e '$VIDEOS/photos/$second' && logged 'Removed photos/$first (aunt-sue added new pictures)'"
+check "and plays it" within 30 bash -c "logged '#aunt-sue: playing $second'"
 echo "   $(post /api/schedule '{}')"
 
 echo "== Check for new videos now, and the recent activity"
