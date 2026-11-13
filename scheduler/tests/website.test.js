@@ -1296,6 +1296,51 @@ test('the box keeps only a visitor\'s own new pictures', async () => {
   assert.ok(!fs.existsSync(u.root + '/override.json'), 'nothing played');
 });
 
+// The easy page's page-code-free script (shapeOf, fitNote, sendVisit), run on its own.
+async function easyScript() {
+  const page = (await site().call('GET', '/')).body;
+  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function sendVisit'));
+  const context = {};
+  require('vm').runInNewContext(code + '\nthis.shapeOf = shapeOf; this.fitNote = fitNote;', context);
+  return { page, shapeOf: context.shapeOf, fitNote: context.fitNote };
+}
+
+test('the easy page shows each picked file with its shape', async () => {
+  const { page, shapeOf } = await easyScript();
+  assert.deepEqual([shapeOf(3000, 4000), shapeOf(4080, 3072), shapeOf(1080, 1080), shapeOf(0, 0)],
+    ['portrait', 'landscape', 'square', null]);
+  for (const text of ['id="thumbs"', 'URL.createObjectURL(file)', 'naturalWidth', 'videoWidth', "preload = 'metadata'",
+    "portrait: 'Portrait', landscape: 'Landscape', square: 'Square'", "label.textContent = shape ? LABELS[shape] : ''"]) {
+    assert.ok(page.includes(text), 'easy page has ' + text);
+  }
+  assertScriptCompiles(page);
+});
+
+test('the easy page warns when no picked file fits the TV', async () => {
+  const { page, fitNote } = await easyScript();
+  assert.equal(fitNote(['landscape', 'landscape'], 'portrait'), "The TV is portrait, so landscape pictures won't show until it's turned.");
+  assert.equal(fitNote(['portrait'], 'landscape'), "The TV is landscape, so portrait pictures won't show until it's turned.");
+  for (const [shapes, way] of [[['landscape', 'portrait'], 'portrait'], [['landscape', 'square'], 'portrait'],
+    [['portrait'], 'portrait'], [[null], 'portrait'], [[], 'landscape'], [['landscape', null], 'landscape']]) {
+    assert.equal(fitNote(shapes, way), '', JSON.stringify([shapes, way]));
+  }
+  // An unmeasured file doesn't stop the warning for the rest.
+  assert.ok(fitNote(['landscape', null], 'portrait'));
+  for (const text of ['id="fit"', "fetch('/api/screen')", "$('fit').textContent = fitNote(shapes, tvWay)"]) {
+    assert.ok(page.includes(text), 'easy page has ' + text);
+  }
+});
+
+test('done says the pictures won\'t show until the TV is turned', async () => {
+  const note = "The TV is portrait, so landscape pictures won't show until it's turned.";
+  const f = await visitFlow({ name: 'Aunt Sue', files: [{ name: 'wide.jpg', size: 5 }], note });
+  assert.equal(f.result, true);
+  assert.deepEqual(f.said.pop(), ["Done! They're on the box, but the TV is portrait, so they won't show until it's turned.", false]);
+  assert.ok(f.calls.some((c) => c[0] === 'play'), 'still sent and played');
+  const g = await visitFlow({ name: 'Aunt Sue', files: [{ name: 'tall.jpg', size: 5 }], note: '' });
+  assert.deepEqual(g.said.pop(), ['Done! Your pictures are on the TV now.', false]);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); passed++; } catch (e) { console.error('FAIL: ' + name + '\n  ' + e.message); process.exitCode = 1; }

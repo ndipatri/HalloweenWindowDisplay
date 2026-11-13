@@ -1455,6 +1455,15 @@ const EASY_PAGE = `<!DOCTYPE html>
   #message.error { color: #ff6b6b; }
   #progress { font-size: 14px; color: var(--dim); margin-top: 8px; }
   .other { display: block; text-align: center; margin-top: 28px; color: var(--dim); font-size: 15px; }
+  #thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  #thumbs:empty { display: none; }
+  .thumb { position: relative; aspect-ratio: 1; background: #000; border-radius: 8px; overflow: hidden; }
+  .thumb img, .thumb video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .thumb .shape { position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; font-size: 12px; border-radius: 4px; color: #fff; background: rgba(0, 0, 0, 0.7); }
+  .thumb .shape:empty { display: none; }
+  .thumb.off .shape { background: #b3261e; }
+  #fit { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #3a2a10; color: #ffd28a; font-size: 15px; }
+  #fit:empty { display: none; }
 </style>
 </head>
 <body>
@@ -1467,6 +1476,8 @@ const EASY_PAGE = `<!DOCTYPE html>
     <label>Photos and videos</label>
     <label class="pick">Choose photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
     <div id="chosen"></div>
+    <div id="thumbs"></div>
+    <div id="fit" role="status" aria-live="polite"></div>
     <button id="send">Put them on the TV</button>
     <div id="message"></div>
     <div id="progress"></div>
@@ -1483,9 +1494,63 @@ const EASY_PAGE = `<!DOCTYPE html>
     $('message').className = error ? 'error' : '';
   }
 
-  $('files').onchange = () => {
-    const n = $('files').files.length;
+  // The way the TV faces now, read when the page opens and when files are picked.
+  let tvWay = 'portrait';
+  async function readTvWay() {
+    try { tvWay = (await (await fetch('/api/screen')).json()).orientation || tvWay; } catch (e) { /* keep the last */ }
+  }
+  readTvWay();
+
+  // Each picked file as a thumbnail labeled with its shape, measured as the
+  // box does once the phone has loaded it; then the warning if none fit.
+  let shapes = [];
+  let picked = 0;
+  const LABELS = { portrait: 'Portrait', landscape: 'Landscape', square: 'Square' };
+  function showFit() {
+    $('fit').textContent = fitNote(shapes, tvWay);
+    for (const box of $('thumbs').children) {
+      const shape = box.dataset.shape;
+      box.classList.toggle('off', Boolean(shape) && shape !== 'square' && shape !== tvWay);
+    }
+  }
+  $('files').onchange = async () => {
+    const files = Array.from($('files').files);
+    const n = files.length;
     $('chosen').textContent = n ? (n === 1 ? '1 file chosen' : n + ' files chosen') : '';
+    $('thumbs').textContent = '';
+    $('fit').textContent = '';
+    const batch = ++picked;
+    shapes = files.map(() => null);
+    await readTvWay();
+    files.forEach((file, i) => {
+      const box = document.createElement('div');
+      box.className = 'thumb';
+      const label = document.createElement('span');
+      label.className = 'shape';
+      const isVideo = String(file.type).startsWith('video/') || /[.](mp4|mov|m4v)$/i.test(file.name);
+      const media = document.createElement(isVideo ? 'video' : 'img');
+      const done = (w, h) => {
+        if (batch !== picked) return;
+        const shape = shapeOf(w, h);
+        shapes[i] = shape;
+        box.dataset.shape = shape || '';
+        label.textContent = shape ? LABELS[shape] : '';
+        showFit();
+      };
+      if (isVideo) {
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = 'metadata';
+        media.onloadedmetadata = () => done(media.videoWidth, media.videoHeight);
+      } else {
+        media.onload = () => done(media.naturalWidth, media.naturalHeight);
+      }
+      media.onerror = () => done(0, 0);
+      media.src = URL.createObjectURL(file);
+      box.appendChild(media);
+      box.appendChild(label);
+      $('thumbs').appendChild(box);
+    });
   };
 
   async function postJson(path, body) {
@@ -1536,9 +1601,15 @@ const EASY_PAGE = `<!DOCTYPE html>
     $('send').disabled = true;
     $('progress').textContent = '';
     for (const k of Object.keys(rows)) delete rows[k];
-    const form = { name: $('name').value, files: Array.from($('files').files) };
+    const form = { name: $('name').value, files: Array.from($('files').files), note: fitNote(shapes, tvWay) };
     const done = await sendVisit(form, api, ui);
-    if (done) { $('files').value = ''; $('chosen').textContent = ''; }
+    if (done) {
+      $('files').value = '';
+      $('chosen').textContent = '';
+      $('thumbs').textContent = '';
+      $('fit').textContent = '';
+      shapes = [];
+    }
     $('send').disabled = false;
   };
 </script>
@@ -1548,6 +1619,22 @@ const EASY_PAGE = `<!DOCTYPE html>
   // only when all were added does the box keep just these under the tag
   // (deleting an earlier visit's) and play it, until changed. Stops at the
   // first refusal. No page code here, so it can be tried on its own.
+  // A picture's shape by the box's rule: wider than tall is landscape,
+  // exactly as wide as tall is square; null when it couldn't be measured.
+  function shapeOf(width, height) {
+    if (!(width > 0) || !(height > 0)) return null;
+    return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
+  }
+
+  // The warning when every measured picture is the other shape from the TV's
+  // way (orientation); '' when any fits, is square, or none are measured.
+  function fitNote(shapes, orientation) {
+    const known = shapes.filter(Boolean);
+    const other = orientation === 'portrait' ? 'landscape' : 'portrait';
+    if (!known.length || !known.every((s) => s === other)) return '';
+    return 'The TV is ' + orientation + ', so ' + other + " pictures won't show until it's turned.";
+  }
+
   async function sendVisit(form, api, ui) {
     const name = String(form.name || '').trim();
     const files = form.files || [];
@@ -1572,7 +1659,9 @@ const EASY_PAGE = `<!DOCTYPE html>
     }
     const shown = await api.play(checked.tag, saved);
     if (!shown.ok) { ui.say(shown.error, true); return false; }
-    ui.say('Done! Your pictures are on the TV now.');
+    const way = form.note ? /^The TV is ([a-z]+)/.exec(form.note)[1] : null;
+    ui.say(way ? "Done! They're on the box, but the TV is " + way + ", so they won't show until it's turned."
+      : 'Done! Your pictures are on the TV now.');
     return true;
   }
 </script>
