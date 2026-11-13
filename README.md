@@ -155,7 +155,7 @@ If the picture comes out upside down, change `rotate: 90` to `rotate: 270` in `s
 
 ### See what's on, or play something else for a while
 
-Open **http://tvbox.local/** on a phone or computer on the same Wi‑Fi. It shows what's on screen and why, and has buttons to:
+Open **http://tvbox.local/advanced** on a phone or computer on the same Wi‑Fi (or **Advanced** at the bottom of http://tvbox.local/). It shows what's on screen and why, and has buttons to:
 
 - play your **tags** (Favorites, Uploads, any you've added) and any **filters** (Halloween kid, Thanksgiving, …), whatever day it is: tap one or more to pick them (tap again to unpick), then tap **Play**. Several picked play together as one mix, everything once, round and round. What's playing is outlined;
 - show **Black**;
@@ -167,7 +167,7 @@ At the bottom, **Recent activity** shows the last things the box did: each video
 
 #### When tvbox.local doesn't open
 
-Some phones and computers (many Android phones among them) can't open names ending in `.local`. For those, the TV shows the box's number address as a small QR code in its bottom-right corner for the first 3 seconds of each photo or video, or the whole time when only one is playing: point the phone's camera at it and tap the link. The address is also written on the page under **TV**, next to **Show the box's address on the TV**, which turns the code off and on.
+Some phones and computers (many Android phones among them) can't open names ending in `.local`. For those, the TV shows the box's number address as a small QR code in its bottom-right corner for the first 3 seconds of each photo or video, or the whole time when only one is playing: point the phone's camera at it and tap the link. It opens the easy page (see "Let a visitor add their pictures" below), which links to the advanced one. The address is also written on the page under **TV**, next to **Show the box's address on the TV**, which turns the code off and on.
 
 The router can give the box a new number now and then (the code always shows the current one). To keep it the same, so a bookmark keeps working, reserve the box's address in your router's settings (often called a DHCP reservation or reserved IP).
 
@@ -204,7 +204,7 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 
 ### Put your own photos and videos on the window
 
-1. On your phone, open **http://tvbox.local/**.
+1. On your phone, open **http://tvbox.local/advanced**.
 2. Under **Photos and videos**, type the box's upload PIN. The phone remembers it after the first time.
 3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
 4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
@@ -213,6 +213,15 @@ Your own filters are kept on this box only, and aren't backed up. A new box star
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen fills it (and with the TV turned, only photos and videos of its shape play; see "Turn the TV" below): the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
 
 To take one off, tap **Remove** next to it under **Photos and videos** (it needs the PIN too). It goes for good.
+
+### Let a visitor add their pictures
+
+The box's address, **http://tvbox.local/**, and the QR code on the TV open the easy page, made for someone standing at the window with their phone:
+
+1. They type **their name**, the **PIN** (tell them it), and tap **Choose photos or videos**.
+2. They tap **Put them on the TV**. Each file is sent, and once they're all added the TV plays their pictures, and only theirs, until someone changes it on either page.
+
+Their name becomes a tag (`Aunt Sue` → `aunt-sue`) on everything they add, so you'll find it under Play and on each upload on the advanced page. The same name next time adds to the same tag. A name that would make a tag the box already uses for something else (`upload`, `portrait`, `landscape`, `square`, or a GitHub folder's, like `halloween`) is refused: "That name is taken by the box. Try adding your last name." **Advanced** at the bottom goes to the full page, which has **Easy page** at the top to come back.
 
 Good to know:
 - The GitHub filters never show your photos by themselves: they show when you play Uploads or Favorites, or in a filter of your own that names their tags.

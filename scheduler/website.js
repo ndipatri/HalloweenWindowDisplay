@@ -104,6 +104,32 @@ function createWebsite(options) {
     return item.path.startsWith(logic.PHOTOS + '/');
   }
 
+  // A visitor's name as their tag, for the easy page: { tag } or { error }.
+  // 'Aunt Sue' -> 'aunt-sue', 'José María' -> 'jose-maria'. Tags the box
+  // uses for something else are refused; another visitor's are not, so the
+  // same name adds to the same tag.
+  const TAKEN = 'That name is taken by the box. Try adding your last name.';
+  function visitorTag(name) {
+    const text = typeof name === 'string' ? name.trim() : '';
+    if (!text) return { error: 'Type your name first.' };
+    const tag = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+    if (!tag) return { error: 'Use some letters or numbers in your name.' };
+    return takenTag(tag) ? { error: TAKEN } : { tag };
+  }
+  // A tag the box uses for something else: the uploads', the shapes', or a
+  // GitHub folder's.
+  function takenTag(tag) {
+    if ([logic.UPLOAD_TAG, 'portrait', 'landscape', 'square'].includes(tag)) return true;
+    return logic.items().some((i) => !isUpload(i) && i.folderTags.includes(tag));
+  }
+  // null if an upload can carry `tag` (a tag a visitor's name gives), else the refusal.
+  function checkVisitorTag(tag) {
+    if (tag === undefined || tag === null) return null;
+    if (!logic.isTagName(tag)) return fail('Not a tag name: ' + JSON.stringify(tag) + '. Use lowercase letters, digits and dashes.');
+    return takenTag(tag) ? fail(TAKEN) : null;
+  }
+
   // POST /api/tags { path, add | remove }: a box tag on an upload, no PIN.
   async function changeTag(body) {
     const rel = body && typeof body.path === 'string' ? body.path : '';
@@ -331,16 +357,26 @@ function createWebsite(options) {
     const valid = files && files.length > 0 && files.every((f) =>
       f && typeof f.name === 'string' && Number.isInteger(f.bytes) && f.bytes >= 0);
     if (!valid) return fail('Bad request.');
+    // From the easy page: the visitor's name, checked first (no PIN try).
+    let tag;
+    if (body.name !== undefined) {
+      const v = visitorTag(body.name);
+      if (v.error) return fail(v.error);
+      tag = v.tag;
+    }
     const refused = checkPin(pinFrom(headers)) || checkFiles(files);
     if (refused) return refused;
-    return ok('Ready to add ' + files.length + (files.length === 1 ? ' file.' : ' files.'));
+    const answer = { message: 'Ready to add ' + files.length + (files.length === 1 ? ' file.' : ' files.') };
+    if (tag) answer.tag = tag;
+    return json(200, answer);
   }
 
   // One file, streamed to a hidden part file and then numbered into place.
   // `stream` is not read at all when the upload is refused.
-  async function receiveUpload({ name, pin, length, stream }) {
+  // With `tag` (from the easy page) the saved file gets that box tag.
+  async function receiveUpload({ name, pin, length, stream, tag }) {
     if (typeof name !== 'string' || !Number.isInteger(length) || length < 0) return fail('Bad request.');
-    const refused = checkPin(pin) || checkFiles([{ name, bytes: length }]);
+    const refused = checkVisitorTag(tag) || checkPin(pin) || checkFiles([{ name, bytes: length }]);
     if (refused) return refused;
 
     fs.mkdirSync(PHOTOS_DIR, { recursive: true });
@@ -372,7 +408,16 @@ function createWebsite(options) {
       return fail('The upload of ' + name + ' stopped partway; nothing was kept.');
     }
     const saved = numberIntoPlace(part, name);
-    log('Uploaded photos/' + saved + ' (' + (length / MB).toFixed(1) + ' MB)');
+    log('Uploaded photos/' + saved + ' (' + (length / MB).toFixed(1) + ' MB)' + (tag ? ' for ' + tag : ''));
+    if (tag) {
+      const rel = logic.PHOTOS + '/' + saved;
+      const tags = logic.readBoxTags();
+      const own = (Array.isArray(tags[rel]) ? tags[rel] : []).filter((t) => logic.isTagName(t));
+      if (!own.includes(tag)) own.push(tag);
+      tags[rel] = own;
+      writeBoxTags(tags);
+      await filtersChanged();
+    }
     return ok('Added ' + name + '.');
   }
 
@@ -552,7 +597,8 @@ function createWebsite(options) {
 
   async function handle({ method, path, headers, body }) {
     const route = method + ' ' + path.split('?')[0];
-    if (route === 'GET /') return { status: 200, type: 'text/html', body: PAGE };
+    if (route === 'GET /') return { status: 200, type: 'text/html', body: EASY_PAGE };
+    if (route === 'GET /advanced') return { status: 200, type: 'text/html', body: PAGE };
     if (route === 'GET /api/status') {
       const text = readText(logic.STATUS_PATH);
       return json(200, { status: text === null ? null : text.trim() });
@@ -665,9 +711,12 @@ function startWebsite(options, port) {
       const m = /[?&]name=([^&]*)/.exec(req.url);
       let name = null;
       try { name = m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null; } catch (e) { name = null; }
+      const t = /[?&]tag=([^&]*)/.exec(req.url);
+      let tag;
+      try { tag = t ? decodeURIComponent(t[1]) : undefined; } catch (e) { tag = ''; }
       const length = Number(req.headers['content-length']);
       if (!name || !Number.isInteger(length)) return send(json(400, { error: 'Bad request.' }));
-      site.receiveUpload({ name, pin: req.headers['x-upload-pin'], length, stream: req }).then(send, failed);
+      site.receiveUpload({ name, pin: req.headers['x-upload-pin'], length, stream: req, tag }).then(send, failed);
       return undefined;
     }
 
@@ -789,12 +838,13 @@ const PAGE = `<!DOCTYPE html>
   .editor .ticks label { display: inline-flex; align-items: center; gap: 4px; margin: 2px 10px 2px 0; color: var(--text); }
   .editor .entry { border-top: 1px dashed #3a3a3a; margin-top: 8px; padding-top: 6px; }
   #filter-pin { margin: 10px 0; }
+  h1 .other { float: right; font-size: 15px; font-weight: 400; color: var(--accent); margin-top: 4px; }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Window</h1>
+  <h1>Window <a class="other" href="/">Easy page</a></h1>
 
   <h2>Play</h2>
   <div class="card">
@@ -1437,6 +1487,174 @@ const PAGE = `<!DOCTYPE html>
     const moved = out.splice(i, 1)[0];
     out.splice(j, 0, moved);
     return out;
+  }
+</script>
+</body>
+</html>
+`;
+
+// The easy page, at /: for someone who scanned the code on the TV and wants
+// to put a few of their own pictures on it. Their name becomes a tag on
+// everything they add, and that tag then plays until someone changes it.
+const EASY_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Window</title>
+<style>
+  :root { color-scheme: dark; --bg: #121212; --card: #1e1e1e; --text: #f2f2f2; --dim: #a0a0a0; --accent: #ff8a1f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 18px/1.4 system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 480px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  .lead { color: var(--dim); margin: 0 0 20px; }
+  .card { background: var(--card); border-radius: 14px; padding: 16px; }
+  label { display: block; font-size: 15px; color: var(--dim); margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  input[type=text], input[type=password] { font: inherit; color: var(--text); background: #2c2c2c; border: 1px solid #3a3a3a; border-radius: 10px; padding: 14px; width: 100%; }
+  .hint { font-size: 14px; color: var(--dim); margin-top: 6px; }
+  .pick { display: block; position: relative; text-align: center; background: #2c2c2c; border: 1px dashed #5a5a5a; border-radius: 10px; padding: 16px; cursor: pointer; }
+  .pick input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+  #chosen { font-size: 15px; color: var(--dim); margin-top: 6px; }
+  button { font: inherit; font-weight: 600; width: 100%; margin-top: 20px; padding: 16px; border-radius: 12px; border: none; background: var(--accent); color: #1a1a1a; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  #message { min-height: 1.4em; margin-top: 14px; color: var(--accent); font-weight: 600; }
+  #message.error { color: #ff6b6b; }
+  #progress { font-size: 14px; color: var(--dim); margin-top: 8px; }
+  .other { display: block; text-align: center; margin-top: 28px; color: var(--dim); font-size: 15px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Put your pictures on the TV</h1>
+  <p class="lead">Add your photos or videos and they'll play in the window.</p>
+  <div class="card">
+    <label for="name">Your name</label>
+    <input id="name" type="text" autocomplete="name" maxlength="60" placeholder="Aunt Sue">
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+    <div class="hint">Ask whoever runs the window for the PIN.</div>
+    <label>Photos and videos</label>
+    <label class="pick">Choose photos or videos<input id="files" type="file" accept="image/*,video/*" multiple></label>
+    <div id="chosen"></div>
+    <button id="send">Put them on the TV</button>
+    <div id="message"></div>
+    <div id="progress"></div>
+  </div>
+  <a class="other" href="/advanced">Advanced</a>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const PIN_KEY = 'tvbox-upload-pin';
+  try { $('pin').value = localStorage.getItem(PIN_KEY) || ''; } catch (e) { /* type it */ }
+  try { $('name').value = localStorage.getItem('tvbox-visitor-name') || ''; } catch (e) { /* type it */ }
+
+  function say(text, error) {
+    $('message').textContent = text;
+    $('message').className = error ? 'error' : '';
+  }
+
+  $('files').onchange = () => {
+    const n = $('files').files.length;
+    $('chosen').textContent = n ? (n === 1 ? '1 file chosen' : n + ' files chosen') : '';
+  };
+
+  async function postJson(path, body, pin) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (pin) headers['X-Upload-Pin'] = pin;
+      const r = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
+      const d = await r.json();
+      return { ok: r.ok, message: d.message, error: d.error, tag: d.tag };
+    } catch (e) { return { ok: false, error: "Couldn't reach the box." }; }
+  }
+
+  const api = {
+    check: (pin, files, name) => postJson('/api/uploads/check',
+      { name, files: files.map((f) => ({ name: f.name, bytes: f.size })) }, pin),
+    upload(file, pin, tag, onProgress) {
+      return new Promise((resolve) => {
+        const x = new XMLHttpRequest();
+        x.open('POST', '/api/uploads?name=' + encodeURIComponent(file.name) + '&tag=' + encodeURIComponent(tag));
+        x.setRequestHeader('X-Upload-Pin', pin);
+        x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded * 100) / e.total)); };
+        x.onload = () => {
+          let d = {};
+          try { d = JSON.parse(x.responseText); } catch (e) { /* no answer */ }
+          resolve({ ok: x.status === 200, message: d.message, error: d.error || 'The box refused it.' });
+        };
+        x.onerror = () => resolve({ ok: false, error: 'The upload stopped. Keep this page open while it sends, then try again.' });
+        x.send(file);
+      });
+    },
+    show: (tag) => postJson('/api/show', { tags: [tag], until: 'cleared' }),
+  };
+
+  const rows = {};
+  const ui = {
+    say,
+    forgetPin() {
+      try { localStorage.removeItem(PIN_KEY); } catch (e) { /* nothing kept */ }
+      $('pin').value = '';
+    },
+    remember(name, pin) {
+      try { localStorage.setItem(PIN_KEY, pin); localStorage.setItem('tvbox-visitor-name', name); } catch (e) { /* not kept */ }
+    },
+    progress(name, text) {
+      if (!rows[name]) {
+        rows[name] = document.createElement('div');
+        $('progress').appendChild(rows[name]);
+      }
+      rows[name].textContent = name + ': ' + text;
+    },
+  };
+
+  $('send').onclick = async () => {
+    $('send').disabled = true;
+    $('progress').textContent = '';
+    for (const k of Object.keys(rows)) delete rows[k];
+    const form = { name: $('name').value, pin: $('pin').value, files: Array.from($('files').files) };
+    const done = await sendVisit(form, api, ui);
+    if (done) { $('files').value = ''; $('chosen').textContent = ''; }
+    $('send').disabled = false;
+  };
+</script>
+<script>
+  // Put them on the TV: the name, PIN and files are needed; the box checks
+  // the name and the whole batch, each file is sent with the visitor's tag,
+  // and only when all were added is the tag played, until changed. Stops at
+  // the first refusal; a wrong PIN or a lock forgets the remembered PIN. No
+  // page code here, so it can be tried on its own.
+  async function sendVisit(form, api, ui) {
+    const name = String(form.name || '').trim();
+    const pin = String(form.pin || '').trim();
+    const files = form.files || [];
+    if (!name) { ui.say('Type your name first.', true); return false; }
+    if (!pin) { ui.say('Type the PIN first.', true); return false; }
+    if (!files.length) { ui.say('Choose some photos or videos first.', true); return false; }
+    const refusedPin = (error) => error === 'Wrong PIN.' || /^Too many wrong PINs/.test(error || '');
+    const checked = await api.check(pin, files, name);
+    if (!checked.ok) {
+      ui.say(checked.error, true);
+      if (refusedPin(checked.error)) ui.forgetPin();
+      return false;
+    }
+    ui.remember(name, pin);
+    for (const file of files) {
+      ui.progress(file.name, 'Sending…');
+      const r = await api.upload(file, pin, checked.tag, (percent) => ui.progress(file.name, 'Sending… ' + percent + '%'));
+      ui.progress(file.name, r.ok ? 'Added.' : r.error);
+      if (!r.ok) {
+        ui.say(r.error, true);
+        if (refusedPin(r.error)) ui.forgetPin();
+        return false;
+      }
+    }
+    const shown = await api.show(checked.tag);
+    if (!shown.ok) { ui.say(shown.error, true); return false; }
+    ui.say('Done! Your pictures are on the TV now.');
+    return true;
   }
 </script>
 </body>

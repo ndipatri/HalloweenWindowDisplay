@@ -129,7 +129,8 @@ player=$!
 
 check "the player starts and logs its filters" within 90 logged "Filters: Halloween kid, Halloween grownup, Thanksgiving"
 check "the website answers with a status" within 60 bash -c "[ -n \"\$(curl -fsS $SITE/api/status 2>/dev/null)\" ]"
-check "the website page loads" bash -c "curl -fsS $SITE/ | grep -q 'Back to schedule'"
+check "the advanced page loads at /advanced" bash -c "curl -fsS $SITE/advanced | grep -q 'Back to schedule'"
+check "the easy page loads at the box's address" bash -c "curl -fsS $SITE/ | grep -q 'Put them on the TV'"
 
 echo "== Using the website: Halloween grownup, until switched back"
 echo "   $(post /api/show '{"filters":["Halloween grownup"],"until":"cleared"}')"
@@ -387,6 +388,18 @@ echo "   $(post /api/address-code '{"show":true}')"
 check "switched back on, it is drawn when the next item starts" within 30 code_up
 echo "   $(post /api/show '{"target":"black","until":"cleared"}')"
 check "on a black screen, the code is taken away" within 5 bash -c "! code_up"
+echo "   $(post /api/schedule '{}')"
+
+echo "== The easy page: a visitor adds a photo under their name"
+visitor_tag="$(curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{"name":"Aunt Sue","files":[{"name":"red.jpg","bytes":10}]}' "$SITE/api/uploads/check" | node -pe 'JSON.parse(require("fs").readFileSync(0)).tag')"
+check "the visitor's name becomes their tag" test "$visitor_tag" = aunt-sue
+check "a name the box uses is refused" \
+  bash -c "curl -sS -X POST -H 'X-Upload-Pin: 4321' -d '{\"name\":\"Upload\",\"files\":[{\"name\":\"a.jpg\",\"bytes\":10}]}' '$SITE/api/uploads/check' | grep -q 'That name is taken by the box'"
+echo "   $(curl -sS -X POST -H 'X-Upload-Pin: 4321' --data-binary "@$E/red.jpg" "$SITE/api/uploads?name=visitor.jpg&tag=aunt-sue")"
+check "the visitor's upload is tagged with their name, logged" \
+  bash -c "grep -q '\"aunt-sue\"' $VIDEOS/tags.json && grep -qE 'Uploaded photos/[0-9]+-visitor.jpg \(0.0 MB\) for aunt-sue' '$LOG'"
+echo "   $(post /api/show '{"tags":["aunt-sue"],"until":"cleared"}')"
+check "the visitor's tag plays, and only that" within 30 bash -c "logged '#aunt-sue: playing' && status | grep -q '^#aunt-sue (override until cleared)'"
 echo "   $(post /api/schedule '{}')"
 
 echo "== Check for new videos now, and the recent activity"
