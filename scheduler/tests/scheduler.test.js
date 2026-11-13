@@ -498,10 +498,10 @@ test('a filter without days and times is refused and skipped', async () => {
   assert.ok(logs.some((l) => l.startsWith('ERROR: Ignoring filter 1 (Favorites): a filter needs days and times')), logs.join('\n'));
   // The website refuses to save one.
   const { createWebsite } = require('../website.js');
-  const files = { [ROOT + '/upload-pin']: '4321\n', [ROOT + '/filters.json']: JSON.stringify({ filters: [late] }) };
+  const files = { [ROOT + '/filters.json']: JSON.stringify({ filters: [late] }) };
   const w = createWebsite({ config, videoRoot: ROOT, now: () => at(10, 20, 18), readText: (p) => (p in files ? files[p] : null),
     writeText: (p, x) => { files[p] = x; }, removeFile: (p) => { delete files[p]; }, listFolder: () => null, readTail: () => null, startSync: () => true });
-  const r = await w.handle({ method: 'POST', path: '/api/filters', headers: { 'x-upload-pin': '4321' },
+  const r = await w.handle({ method: 'POST', path: '/api/filters', headers: {},
     body: JSON.stringify({ filters: [{ name: 'Party', anyOf: ['halloween'] }] }) });
   assert.equal(JSON.parse(r.body).error, 'Party: a filter needs days and times; to play tags any time, pick them under Play.');
 });

@@ -11,7 +11,6 @@ For ndipatri/HalloweenWindowDisplay. `scheduler/tests/e2e/emulate.sh` runs the b
 
 - **The website:** http://localhost:8080/ (the box's http://tvbox.local/): the easy page for visitors; the full page is http://localhost:8080/advanced. From a phone on the same Wi‑Fi: `http://<this-mac>.local:8080/`.
 - **The TV:** http://localhost:8081/ (`scheduler/tests/e2e/emulator/tv.js`): the newest frame mpv drew (about twice a second, no sound), turned and shaped as the TV shows it (portrait, or landscape once **Landscape** is tapped under TV on the website), plus the status line. Black there when nothing has been drawn in the last two seconds.
-- **Upload PIN:** `1234` (or `TVBOX_EMULATOR_PIN`).
 - **Code:** this folder as it is when the emulator **starts**, uncommitted changes included. Sync "pulls" from this folder's current branch (its `origin` is the mounted folder), never from GitHub.
 - **Clock:** the Mac's, in `TVBOX_TIMEZONE` (default America/New_York), so today's schedule applies. To see another season, play its filter under Play.
 - **Container:** `tvbox-emulator`, run with `--rm`. Nothing is kept outside it.
@@ -37,13 +36,13 @@ The emulator copies the code only when it starts. **After any change to the code
 
 ## Putting test content on it
 
-- **An upload without a phone:** the Mac has no ffmpeg, but the container does. Make the file there and send it to the website with the PIN:
+- **An upload without a phone:** the Mac has no ffmpeg, but the container does. Make the file there and send it to the website (no PIN):
 
   ```bash
-  docker exec tvbox-emulator bash -c 'ffmpeg -loglevel error -y -f lavfi -i color=c=green:s=720x1280 -frames:v 1 /tmp/test.png && curl -sS -X POST -H "X-Upload-Pin: 1234" --data-binary @/tmp/test.png "localhost:8080/api/uploads?name=test.png"'
+  docker exec tvbox-emulator bash -c 'ffmpeg -loglevel error -y -f lavfi -i color=c=green:s=720x1280 -frames:v 1 /tmp/test.png && curl -sS -X POST --data-binary @/tmp/test.png "localhost:8080/api/uploads?name=test.png"'
   ```
 
-- **Tags, filters, Play:** through the page, or the API (`POST /api/tags`, `POST /api/filters` with `X-Upload-Pin: 1234`, `POST /api/show`); see the window-display-schedule skill for the bodies.
+- **Tags, filters, Play:** through the page, or the API (`POST /api/tags`, `POST /api/filters`, `POST /api/show`); see the window-display-schedule skill for the bodies.
 
 ## Checking a change
 

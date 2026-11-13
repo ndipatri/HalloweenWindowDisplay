@@ -12,8 +12,7 @@
 # A phone on the same Wi-Fi can use the Mac's name or address instead of
 # localhost, e.g. http://<this-mac>.local:8080/, to try uploads, tags and filters.
 #
-# The upload PIN is 1234 (TVBOX_EMULATOR_PIN=5678 to change it). It runs the
-# code as it is in this folder, uncommitted changes included, and sync pulls
+# It runs the code as it is in this folder, uncommitted changes included, and sync pulls
 # from this folder's current branch, never from GitHub. Nothing is kept:
 # uploads, picks and the log go when it stops. The clock is the Mac's.
 # Uses the same image as box.e2e.sh (see there for what it can't show).
@@ -44,7 +43,6 @@ exec docker run --rm ${tty[@]+"${tty[@]}"} --init --platform "$platform" \
   --name tvbox-emulator \
   -p 8080:8080 -p 8081:8081 \
   -e TZ="${TVBOX_TIMEZONE:-America/New_York}" \
-  -e TVBOX_EMULATOR_PIN="${TVBOX_EMULATOR_PIN:-1234}" \
   -v "$repo:/src:ro" \
   -v "$here/fakes:/opt/e2e-fakes:ro" \
   -v "$here/emulator:/opt/emulator:ro" \

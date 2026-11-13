@@ -198,27 +198,26 @@ For your own filters:
   - times look like `17:00-23:00`; leave times empty for all day.
 - **↑** and **↓** change the order: where two filters' times overlap, the higher one plays.
 - **New filter** adds one, and **Delete** removes one.
-- Nothing changes until you type the upload PIN and tap **Save filters**. If something can't be used, it says which filter and why.
+- Nothing changes until you tap **Save filters**. If something can't be used, it says which filter and why.
 
 Your own filters are kept on this box only, and aren't backed up. A new box starts with just the GitHub ones.
 
 ### Put your own photos and videos on the window
 
 1. On your phone, open **http://tvbox.local/advanced**.
-2. Under **Photos and videos**, type the box's upload PIN. The phone remembers it after the first time.
-3. Tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
-4. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
-5. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Photos and videos** to add them to **Favorites** too.
+2. Under **Photos and videos**, tap **Add photos or videos** and pick as many as you like. On an iPhone they come from Photos; on Android you can pick from Google Photos too.
+3. Keep the page open until each one says **Added**. A long video takes a while, and an iPhone may spend a moment "Preparing" it before it starts sending.
+4. Pick **Uploads** under Play and tap **Play** to show them all, for as long as you choose. Star them under **Photos and videos** to add them to **Favorites** too.
 
 They play in the order you added them, round and round: each photo for 10 seconds, each video all the way through. When there's only one photo to play, it just stays on screen until something else is added. A photo the same shape as the screen fills it (and with the TV turned, only photos and videos of its shape play; see "Turn the TV" below): the box zooms it until there's no black around it, so whatever doesn't fit is cut off evenly at the edges (for a typical phone photo, about an eighth of its width on each side). To choose what's kept, crop it on the phone to the screen's shape (9:16) before adding it. Any other photo, and every video, is shown whole, with black around it if it isn't the screen's shape.
 
-To take one off, tap **Remove** next to it under **Photos and videos** (it needs the PIN too). It goes for good.
+To take one off, tap **Remove** next to it under **Photos and videos**. It goes for good.
 
 ### Let a visitor add their pictures
 
 The box's address, **http://tvbox.local/**, and the QR code on the TV open the easy page, made for someone standing at the window with their phone:
 
-1. They type **their name**, the **PIN** (tell them it), and tap **Choose photos or videos**.
+1. They type **their name** and tap **Choose photos or videos**.
 2. They tap **Put them on the TV**. Each file is sent, and once they're all added the TV plays their pictures, and only theirs, until someone changes it on either page.
 
 Their name becomes a tag (`Aunt Sue` → `aunt-sue`) on everything they add, so you'll find it under Play and on each upload on the advanced page. The same name next time adds to the same tag. A name that would make a tag the box already uses for something else (`upload`, `portrait`, `landscape`, `square`, or a GitHub folder's, like `halloween`) is refused: "That name is taken by the box. Try adding your last name." **Advanced** at the bottom goes to the full page, which has **Easy page** at the top to come back.
@@ -227,8 +226,7 @@ Good to know:
 - The GitHub filters never show your photos by themselves: they show when you play Uploads or Favorites, or in a filter of your own that names their tags.
 - They live only on this box. They aren't in the repo, aren't backed up, and other boxes don't have them.
 - Each file can be up to 1 GB, and the box keeps 2 GB of its card free, so it may say there isn't room.
-- Anyone on your Wi‑Fi can see the photos added (they're on the window anyway), but only someone with the PIN can add or remove them.
-- The PIN is chosen when the box is set up. To change it, or to set one on a box that says adding photos is off: `ssh tvbox.local`, then `cd ~/HalloweenWindowDisplay && sudo TVBOX_UPLOAD_PIN=1234 bash scheduler/setup.sh` (with your own 4 to 8 digits).
+- There's no PIN: anyone on your Wi‑Fi can add photos, remove them, and change filters, just as they can pick what plays.
 
 ### Turn the TV for landscape photos and videos
 
@@ -293,13 +291,10 @@ Open http://tvbox.local/ first: it says what should be on screen and why.
 | The picture is upside down with the TV landscape | Switch `landscapeRotate` between 0 and 180 in `scheduler/config.js`, then run setup again |
 | The screen is black but the page says something is playing | Check the TV's input and brightness, and that the curtain isn't too thick |
 | The TV turns itself off in the evening | Turn off the TV's auto power-off |
-| The page says `Adding photos is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |
-| It says `Wrong PIN` or `Too many wrong PINs` | Type the PIN again. After five wrong tries, wait five minutes |
 | A photo is refused as not a JPEG or PNG | The phone sent it as HEIC. On an iPhone: Settings → Camera → Formats → Most Compatible, then add it again |
 | A video of yours stutters on the window | Share or save it at 1080p (not 4K) and add it again |
 | Your photos show black | Nothing has been added yet, or everything was removed: add some on the page |
 | Favorites shows black, or won't start | Nothing is starred yet: star something under **Photos and videos** |
 | A filter won't start: `Nothing in … yet` | Nothing has its tags yet: add the tag to something under **Photos and videos**, or edit the filter |
-| Saving filters says `Editing filters is off` | The box has no upload PIN yet: set one (see "Put your own photos and videos on the window") |
 
 For anything else, the log has the details: `ssh tvbox.local`, then `tail -50 ~/video-scheduler/scheduler.log`.

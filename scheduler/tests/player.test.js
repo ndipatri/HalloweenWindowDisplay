@@ -473,7 +473,6 @@ test('a tilt switch that can\'t be read is logged once', async () => {
 async function photosPlaying() {
   const b = box({ photos: ['00001-a.jpg', '00002-b.mp4', '00003-c.png'] });
   b.files[ROOT + '/override.json'] = JSON.stringify({ tags: ['upload'], setAt: +at(10, 20, 17), expires: null, untilCleared: true });
-  b.files[ROOT + '/upload-pin'] = '4321\n';
   await b.tick();
   const { createWebsite } = require('../website.js');
   const site = createWebsite({
@@ -492,7 +491,7 @@ async function photosPlaying() {
     beforeRemove: (p) => b.player.dropFile(p),
   });
   b.remove = (name) => site.handle({
-    method: 'POST', path: '/api/uploads/remove', headers: { 'x-upload-pin': '4321' }, body: JSON.stringify({ name }),
+    method: 'POST', path: '/api/uploads/remove', headers: {}, body: JSON.stringify({ name }),
   });
   return b;
 }

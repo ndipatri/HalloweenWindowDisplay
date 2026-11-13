@@ -18,7 +18,7 @@ git -C "$REPO" remote set-url origin /src
 chown -R pi: "$REPO"
 
 echo "== Running setup (sudo bash scheduler/setup.sh)"
-if ! env PATH="/opt/emulator:/opt/e2e-fakes:$PATH" SUDO_USER=pi TVBOX_UPLOAD_PIN="$TVBOX_EMULATOR_PIN" \
+if ! env PATH="/opt/emulator:/opt/e2e-fakes:$PATH" SUDO_USER=pi \
     bash "$REPO/scheduler/setup.sh" < /dev/null > /tmp/e2e/setup.out 2>&1; then
   sed 's/^/   /' /tmp/e2e/setup.out
   echo "Setup failed; see above." >&2
@@ -38,7 +38,7 @@ node /opt/emulator/tv.js "$VIDEOS/status" /opt/tvbox/config.js &
 cat <<MSG
 
    The box is running.
-     Website:  http://localhost:8080/   (upload PIN $TVBOX_EMULATOR_PIN)
+     Website:  http://localhost:8080/
      TV:       http://localhost:8081/
    A phone on the same Wi-Fi can use this Mac's name instead of localhost.
    Ctrl-C stops it. The box's log follows:

@@ -23,7 +23,7 @@ const GITHUB = ROOT + '/github-filters.json';
 
 // A website with fake files. `dirs` maps folder paths (relative to the
 // video folder) to the names in them. `extra`: filters (default: the starting
-// set), tags, pin, files, now, log, filtersChanged.
+// set), tags, files, now, log, filtersChanged.
 function site(dirs = {}, extra = {}) {
   const files = Object.assign({}, extra.files || {});
   // Custom filters if given; the GitHub filters (by default the repo's) unless only custom ones are given.
@@ -31,7 +31,6 @@ function site(dirs = {}, extra = {}) {
   if (extra.github) files[GITHUB] = JSON.stringify({ filters: extra.github });
   else if (!extra.filters) files[GITHUB] = STARTING;
   if (extra.tags) files[TAGS] = JSON.stringify({ tags: extra.tags });
-  if (extra.pin) files[ROOT + '/upload-pin'] = extra.pin + '\n';
   const folders = { [ROOT]: [] };
   for (const [k, v] of Object.entries(dirs)) {
     folders[ROOT + '/' + k] = folders[ROOT + '/' + k] || [];
@@ -314,7 +313,7 @@ test('the address code is on until switched off', async () => {
 
 test('the address code is switched off and on with no PIN', async () => {
   const logs = [];
-  const s = site({}, { log: (m) => logs.push(m), pin: '1234' });
+  const s = site({}, { log: (m) => logs.push(m) });
   let r = await s.call('POST', '/api/address-code', { show: false });
   assert.equal(r.status, 200, r.body);
   assert.deepEqual(JSON.parse(s.files[ROOT + '/address-code.json']), { show: false });
@@ -476,12 +475,11 @@ test('the box turns the old picks into favorites', async () => {
 
 // ---- Filters ----
 
-const PIN = { 'x-upload-pin': '4321' };
 const christmas = { name: 'Christmas', anyOf: ['christmas'], except: [],
   schedule: [{ from: '12-01', to: '12-31', times: [{ start: '17:00', stop: '23:00' }] }] };
 const late = { name: 'Late', anyOf: ['halloween'], except: [],
   schedule: [{ from: '01-01', to: '12-31', weekdays: ['fri'], times: [{ start: '22:00', stop: '01:00' }] }] };
-const pinSite = (extra = {}) => site({}, Object.assign({ pin: '4321', filters: [late] }, extra));
+const filterSite = (extra = {}) => site({}, Object.assign({ filters: [late] }, extra));
 const saved = (s) => JSON.parse(s.files[FILTERS]).filters;
 
 test('the website lists the filters', async () => {
@@ -496,11 +494,11 @@ test('the website lists the filters', async () => {
   assert.deepEqual(r.json.github, [kid, thanks]);
 });
 
-test('the website saves the filters with the right PIN', async () => {
+test('the website saves the filters with no PIN', async () => {
   const logs = [];
   let changed = 0;
-  const s = pinSite({ log: (m) => logs.push(m), filtersChanged: async () => { changed++; } });
-  const r = await s.call('POST', '/api/filters', { filters: [christmas, late] }, PIN);
+  const s = filterSite({ log: (m) => logs.push(m), filtersChanged: async () => { changed++; } });
+  const r = await s.call('POST', '/api/filters', { filters: [christmas, late] });
   assert.equal(r.status, 200, r.body);
   assert.deepEqual(saved(s).map((f) => f.name), ['Christmas', 'Late']);
   assert.equal(r.json.message, 'Saved 2 filters.');
@@ -508,24 +506,8 @@ test('the website saves the filters with the right PIN', async () => {
   assert.equal(changed, 1);
 });
 
-test('the website refuses to save filters with the wrong PIN', async () => {
-  const s = pinSite();
-  const r = await s.call('POST', '/api/filters', { filters: [christmas] }, { 'x-upload-pin': '1111' });
-  assert.equal(r.status, 403, r.body);
-  assert.equal(r.json.error, 'Wrong PIN.');
-  assert.deepEqual(saved(s).map((f) => f.name), ['Late']);
-});
-
-test('the website refuses to save filters while no PIN is set', async () => {
-  const s = pinSite({ pin: null });
-  const r = await s.call('POST', '/api/filters', { filters: [christmas] }, PIN);
-  assert.equal(r.status, 403, r.body);
-  assert.equal(r.json.error, 'Editing filters is off until a PIN is set on the box.');
-  assert.deepEqual(saved(s).map((f) => f.name), ['Late']);
-});
-
 test("the website refuses a filter it can't use", async () => {
-  const s = pinSite({ github: [{ name: 'Halloween kid', anyOf: ['halloween'], schedule: [{ from: '10-01', to: '10-31' }] }] });
+  const s = filterSite({ github: [{ name: 'Halloween kid', anyOf: ['halloween'], schedule: [{ from: '10-01', to: '10-31' }] }] });
   const f = (o) => Object.assign({}, christmas, o);
   const bad = [
     [[f({ name: '' })], 'Filter 1'],
@@ -540,7 +522,7 @@ test("the website refuses a filter it can't use", async () => {
     [[f({ schedule: [{ from: '12-01', to: '12-31', times: [{ start: '25:00', stop: '23:00' }] }] })], 'Christmas'],
   ];
   for (const [filters, named] of bad) {
-    const r = await s.call('POST', '/api/filters', { filters }, PIN);
+    const r = await s.call('POST', '/api/filters', { filters });
     assert.equal(r.status, 400, JSON.stringify(filters) + ' ' + r.body);
     assert.ok(r.json.error.startsWith(named + ':') && r.json.error.length > named.length + 3, r.json.error);
   }
@@ -559,13 +541,14 @@ test('the website page offers tagging items', async () => {
   assertScriptCompiles(page);
 });
 
-test('the website page offers editing filters with the PIN', async () => {
+test('the website page offers editing filters with no PIN', async () => {
   const page = (await site().call('GET', '/advanced')).body;
-  for (const text of ['<h2>Filters</h2>', 'id="filterlist"', "fetch('/api/filters')", "'/api/filters'", "'X-Upload-Pin'",
+  for (const text of ['<h2>Filters</h2>', 'id="filterlist"', "fetch('/api/filters')", "'/api/filters'",
     'id="filter-note"', 'New filter', 'Save filters', 'moveFilter(', '↑', '↓', 'Edit', 'Delete', 'Any of', 'Except', 'Times',
     'id="githubfilters"', 'From GitHub', 'changed there']) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
+  for (const text of ['id="filter-pin"', 'X-Upload-Pin', 'Type the PIN first.']) assert.ok(!page.includes(text), 'no PIN: ' + text);
   assertScriptCompiles(page);
 });
 
@@ -661,10 +644,9 @@ const { realIo } = require('../player.js');
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
 
-function uploads({ pin = '4321', free = 20 * GB } = {}) {
+function uploads({ free = 20 * GB } = {}) {
   const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-test-')), 'video-scheduler');
   fs.mkdirSync(root);
-  if (pin !== null) fs.writeFileSync(root + '/upload-pin', pin + '\n');
   const u = { root, logs: [], removed: [], now: new Date(2026, 10, 4, 18, 0), free };
   u.w = createWebsite(Object.assign(realIo(), {
     config,
@@ -679,18 +661,18 @@ function uploads({ pin = '4321', free = 20 * GB } = {}) {
   }));
   const answer = (r) => Object.assign({}, r, { json: r.type === 'application/json' ? JSON.parse(r.body) : null });
   // Sends `name` with `bytes` (a number of bytes, or a Buffer).
-  u.upload = async (name, bytes = 1000, pin = '4321') => {
+  u.upload = async (name, bytes = 1000) => {
     const data = Buffer.isBuffer(bytes) ? bytes : Buffer.alloc(bytes, 7);
-    return answer(await u.w.receiveUpload({ name, pin, length: data.length, stream: Readable.from([data]) }));
+    return answer(await u.w.receiveUpload({ name, length: data.length, stream: Readable.from([data]) }));
   };
   // Declares `length` bytes, but a body that must never be read.
-  u.declare = async (name, length, pin = '4321') => {
+  u.declare = async (name, length) => {
     u.bodyRead = false;
     const stream = new Readable({ read() { u.bodyRead = true; this.push(null); } });
-    return answer(await u.w.receiveUpload({ name, pin, length, stream }));
+    return answer(await u.w.receiveUpload({ name, length, stream }));
   };
-  u.call = async (method, p, body, pin) => answer(await u.w.handle({
-    method, path: p, headers: pin === undefined ? {} : { 'x-upload-pin': pin },
+  u.call = async (method, p, body) => answer(await u.w.handle({
+    method, path: p, headers: {},
     body: body === undefined ? '' : JSON.stringify(body),
   }));
   // Everything in photos/, hidden part files included, but not the counter.
@@ -703,7 +685,7 @@ function uploads({ pin = '4321', free = 20 * GB } = {}) {
   return u;
 }
 
-test('the website adds a photo with the right PIN', async () => {
+test('the website adds a photo with no PIN', async () => {
   const u = uploads();
   const data = Buffer.alloc(2 * MB, 9);
   const r = await u.upload('IMG_1234.JPG', data);
@@ -712,57 +694,6 @@ test('the website adds a photo with the right PIN', async () => {
   assert.ok(fs.readFileSync(u.root + '/photos/00001-img_1234.jpg').equals(data));
   assert.equal(r.json.message, 'Added IMG_1234.JPG.');
   assert.ok(u.logs.includes('Uploaded photos/00001-img_1234.jpg (2.0 MB)'), u.logs.join('\n'));
-});
-
-test('the website refuses an upload with the wrong PIN', async () => {
-  const u = uploads();
-  const r = await u.upload('IMG_1234.JPG', 1000, '1111');
-  assert.equal(r.json && r.json.error, 'Wrong PIN.');
-  assert.deepEqual(u.photos(), []);
-});
-
-test('the website refuses an upload with no PIN', async () => {
-  const u = uploads();
-  const data = Buffer.alloc(1000);
-  const r = await u.w.receiveUpload({ name: 'IMG_1234.JPG', pin: undefined, length: data.length, stream: Readable.from([data]) });
-  assert.equal(JSON.parse(r.body).error, 'Wrong PIN.');
-  assert.deepEqual(u.photos(), []);
-});
-
-test('the website refuses uploads while no PIN is set', async () => {
-  const u = uploads({ pin: null });
-  const r = await u.upload('IMG_1234.JPG', 1000, '4321');
-  assert.equal(r.json && r.json.error, 'Adding photos is off: no upload PIN is set on the box.');
-  assert.deepEqual(u.photos(), []);
-});
-
-test("a PIN file that isn't 4 to 8 digits leaves uploads off", async () => {
-  const u = uploads({ pin: '12' });
-  const r = await u.upload('IMG_1234.JPG', 1000, '12');
-  assert.equal(r.json && r.json.error, 'Adding photos is off: no upload PIN is set on the box.');
-  assert.deepEqual(u.photos(), []);
-});
-
-test('five wrong PINs in a row lock uploads for five minutes', async () => {
-  const u = uploads();
-  for (let i = 0; i < 5; i++) await u.upload('a.jpg', 10, '1111');
-  u.now = new Date(2026, 10, 4, 18, 1);
-  const locked = await u.upload('a.jpg', 10, '4321');
-  assert.equal(locked.json && locked.json.error, 'Too many wrong PINs. Try again after 6:05 PM.');
-  assert.equal(u.logs.filter((l) => l === 'Five wrong upload PINs in a row: uploads locked until 6:05 PM').length, 1, u.logs.join('\n'));
-  u.now = new Date(2026, 10, 4, 18, 5);
-  const r = await u.upload('a.jpg', 10, '4321');
-  assert.equal(r.status, 200, r.body);
-  assert.deepEqual(u.photos(), ['00001-a.jpg']);
-});
-
-test('a right PIN starts the count of wrong PINs again', async () => {
-  const u = uploads();
-  for (let i = 0; i < 4; i++) await u.upload('x.jpg', 10, '1111');
-  assert.equal((await u.upload('a.jpg', 10, '4321')).status, 200);
-  for (let i = 0; i < 4; i++) await u.upload('x.jpg', 10, '1111');
-  assert.equal((await u.upload('b.jpg', 10, '4321')).status, 200);
-  assert.deepEqual(u.photos(), ['00001-a.jpg', '00002-b.jpg']);
 });
 
 test('uploads are numbered in the order they arrived', async () => {
@@ -818,7 +749,7 @@ test('the website refuses an upload that would leave under 2 GB free', async () 
 test('an upload that stops partway leaves nothing behind', async () => {
   const u = uploads();
   const stream = new Readable({ read() {} });
-  const done = u.w.receiveUpload({ name: 'clip.mov', pin: '4321', length: 10 * MB, stream });
+  const done = u.w.receiveUpload({ name: 'clip.mov', length: 10 * MB, stream });
   stream.push(Buffer.alloc(5 * MB, 3));
   stream.push(null);
   await done;
@@ -829,25 +760,16 @@ test('an upload that stops partway leaves nothing behind', async () => {
 test('the website clears a batch before it is sent', async () => {
   const u = uploads();
   const r = await u.call('POST', '/api/uploads/check',
-    { files: [{ name: 'a.jpg', bytes: 3 * MB }, { name: 'b.mov', bytes: 200 * MB }, { name: 'c.png', bytes: MB }] }, '4321');
+    { files: [{ name: 'a.jpg', bytes: 3 * MB }, { name: 'b.mov', bytes: 200 * MB }, { name: 'c.png', bytes: MB }] });
   assert.equal(r.status, 200, r.body);
   assert.equal(r.json.message, 'Ready to add 3 files.');
   assert.deepEqual(u.photos(), []);
 });
 
-test('the website refuses a batch with the wrong PIN before it is sent', async () => {
-  const u = uploads();
-  const r = await u.call('POST', '/api/uploads/check', { files: [{ name: 'a.jpg', bytes: 10 }, { name: 'b.jpg', bytes: 10 }] }, '1111');
-  assert.equal(r.json && r.json.error, 'Wrong PIN.');
-  // It counted as one wrong PIN: four more make five, and uploads lock.
-  for (let i = 0; i < 4; i++) await u.upload('x.jpg', 10, '1111');
-  assert.equal((await u.upload('a.jpg', 10, '4321')).json.error, 'Too many wrong PINs. Try again after 6:05 PM.');
-});
-
 test("the website refuses a batch that wouldn't fit before it is sent", async () => {
   const u = uploads({ free: 3 * GB });
   const r = await u.call('POST', '/api/uploads/check',
-    { files: [{ name: 'a.mov', bytes: 600 * MB }, { name: 'b.mov', bytes: 600 * MB }] }, '4321');
+    { files: [{ name: 'a.mov', bytes: 600 * MB }, { name: 'b.mov', bytes: 600 * MB }] });
   assert.equal(r.json && r.json.error, 'Not enough room on the box for these 2 files: 2 GB must stay free.');
 });
 
@@ -859,15 +781,14 @@ test('the website lists the uploads in the order they play', async () => {
   u.put('notes.txt');
   const r = await u.call('GET', '/api/uploads');
   assert.deepEqual(r.json, {
-    pinSet: true,
     uploads: [{ name: '00001-a.jpg', kind: 'photo', bytes: 10 }, { name: '00002-b.mp4', kind: 'video', bytes: 20 }],
   });
 });
 
 test('the website lists no uploads when there are none', async () => {
-  const u = uploads({ pin: null });
+  const u = uploads();
   const r = await u.call('GET', '/api/uploads');
-  assert.deepEqual(r.json, { pinSet: false, uploads: [] });
+  assert.deepEqual(r.json, { uploads: [] });
 });
 
 const bytesOf = (r) => {
@@ -923,10 +844,10 @@ test('the website sends nothing outside the uploads', async () => {
   }
 });
 
-test('the website removes an upload with the right PIN', async () => {
+test('the website removes an upload with no PIN', async () => {
   const u = uploads();
   u.put('00001-a.jpg');
-  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' }, '4321');
+  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' });
   assert.equal(r.status, 200, r.body);
   assert.deepEqual(u.photos(), []);
   assert.equal(r.json.message, 'Removed 00001-a.jpg.');
@@ -938,7 +859,7 @@ test('removing an upload drops its box tags', async () => {
   const u = uploads();
   u.put('00001-a.jpg');
   fs.writeFileSync(u.root + '/tags.json', JSON.stringify({ tags: { 'photos/00001-a.jpg': ['family'], 'halloween/fuzzy.mp4': ['favorites'] } }));
-  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' }, '4321');
+  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' });
   assert.equal(r.status, 200, r.body);
   const tags = JSON.parse(fs.readFileSync(u.root + '/tags.json', 'utf8')).tags;
   assert.ok(!('photos/00001-a.jpg' in tags), JSON.stringify(tags));
@@ -946,21 +867,12 @@ test('removing an upload drops its box tags', async () => {
   assert.equal(u.filtersChanged, 1, 'the player is told');
 });
 
-test('the website refuses to remove an upload with the wrong PIN', async () => {
-  const u = uploads();
-  u.put('00001-a.jpg');
-  const r = await u.call('POST', '/api/uploads/remove', { name: '00001-a.jpg' }, '1111');
-  assert.equal(r.json && r.json.error, 'Wrong PIN.');
-  assert.deepEqual(u.photos(), ['00001-a.jpg']);
-  assert.deepEqual(u.removed, [], 'nothing taken off the TV');
-});
-
 test("the website refuses to remove something that isn't an upload", async () => {
   const u = uploads();
   u.put('.upload-123');
   fs.writeFileSync(u.root + '/status', 'x\n');
   for (const name of ['../status', '.upload-123', 'missing.jpg']) {
-    const r = await u.call('POST', '/api/uploads/remove', { name }, '4321');
+    const r = await u.call('POST', '/api/uploads/remove', { name });
     assert.ok(r.json && r.json.error && r.json.error.startsWith('No upload named ' + name), name + ': ' + r.body);
   }
   assert.ok(fs.existsSync(u.root + '/status'));
@@ -974,7 +886,7 @@ test("a removed upload's number is never given again", async () => {
   const u = uploads();
   await u.upload('a.jpg');
   await u.upload('b.jpg');
-  await u.call('POST', '/api/uploads/remove', { name: '00002-b.jpg' }, '4321');
+  await u.call('POST', '/api/uploads/remove', { name: '00002-b.jpg' });
   const r = await u.upload('b.jpg');
   assert.equal(r.status, 200, r.body);
   assert.deepEqual(u.photos(), ['00001-a.jpg', '00003-b.jpg']);
@@ -1012,7 +924,7 @@ test('a phone dropping off mid-upload is not logged as an error', async () => {
       this.destroy(Object.assign(new Error('read ETIMEDOUT'), { code: 'ETIMEDOUT' }));
     },
   });
-  const r = await u.w.receiveUpload({ name: 'clip.mov', pin: '4321', length: 1000, stream });
+  const r = await u.w.receiveUpload({ name: 'clip.mov', length: 1000, stream });
   assert.equal(r.status, 400);
   assert.deepEqual(u.photos(), []);
   assert.ok(!u.logs.some((l) => l.startsWith('ERROR')), u.logs.join('\n'));
@@ -1057,13 +969,14 @@ const PAGE_TEXT = () => pageText;
 test('the website page offers adding and removing photos', async () => {
   const s = site();
   const page = (await s.call('GET', '/advanced')).body;
-  for (const text of ['Add photos or videos', 'type="file"', 'accept="image/*,video/*"', 'multiple', 'id="pin"',
-    "fetch('/api/uploads')", '>Remove<', 'Adding photos is off until a PIN is set on the box.', 'preload="metadata"']) {
+  for (const text of ['Add photos or videos', 'type="file"', 'accept="image/*,video/*"', 'multiple',
+    '>Remove<', 'preload="metadata"']) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
+  for (const text of ['id="pin"', 'Adding photos is off', 'X-Upload-Pin', 'Type the PIN first.']) assert.ok(!page.includes(text), 'no PIN: ' + text);
   // One section: the picker, then each upload once with its tags and Remove.
   const section = page.slice(page.indexOf('<h2>Photos and videos</h2>'), page.indexOf('<h2>Filters</h2>'));
-  for (const text of ['id="files"', 'id="pin"', 'id="taglist"']) assert.ok(section.includes(text), 'section has ' + text);
+  for (const text of ['id="files"', 'id="taglist"']) assert.ok(section.includes(text), 'section has ' + text);
   for (const text of ['<h2>Tags</h2>', '<h2>Add photos or videos</h2>', '<h2>Photos and videos added</h2>', 'id="uploads"']) {
     assert.ok(!page.includes(text), 'page no longer has ' + text);
   }
@@ -1074,17 +987,15 @@ function fakeBatch(checkAnswer) {
   const calls = [];
   const said = [];
   const progress = [];
-  let forgot = 0;
   const api = {
-    check: async (pin, files) => { calls.push(['check', pin, files.map((f) => f.name)]); return checkAnswer; },
-    upload: async (file, pin) => { calls.push(['upload', pin, file.name]); return { ok: true, message: 'Added ' + file.name + '.' }; },
+    check: async (files) => { calls.push(['check', files.map((f) => f.name)]); return checkAnswer; },
+    upload: async (file) => { calls.push(['upload', file.name]); return { ok: true, message: 'Added ' + file.name + '.' }; },
   };
   const ui = {
     say: (text, error) => said.push([text, !!error]),
     progress: (name, text) => progress.push([name, text]),
-    forgetPin: () => { forgot++; },
   };
-  return { api, ui, calls, said, progress, forgot: () => forgot };
+  return { api, ui, calls, said, progress };
 }
 
 test('the page sends a batch only after the box clears it', async () => {
@@ -1092,24 +1003,13 @@ test('the page sends a batch only after the box clears it', async () => {
   const sendBatch = batchFlow();
   const f = fakeBatch({ ok: true, message: 'Ready to add 3 files.' });
   const files = [{ name: 'a.jpg', size: 3 }, { name: 'b.mov', size: 200 }, { name: 'c.png', size: 1 }];
-  await sendBatch(files, '4321', f.api, f.ui);
+  await sendBatch(files, f.api, f.ui);
   assert.deepEqual(f.calls, [
-    ['check', '4321', ['a.jpg', 'b.mov', 'c.png']],
-    ['upload', '4321', 'a.jpg'], ['upload', '4321', 'b.mov'], ['upload', '4321', 'c.png'],
+    ['check', ['a.jpg', 'b.mov', 'c.png']],
+    ['upload', 'a.jpg'], ['upload', 'b.mov'], ['upload', 'c.png'],
   ]);
   assert.deepEqual(f.progress.filter((p) => /^Added/.test(p[1])),
     [['a.jpg', 'Added a.jpg.'], ['b.mov', 'Added b.mov.'], ['c.png', 'Added c.png.']]);
-});
-
-test('the page stops a batch at a wrong PIN and asks for it again', async () => {
-  pageText = (await site().call('GET', '/advanced')).body;
-  const sendBatch = batchFlow();
-  const f = fakeBatch({ ok: false, error: 'Wrong PIN.' });
-  const files = ['1', '2', '3', '4', '5'].map((n) => ({ name: n + '.jpg', size: 1 }));
-  await sendBatch(files, '1111', f.api, f.ui);
-  assert.deepEqual(f.calls.map((c) => c[0]), ['check']);
-  assert.ok(f.said.some(([text, error]) => text === 'Wrong PIN.' && error), JSON.stringify(f.said));
-  assert.equal(f.forgot(), 1);
 });
 
 test("a picks file that can't be read is kept, and logged", async () => {
@@ -1195,10 +1095,10 @@ function visitorBox() {
   const u = uploads();
   fs.mkdirSync(u.root + '/halloween', { recursive: true });
   fs.writeFileSync(u.root + '/halloween/ghost.mp4', 'x');
-  u.check = (name, files = [{ name: 'a.jpg', bytes: 10 }], pin = '4321') => u.call('POST', '/api/uploads/check', { name, files }, pin);
-  u.sendFor = async (name, tag, bytes = 1000, pin = '4321') => {
+  u.check = (name, files = [{ name: 'a.jpg', bytes: 10 }]) => u.call('POST', '/api/uploads/check', { name, files });
+  u.sendFor = async (name, tag, bytes = 1000) => {
     const data = Buffer.isBuffer(bytes) ? bytes : Buffer.alloc(bytes, 7);
-    const r = await u.w.receiveUpload({ name, pin, length: data.length, stream: Readable.from([data]), tag });
+    const r = await u.w.receiveUpload({ name, length: data.length, stream: Readable.from([data]), tag });
     return Object.assign({}, r, { json: JSON.parse(r.body) });
   };
   u.tags = () => {
@@ -1217,15 +1117,14 @@ async function visitFlow(form, answers = {}) {
   const calls = [];
   const said = [];
   const api = {
-    check: async (pin, files, name) => { calls.push(['check', pin, files.map((f) => f.name), name]); return answers.check || { ok: true, tag: 'aunt-sue' }; },
-    upload: async (file, pin, tag, onProgress) => { calls.push(['upload', file.name, pin, tag]); onProgress(100); return (answers.upload && answers.upload(file)) || { ok: true }; },
+    check: async (files, name) => { calls.push(['check', files.map((f) => f.name), name]); return answers.check || { ok: true, tag: 'aunt-sue' }; },
+    upload: async (file, tag, onProgress) => { calls.push(['upload', file.name, tag]); onProgress(100); return (answers.upload && answers.upload(file)) || { ok: true }; },
     show: async (tag) => { calls.push(['show', tag]); return { ok: true }; },
   };
   const ui = {
     say: (text, error) => said.push([text, Boolean(error)]),
     progress: () => {},
-    forgetPin: () => calls.push(['forget']),
-    remember: (name, pin) => calls.push(['remember', name, pin]),
+    remember: (name) => calls.push(['remember', name]),
   };
   const result = await context.sendVisit(form, api, ui);
   return { result, calls, said };
@@ -1235,7 +1134,8 @@ test('the easy page is at the box\'s address', async () => {
   const r = await site().call('GET', '/');
   assert.equal(r.status, 200);
   assert.equal(r.type, 'text/html');
-  for (const text of ['id="name"', 'id="pin"', 'type="file"', 'accept="image/*,video/*"', 'multiple',
+  assert.ok(!r.body.includes('id="pin"') && !r.body.includes('X-Upload-Pin'), 'no PIN field');
+  for (const text of ['id="name"', 'type="file"', 'accept="image/*,video/*"', 'multiple',
     '>Put them on the TV<', 'href="/advanced"']) {
     assert.ok(r.body.includes(text), 'easy page has ' + text);
   }
@@ -1266,7 +1166,7 @@ test('a visitor\'s name becomes their tag', async () => {
   const long = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmn';
   assert.equal(await tagFor(long), long.slice(0, 30));
   // Without a name, check is as before: no tag.
-  const plain = await u.call('POST', '/api/uploads/check', { files: [{ name: 'a.jpg', bytes: 10 }] }, '4321');
+  const plain = await u.call('POST', '/api/uploads/check', { files: [{ name: 'a.jpg', bytes: 10 }] });
   assert.equal(plain.status, 200);
   assert.equal(plain.json.tag, undefined);
 });
@@ -1284,9 +1184,6 @@ test('a name with no letters or numbers is refused', async () => {
   const u = visitorBox();
   assert.equal((await u.check('   ')).json.error, 'Type your name first.');
   assert.equal((await u.check('!!!')).json.error, 'Use some letters or numbers in your name.');
-  // A refused name costs no PIN try.
-  for (let i = 0; i < 10; i++) await u.check('!!!', undefined, '0000');
-  assert.equal((await u.check('Aunt Sue')).status, 200);
 });
 
 test('a returning visitor adds to their tag', async () => {
@@ -1313,14 +1210,6 @@ test('each visitor upload is tagged with their name', async () => {
   assert.equal((await u.call('POST', '/api/show', { tags: ['aunt-sue'], until: 'cleared' })).status, 200);
 });
 
-test('a visitor upload needs the PIN', async () => {
-  const u = visitorBox();
-  const r = await u.sendFor('Beach.JPG', 'aunt-sue', 1000, '1111');
-  assert.equal(r.json.error, 'Wrong PIN.');
-  assert.deepEqual(u.photos(), []);
-  assert.deepEqual(u.tags(), {});
-});
-
 test('a visitor upload with a tag the box uses is refused', async () => {
   const u = visitorBox();
   for (const tag of ['halloween', 'upload']) {
@@ -1333,13 +1222,13 @@ test('a visitor upload with a tag the box uses is refused', async () => {
 });
 
 test('the visitor\'s pictures play until changed', async () => {
-  const f = await visitFlow({ name: ' Aunt Sue ', pin: '4321', files: [{ name: 'a.jpg', size: 5 }, { name: 'b.mp4', size: 9 }] });
+  const f = await visitFlow({ name: ' Aunt Sue ', files: [{ name: 'a.jpg', size: 5 }, { name: 'b.mp4', size: 9 }] });
   assert.equal(f.result, true);
   assert.deepEqual(f.calls, [
-    ['check', '4321', ['a.jpg', 'b.mp4'], 'Aunt Sue'],
-    ['remember', 'Aunt Sue', '4321'],
-    ['upload', 'a.jpg', '4321', 'aunt-sue'],
-    ['upload', 'b.mp4', '4321', 'aunt-sue'],
+    ['check', ['a.jpg', 'b.mp4'], 'Aunt Sue'],
+    ['remember', 'Aunt Sue'],
+    ['upload', 'a.jpg', 'aunt-sue'],
+    ['upload', 'b.mp4', 'aunt-sue'],
     ['show', 'aunt-sue'],
   ]);
   assert.deepEqual(f.said.pop(), ['Done! Your pictures are on the TV now.', false]);
@@ -1349,26 +1238,25 @@ test('the visitor\'s pictures play until changed', async () => {
 });
 
 test('nothing plays when an upload is refused', async () => {
-  const form = { name: 'Aunt Sue', pin: '1111', files: [{ name: 'a.jpg', size: 5 }] };
-  const f = await visitFlow(form, { check: { ok: false, error: 'Wrong PIN.' } });
+  const form = { name: 'Halloween', files: [{ name: 'a.jpg', size: 5 }] };
+  const taken = 'That name is taken by the box. Try adding your last name.';
+  const f = await visitFlow(form, { check: { ok: false, error: taken } });
   assert.equal(f.result, false);
-  assert.deepEqual(f.said, [['Wrong PIN.', true]]);
-  assert.ok(f.calls.some((c) => c[0] === 'forget'), 'forgets the PIN');
+  assert.deepEqual(f.said, [[taken, true]]);
   assert.ok(!f.calls.some((c) => c[0] === 'show' || c[0] === 'upload'));
   // Refused partway: stops there, plays nothing.
-  const g = await visitFlow({ name: 'Aunt Sue', pin: '4321', files: [{ name: 'a.jpg' }, { name: 'b.jpg' }] },
+  const g = await visitFlow({ name: 'Aunt Sue', files: [{ name: 'a.jpg' }, { name: 'b.jpg' }] },
     { upload: (file) => (file.name === 'a.jpg' ? { ok: false, error: 'Too big: one file can be at most 4 GB.' } : null) });
   assert.equal(g.result, false);
   assert.deepEqual(g.said, [['Too big: one file can be at most 4 GB.', true]]);
   assert.ok(!g.calls.some((c) => c[0] === 'show' || (c[0] === 'upload' && c[1] === 'b.jpg')));
 });
 
-test('the easy page needs a name, the PIN and a file', async () => {
+test('the easy page needs a name and a file', async () => {
   const files = [{ name: 'a.jpg', size: 5 }];
   for (const [form, text] of [
-    [{ name: ' ', pin: '4321', files }, 'Type your name first.'],
-    [{ name: 'Aunt Sue', pin: '', files }, 'Type the PIN first.'],
-    [{ name: 'Aunt Sue', pin: '4321', files: [] }, 'Choose some photos or videos first.'],
+    [{ name: ' ', files }, 'Type your name first.'],
+    [{ name: 'Aunt Sue', files: [] }, 'Choose some photos or videos first.'],
   ]) {
     const f = await visitFlow(form);
     assert.equal(f.result, false);

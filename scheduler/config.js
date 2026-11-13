@@ -21,8 +21,6 @@ module.exports = {
   uploads: {
     maxBytes: 1024 ** 3, // at most 1 GB a file
     keepFreeBytes: 2 * 1024 ** 3, // refuse an upload that would leave under 2 GB free
-    pinTries: 5, // wrong upload PINs in a row before uploads lock...
-    lockMinutes: 5, // ...for this long
   },
 
   // A QR code of the website's address (http://<the box's address>/) shown
