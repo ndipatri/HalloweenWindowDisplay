@@ -101,7 +101,7 @@ test('the website says when the box has not started yet', async () => {
   const r = await s.call('GET', '/api/status');
   assert.equal(r.status, 200);
   assert.equal(r.json.status, null);
-  assert.ok((await s.call('GET', '/')).body.includes("r.status || 'The box has not started yet.'"));
+  assert.ok((await s.call('GET', '/advanced')).body.includes("r.status || 'The box has not started yet.'"));
 });
 
 // ---- Shows tags for a while ----
@@ -211,7 +211,7 @@ test('the website lists the tags as choices', async () => {
 });
 
 test('the page offers each tag under Play, to pick several and play', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const load = page.slice(page.indexOf('async function load()'), page.indexOf('let filterNames') > 0 ? page.length : page.length);
   assert.ok(/for \(const tag of c\.tags\)[\s\S]*?pickButton\(tagLabel\(tag\), '#' \+ tag\)/.test(load), 'a button per tag, labelled as words');
   assert.ok(/for \(const name of c\.filters\)[\s\S]*?pickButton\(name, name\)/.test(load), 'a button per filter');
@@ -230,7 +230,7 @@ test('the page labels tags as words', async () => {
 // ---- The page highlights the playing tags ----
 
 test('the page shows the status under Play and outlines what is playing', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const body = page.slice(page.indexOf('<main>'));
   const play = body.indexOf('<h2>Play</h2>');
   assert.ok(play !== -1 && body.indexOf('id="status"') > play && body.indexOf('id="status"') < body.indexOf('id="tagpicks"'),
@@ -246,7 +246,7 @@ test('the page shows the status under Play and outlines what is playing', async 
 
 // Pulls a function out of the page's DOM-free script block.
 async function pageFunction(name) {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function ' + name));
   assert.ok(code, 'the page has ' + name);
   const context = {};
@@ -290,7 +290,7 @@ test('the website refuses an unknown orientation', async () => {
 });
 
 test('the page offers Portrait and Landscape', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const body = page.slice(page.indexOf('<main>'));
   const tv = body.indexOf('<h2>TV</h2>');
   assert.ok(tv !== -1, 'a TV section');
@@ -331,7 +331,7 @@ test('the address code is switched off and on with no PIN', async () => {
 });
 
 test('the page has the address code switch under TV', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const body = page.slice(page.indexOf('<main>'));
   const tv = body.indexOf('<h2>TV</h2>');
   const section = body.slice(tv, body.indexOf('<h2>', tv + 1));
@@ -431,7 +431,7 @@ test('the website says each upload\'s measured shape', async () => {
 });
 
 test('the website page marks each untagged upload\'s thumbnail with its measured shape', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   for (const text of ['class="shape"', 'item.shape', "'?'", "includes('portrait')", "includes('landscape')"]) {
     assert.ok(page.includes(text), 'page has ' + text);
   }
@@ -550,7 +550,7 @@ test("the website refuses a filter it can't use", async () => {
 // ---- The page tags items and edits filters ----
 
 test('the website page offers tagging items', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   for (const text of ['<h2>Photos and videos</h2>', 'id="taglist"', "fetch('/api/items')", "'/api/tags'", '<datalist id="tagnames">',
     'Videos from GitHub take their tags from their folders',
     "c.className = 'chip'", "{ add: 'favorites' }", "{ remove: 'favorites' }", '☆', '★', '×']) {
@@ -560,7 +560,7 @@ test('the website page offers tagging items', async () => {
 });
 
 test('the website page offers editing filters with the PIN', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   for (const text of ['<h2>Filters</h2>', 'id="filterlist"', "fetch('/api/filters')", "'/api/filters'", "'X-Upload-Pin'",
     'id="filter-note"', 'New filter', 'Save filters', 'moveFilter(', '↑', '↓', 'Edit', 'Delete', 'Any of', 'Except', 'Times',
     'id="githubfilters"', 'From GitHub', 'changed there']) {
@@ -581,7 +581,7 @@ test('the page moves a filter up and down', async () => {
 // ---- Durations, choices, sync and activity (unchanged) ----
 
 test('the page starts For how long on until switched back', async () => {
-  const page = (await site().call('GET', '/')).body;
+  const page = (await site().call('GET', '/advanced')).body;
   const select = page.slice(page.indexOf('<select id="until">'), page.indexOf('</select>', page.indexOf('<select id="until">')));
   const chosen = select.split('<option').filter((o) => /\sselected[\s>]/.test(o.split('>')[0] + '>'));
   assert.equal(chosen.length, 1, 'one option chosen: ' + select);
@@ -591,7 +591,7 @@ test('the page starts For how long on until switched back', async () => {
 
 test('the website page offers each choice', async () => {
   const s = site();
-  const r = await s.call('GET', '/');
+  const r = await s.call('GET', '/advanced');
   assert.equal(r.status, 200);
   assert.equal(r.type, 'text/html');
   for (const text of ['>Black<', '>Back to schedule<',
@@ -640,7 +640,7 @@ test('the website shows no log lines when there is no log yet', async () => {
 
 test('the website page offers checking for new videos and shows recent activity', async () => {
   const s = site();
-  const page = (await s.call('GET', '/')).body;
+  const page = (await s.call('GET', '/advanced')).body;
   assert.ok(!page.includes('Sync now'), 'the old wording is gone');
   for (const text of ['<h2>New videos from GitHub</h2>', 'The box checks GitHub for new videos every hour by itself.',
     'id="sync">Check for new videos now<', 'id="sync-note"', "setText($('sync-note')", 'Recent activity', 'id="log"', "fetch('/api/log')", "post('/api/sync', {}, true)"]) {
@@ -1056,7 +1056,7 @@ const PAGE_TEXT = () => pageText;
 
 test('the website page offers adding and removing photos', async () => {
   const s = site();
-  const page = (await s.call('GET', '/')).body;
+  const page = (await s.call('GET', '/advanced')).body;
   for (const text of ['Add photos or videos', 'type="file"', 'accept="image/*,video/*"', 'multiple', 'id="pin"',
     "fetch('/api/uploads')", '>Remove<', 'Adding photos is off until a PIN is set on the box.', 'preload="metadata"']) {
     assert.ok(page.includes(text), 'page has ' + text);
@@ -1088,7 +1088,7 @@ function fakeBatch(checkAnswer) {
 }
 
 test('the page sends a batch only after the box clears it', async () => {
-  pageText = (await site().call('GET', '/')).body;
+  pageText = (await site().call('GET', '/advanced')).body;
   const sendBatch = batchFlow();
   const f = fakeBatch({ ok: true, message: 'Ready to add 3 files.' });
   const files = [{ name: 'a.jpg', size: 3 }, { name: 'b.mov', size: 200 }, { name: 'c.png', size: 1 }];
@@ -1102,7 +1102,7 @@ test('the page sends a batch only after the box clears it', async () => {
 });
 
 test('the page stops a batch at a wrong PIN and asks for it again', async () => {
-  pageText = (await site().call('GET', '/')).body;
+  pageText = (await site().call('GET', '/advanced')).body;
   const sendBatch = batchFlow();
   const f = fakeBatch({ ok: false, error: 'Wrong PIN.' });
   const files = ['1', '2', '3', '4', '5'].map((n) => ({ name: n + '.jpg', size: 1 }));
@@ -1186,6 +1186,195 @@ test('custom copies are only dropped once, so a later clash keeps the custom fil
     files: { [ROOT + '/.custom-copies-dropped']: 'done\n' } });
   assert.deepEqual(JSON.parse(s.files[FILTERS]).filters.map((f) => f.name), ['Party']);
   assert.deepEqual(JSON.parse(s2.files[FILTERS]).filters.map((f) => f.name), ['Party']);
+});
+
+// ---- The easy page ----
+
+// An uploads box with a GitHub folder tagged halloween.
+function visitorBox() {
+  const u = uploads();
+  fs.mkdirSync(u.root + '/halloween', { recursive: true });
+  fs.writeFileSync(u.root + '/halloween/ghost.mp4', 'x');
+  u.check = (name, files = [{ name: 'a.jpg', bytes: 10 }], pin = '4321') => u.call('POST', '/api/uploads/check', { name, files }, pin);
+  u.sendFor = async (name, tag, bytes = 1000, pin = '4321') => {
+    const data = Buffer.isBuffer(bytes) ? bytes : Buffer.alloc(bytes, 7);
+    const r = await u.w.receiveUpload({ name, pin, length: data.length, stream: Readable.from([data]), tag });
+    return Object.assign({}, r, { json: JSON.parse(r.body) });
+  };
+  u.tags = () => {
+    try { return JSON.parse(fs.readFileSync(u.root + '/tags.json', 'utf8')).tags; } catch (e) { return {}; }
+  };
+  return u;
+}
+
+// The easy page's flow, run on its own with a fake box and page.
+async function visitFlow(form, answers = {}) {
+  const page = (await site().call('GET', '/')).body;
+  const code = page.split('<script>').map((p) => p.split('</script>')[0]).find((p) => p.includes('function sendVisit'));
+  assert.ok(code, 'the easy page has sendVisit');
+  const context = {};
+  require('vm').runInNewContext(code + '\nthis.sendVisit = sendVisit;', context);
+  const calls = [];
+  const said = [];
+  const api = {
+    check: async (pin, files, name) => { calls.push(['check', pin, files.map((f) => f.name), name]); return answers.check || { ok: true, tag: 'aunt-sue' }; },
+    upload: async (file, pin, tag, onProgress) => { calls.push(['upload', file.name, pin, tag]); onProgress(100); return (answers.upload && answers.upload(file)) || { ok: true }; },
+    show: async (tag) => { calls.push(['show', tag]); return { ok: true }; },
+  };
+  const ui = {
+    say: (text, error) => said.push([text, Boolean(error)]),
+    progress: () => {},
+    forgetPin: () => calls.push(['forget']),
+    remember: (name, pin) => calls.push(['remember', name, pin]),
+  };
+  const result = await context.sendVisit(form, api, ui);
+  return { result, calls, said };
+}
+
+test('the easy page is at the box\'s address', async () => {
+  const r = await site().call('GET', '/');
+  assert.equal(r.status, 200);
+  assert.equal(r.type, 'text/html');
+  for (const text of ['id="name"', 'id="pin"', 'type="file"', 'accept="image/*,video/*"', 'multiple',
+    '>Put them on the TV<', 'href="/advanced"']) {
+    assert.ok(r.body.includes(text), 'easy page has ' + text);
+  }
+  assert.ok(!r.body.includes('>Back to schedule<'), 'not the advanced page');
+  assertScriptCompiles(r.body);
+});
+
+test('the address code opens the easy page', async () => {
+  const { addressUrl } = require('../address_code.js');
+  const url = addressUrl('10.0.0.25', 80);
+  assert.equal(url, 'http://10.0.0.25/');
+  const r = await site().call('GET', new URL(url).pathname);
+  assert.ok(r.body.includes('>Put them on the TV<'));
+});
+
+test('the advanced page is at /advanced and links to the easy page', async () => {
+  const r = await site().call('GET', '/advanced');
+  assert.equal(r.status, 200);
+  for (const text of ['>Back to schedule<', '>Black<', '<h2>Play</h2>', 'href="/"']) assert.ok(r.body.includes(text), 'advanced page has ' + text);
+});
+
+test('a visitor\'s name becomes their tag', async () => {
+  const u = visitorBox();
+  const tagFor = async (name) => { const r = await u.check(name); assert.equal(r.status, 200, r.body); return r.json.tag; };
+  assert.equal(await tagFor('Aunt Sue'), 'aunt-sue');
+  assert.equal(await tagFor('José María'), 'jose-maria');
+  assert.equal(await tagFor('  Bob  O\'Brien!! '), 'bob-o-brien');
+  const long = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmn';
+  assert.equal(await tagFor(long), long.slice(0, 30));
+  // Without a name, check is as before: no tag.
+  const plain = await u.call('POST', '/api/uploads/check', { files: [{ name: 'a.jpg', bytes: 10 }] }, '4321');
+  assert.equal(plain.status, 200);
+  assert.equal(plain.json.tag, undefined);
+});
+
+test('a name the box uses is refused', async () => {
+  const u = visitorBox();
+  for (const name of ['Halloween', 'Upload', 'portrait']) {
+    const r = await u.check(name);
+    assert.equal(r.status, 400, name);
+    assert.equal(r.json.error, 'That name is taken by the box. Try adding your last name.');
+  }
+});
+
+test('a name with no letters or numbers is refused', async () => {
+  const u = visitorBox();
+  assert.equal((await u.check('   ')).json.error, 'Type your name first.');
+  assert.equal((await u.check('!!!')).json.error, 'Use some letters or numbers in your name.');
+  // A refused name costs no PIN try.
+  for (let i = 0; i < 10; i++) await u.check('!!!', undefined, '0000');
+  assert.equal((await u.check('Aunt Sue')).status, 200);
+});
+
+test('a returning visitor adds to their tag', async () => {
+  const u = visitorBox();
+  assert.equal((await u.sendFor('first.jpg', 'aunt-sue')).status, 200);
+  const tag = (await u.check('Aunt Sue')).json.tag;
+  assert.equal(tag, 'aunt-sue');
+  await u.sendFor('second.jpg', tag);
+  await u.sendFor('third.jpg', tag);
+  assert.deepEqual(u.tags(), {
+    'photos/00001-first.jpg': ['aunt-sue'], 'photos/00002-second.jpg': ['aunt-sue'], 'photos/00003-third.jpg': ['aunt-sue'],
+  });
+});
+
+test('each visitor upload is tagged with their name', async () => {
+  const u = visitorBox();
+  const r = await u.sendFor('Beach.JPG', 'aunt-sue', Buffer.alloc(2 * MB, 3));
+  assert.equal(r.status, 200, r.body);
+  assert.deepEqual(u.photos(), ['00001-beach.jpg']);
+  assert.deepEqual(u.tags(), { 'photos/00001-beach.jpg': ['aunt-sue'] });
+  assert.ok(u.logs.includes('Uploaded photos/00001-beach.jpg (2.0 MB) for aunt-sue'), u.logs.join('\n'));
+  assert.equal(u.filtersChanged, 1, 'the player is told');
+  // It plays: aunt-sue is a tag in use.
+  assert.equal((await u.call('POST', '/api/show', { tags: ['aunt-sue'], until: 'cleared' })).status, 200);
+});
+
+test('a visitor upload needs the PIN', async () => {
+  const u = visitorBox();
+  const r = await u.sendFor('Beach.JPG', 'aunt-sue', 1000, '1111');
+  assert.equal(r.json.error, 'Wrong PIN.');
+  assert.deepEqual(u.photos(), []);
+  assert.deepEqual(u.tags(), {});
+});
+
+test('a visitor upload with a tag the box uses is refused', async () => {
+  const u = visitorBox();
+  for (const tag of ['halloween', 'upload']) {
+    const r = await u.sendFor('Beach.JPG', tag);
+    assert.equal(r.status, 400);
+    assert.equal(r.json.error, 'That name is taken by the box. Try adding your last name.');
+  }
+  assert.equal((await u.sendFor('Beach.JPG', 'Not A Tag')).status, 400);
+  assert.deepEqual(u.photos(), []);
+});
+
+test('the visitor\'s pictures play until changed', async () => {
+  const f = await visitFlow({ name: ' Aunt Sue ', pin: '4321', files: [{ name: 'a.jpg', size: 5 }, { name: 'b.mp4', size: 9 }] });
+  assert.equal(f.result, true);
+  assert.deepEqual(f.calls, [
+    ['check', '4321', ['a.jpg', 'b.mp4'], 'Aunt Sue'],
+    ['remember', 'Aunt Sue', '4321'],
+    ['upload', 'a.jpg', '4321', 'aunt-sue'],
+    ['upload', 'b.mp4', '4321', 'aunt-sue'],
+    ['show', 'aunt-sue'],
+  ]);
+  assert.deepEqual(f.said.pop(), ['Done! Your pictures are on the TV now.', false]);
+  // The page asks the box to play it until cleared.
+  const page = (await site().call('GET', '/')).body;
+  assert.ok(page.includes("postJson('/api/show', { tags: [tag], until: 'cleared' })"));
+});
+
+test('nothing plays when an upload is refused', async () => {
+  const form = { name: 'Aunt Sue', pin: '1111', files: [{ name: 'a.jpg', size: 5 }] };
+  const f = await visitFlow(form, { check: { ok: false, error: 'Wrong PIN.' } });
+  assert.equal(f.result, false);
+  assert.deepEqual(f.said, [['Wrong PIN.', true]]);
+  assert.ok(f.calls.some((c) => c[0] === 'forget'), 'forgets the PIN');
+  assert.ok(!f.calls.some((c) => c[0] === 'show' || c[0] === 'upload'));
+  // Refused partway: stops there, plays nothing.
+  const g = await visitFlow({ name: 'Aunt Sue', pin: '4321', files: [{ name: 'a.jpg' }, { name: 'b.jpg' }] },
+    { upload: (file) => (file.name === 'a.jpg' ? { ok: false, error: 'Too big: one file can be at most 4 GB.' } : null) });
+  assert.equal(g.result, false);
+  assert.deepEqual(g.said, [['Too big: one file can be at most 4 GB.', true]]);
+  assert.ok(!g.calls.some((c) => c[0] === 'show' || (c[0] === 'upload' && c[1] === 'b.jpg')));
+});
+
+test('the easy page needs a name, the PIN and a file', async () => {
+  const files = [{ name: 'a.jpg', size: 5 }];
+  for (const [form, text] of [
+    [{ name: ' ', pin: '4321', files }, 'Type your name first.'],
+    [{ name: 'Aunt Sue', pin: '', files }, 'Type the PIN first.'],
+    [{ name: 'Aunt Sue', pin: '4321', files: [] }, 'Choose some photos or videos first.'],
+  ]) {
+    const f = await visitFlow(form);
+    assert.equal(f.result, false);
+    assert.deepEqual(f.said, [[text, true]]);
+    assert.deepEqual(f.calls, [], 'nothing sent');
+  }
 });
 
 (async () => {

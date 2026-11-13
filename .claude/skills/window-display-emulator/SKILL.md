@@ -9,7 +9,7 @@ For ndipatri/HalloweenWindowDisplay. `scheduler/tests/e2e/emulate.sh` runs the b
 
 ## What it is
 
-- **The website:** http://localhost:8080/ (the box's http://tvbox.local/). From a phone on the same Wi‑Fi: `http://<this-mac>.local:8080/`.
+- **The website:** http://localhost:8080/ (the box's http://tvbox.local/): the easy page for visitors; the full page is http://localhost:8080/advanced. From a phone on the same Wi‑Fi: `http://<this-mac>.local:8080/`.
 - **The TV:** http://localhost:8081/ (`scheduler/tests/e2e/emulator/tv.js`): the newest frame mpv drew (about twice a second, no sound), turned and shaped as the TV shows it (portrait, or landscape once **Landscape** is tapped under TV on the website), plus the status line. Black there when nothing has been drawn in the last two seconds.
 - **Upload PIN:** `1234` (or `TVBOX_EMULATOR_PIN`).
 - **Code:** this folder as it is when the emulator **starts**, uncommitted changes included. Sync "pulls" from this folder's current branch (its `origin` is the mounted folder), never from GitHub.
