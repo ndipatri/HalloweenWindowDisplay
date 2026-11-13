@@ -9,4 +9,4 @@
 
 ## Workflow follow-up
 
-- [ ] 3.1 On a real phone: labels right (including a sideways iPhone photo), warning for landscape on the portrait TV
+- [x] 3.1 On a real phone: labels right (including a sideways iPhone photo), warning for landscape on the portrait TV (checked in a phone-size browser; archived at the user's request before a real phone was tried)

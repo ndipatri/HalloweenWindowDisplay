@@ -78,20 +78,6 @@ The page SHALL tag items in its Photos and videos section, listing every upload 
 - **WHEN** the page is opened
 - **THEN** its Photos and videos section is filled from the website's items (the uploads), saying videos from GitHub take their tags from their folders, with box tags with a way to take each off, a favorites star, and an add-a-tag field suggesting the tags in use, each change posted to the website straight away
 
-### Requirement: The page edits filters
-The page SHALL offer a Filters section listing the box's custom filters in order, with ways to move each up or down, edit, delete and add one, and, apart from them, the GitHub filters in order with their tags and schedules but no way to change them, saying they come from GitHub. Editing SHALL cover the name, "any of" and "except" tags chosen from the tags in use, and schedule entries (first and last day, weekdays, extra days, and times). Saving SHALL send the custom filters with the upload PIN, and show the website's answer there.
-
-#### Scenario: the website page offers editing filters with the PIN
-- **GIVEN** the website running
-- **WHEN** the page is opened
-- **THEN** it has a Filters section filled from the website's filters: the custom ones with up, down, edit and delete, and new filter, an editor for the name, tags and schedule entries, and a save that sends the custom filters with the PIN and shows the answer in the section
-- **AND** a read-only list of the GitHub filters, saying they come from GitHub and are changed there
-
-#### Scenario: the page moves a filter up and down
-- **GIVEN** the page with the filters Halloween kid, Christmas and Favorites
-- **WHEN** the person moves Favorites up, then Halloween kid down
-- **THEN** the list is first Halloween kid, Favorites, Christmas, then Favorites, Halloween kid, Christmas
-
 ### Requirement: Shows tags for a while
 The website SHALL write an override for one or more tags in use and filters the box has, or black, lasting until the schedule changes, for a number of minutes, or until switched back, and SHALL say in plain words what it did, naming the tags with `#`, then the filters.
 
@@ -234,3 +220,25 @@ The website SHALL let anyone on the box's network switch the address code on the
 - **WHEN** the page loads
 - **THEN** under TV there is a checkbox "Show the box's address on the TV", ticked as the box has it
 - **AND** the address is written beside it, or "No network address" when there is none
+
+### Requirement: The advanced page is at /advanced
+The website SHALL serve the full page (Play, TV, tags, uploads, filters, the log) at `/advanced`, with a link to the easy page at `/`.
+
+#### Scenario: the advanced page is at /advanced and links to the easy page
+- **WHEN** a phone opens `/advanced`
+- **THEN** it gets the full page, with Play and Back to schedule
+- **AND** a link to `/`
+
+### Requirement: The page edits filters with no PIN
+The page SHALL offer a Filters section listing the box\'s custom filters in order, to move up or down, edit, delete and add, and apart from them the GitHub filters, read-only, saying they come from GitHub. Its editor SHALL cover the name, "any of" and "except" tags chosen from the tags in use, and schedule entries (days, weekdays, extra days, times). Saving SHALL send the custom filters, with no PIN, and show the answer there.
+
+#### Scenario: the website page offers editing filters with no PIN
+- **GIVEN** the website running
+- **WHEN** the page is opened
+- **THEN** it has a Filters section filled from the website's filters: the custom ones with up, down, edit and delete, and new filter, an editor for the name, tags and schedule entries, and a save that sends the custom filters, with no PIN field, and shows the answer in the section
+- **AND** a read-only list of the GitHub filters, saying they come from GitHub and are changed there
+
+#### Scenario: the page moves a filter up and down
+- **GIVEN** the page with the filters Halloween kid, Christmas and Favorites
+- **WHEN** the person moves Favorites up, then Halloween kid down
+- **THEN** the list is first Halloween kid, Favorites, Christmas, then Favorites, Halloween kid, Christmas

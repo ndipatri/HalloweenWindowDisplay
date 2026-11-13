@@ -1,7 +1,7 @@
 # filters Specification
 
 ## Purpose
-Decides what a filter shows (every item with any of its tags and none of its except tags) and in what order, and which filters a box has: the GitHub filters every box shares, and its own custom ones, edited on the website with the PIN; and what happens on screen when tags or filters change.
+Decides what a filter shows (every item with any of its tags and none of its except tags) and in what order, and which filters a box has: the GitHub filters every box shares, and its own custom ones, edited on the website; and what happens on screen when tags or filters change.
 
 ## Requirements
 
@@ -72,44 +72,6 @@ The box's filters SHALL be its custom filters, from `filters.json` in the video 
 - **THEN** the custom filters are just Party
 - **AND** `ERROR: Ignoring filter 1 (halloween KID): GitHub has a filter called Halloween kid.` is logged once
 
-### Requirement: The website saves the filters with the PIN
-With the right upload PIN, the website SHALL replace the box's custom filters with the list it is given, in order, and say so and log their names; it SHALL never change the GitHub filters. It SHALL refuse a wrong or missing PIN, and a list with any filter it can't use (a bad or repeated name, a GitHub filter's name, `black`, no "any of" tags, a bad tag name, no days and times, or a bad day or time), naming the filter and the problem and saving nothing. A name is 1 to 30 letters, digits, spaces, `-` or `'`.
-
-#### Scenario: the website saves the filters with the right PIN
-- **GIVEN** the upload PIN `4321`
-- **WHEN** the website is asked, with PIN `4321`, to save Christmas (any of `christmas`, Dec 1–31 from 17:00 to 23:00), then Late (any of `halloween`, Fridays from Jan 1 to Dec 31, 22:00 to 01:00)
-- **THEN** `filters.json` holds those two filters in that order
-- **AND** the website answers `Saved 2 filters.`
-- **AND** the log says `Filters changed (from the website): Christmas, Late.`
-
-#### Scenario: the website refuses to save filters with the wrong PIN
-- **GIVEN** the upload PIN `4321` and `filters.json` holding Late
-- **WHEN** the website is asked, with PIN `1111`, to save Christmas
-- **THEN** it is refused with `Wrong PIN.`
-- **AND** `filters.json` still holds only Late
-
-#### Scenario: the website refuses to save filters while no PIN is set
-- **GIVEN** no upload PIN on the box, and `filters.json` holding Late
-- **WHEN** the website is asked to save Christmas
-- **THEN** it is refused with `Editing filters is off until a PIN is set on the box.`
-- **AND** `filters.json` still holds only Late
-
-#### Scenario: the website refuses a filter it can't use
-- **GIVEN** the upload PIN `4321` and `filters.json` holding Late
-- **WHEN** the website is asked, with PIN `4321`, each time to save a list with one bad filter:
-  - one with no name;
-  - one called `Black`;
-  - two called `Kid` and `kid`;
-  - one called `halloween KID` while GitHub has Halloween kid;
-  - one called `Kid (old)`;
-  - one with no "any of" tags;
-  - one with no days and times;
-  - one with the tag `Fav Orites`;
-  - one whose entry runs from `13-01`;
-  - one whose times run from `25:00`
-- **THEN** each request is refused with a message naming the filter and what is wrong
-- **AND** `filters.json` still holds only Late
-
 ### Requirement: Bad filters in the filters file are skipped
 The box SHALL skip, and log once as an error naming why, any filter or schedule entry in `filters.json` or `github-filters.json` it can't use, and play the rest. Missing or unreadable files SHALL mean no filters from them; no filters at all SHALL be logged once.
 
@@ -170,8 +132,8 @@ The repo's GitHub filters (`playlists/filters.json`; "the starting filters" in o
 A filter SHALL have at least one schedule entry with days. The website SHALL refuse one without (`<name>: a filter needs days and times; to play tags any time, pick them under Play.`), and the box SHALL skip one in a file, logged once.
 
 #### Scenario: a filter without days and times is refused and skipped
-- **GIVEN** the upload PIN `4321`, and `filters.json` holding Favorites (any of `favorites`, no schedule), then Late
-- **WHEN** the box reads the filters, and the website is asked with PIN `4321` to save Party (any of `halloween`, no schedule)
+- **GIVEN** `filters.json` holding Favorites (any of `favorites`, no schedule), then Late
+- **WHEN** the box reads the filters, and the website is asked to save Party (any of `halloween`, no schedule)
 - **THEN** only Late is kept, and `ERROR: Ignoring filter 1 (Favorites): a filter needs days and times` is logged
 - **AND** the save is refused with `Party: a filter needs days and times; to play tags any time, pick them under Play.`
 
@@ -180,3 +142,29 @@ A filter SHALL have at least one schedule entry with days. The website SHALL ref
 - **WHEN** the website starts
 - **THEN** the box's own filters are just Party
 - **AND** `Dropping the custom filter Favorites: a filter needs days and times now; pick its tags under Play instead.` is logged
+
+### Requirement: The website saves the filters
+Asked by anyone on the home network, with no PIN, the website SHALL replace the box\'s custom filters with the list it is given, in order, say so, log their names, and never change the GitHub filters. It SHALL refuse a list with any filter it can\'t use (a name that isn\'t 1 to 30 letters, digits, spaces, `-` or `\'`, or is repeated, a GitHub filter\'s or `black`; no "any of" tags; a bad tag; no days and times; a bad day or time), naming the filter and the problem and saving nothing.
+
+#### Scenario: the website saves the filters with no PIN
+- **GIVEN** the website running
+- **WHEN** the website is asked to save Christmas (any of `christmas`, Dec 1–31 from 17:00 to 23:00), then Late (any of `halloween`, Fridays from Jan 1 to Dec 31, 22:00 to 01:00)
+- **THEN** `filters.json` holds those two filters in that order
+- **AND** the website answers `Saved 2 filters.`
+- **AND** the log says `Filters changed (from the website): Christmas, Late.`
+
+#### Scenario: the website refuses a filter it can't use
+- **GIVEN** `filters.json` holding Late
+- **WHEN** the website is asked, each time to save a list with one bad filter:
+  - one with no name;
+  - one called `Black`;
+  - two called `Kid` and `kid`;
+  - one called `halloween KID` while GitHub has Halloween kid;
+  - one called `Kid (old)`;
+  - one with no "any of" tags;
+  - one with no days and times;
+  - one with the tag `Fav Orites`;
+  - one whose entry runs from `13-01`;
+  - one whose times run from `25:00`
+- **THEN** each request is refused with a message naming the filter and what is wrong
+- **AND** `filters.json` still holds only Late
